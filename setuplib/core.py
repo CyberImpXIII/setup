@@ -281,7 +281,12 @@ class Setup:
 
     def c_agent(self):
         c = self.comp["agent"]
-        repo = f"github.com/{self.repo_slug}" if self.repo_slug else "none yet"
+        if self.repo_slug:
+            repo = f"github.com/{self.repo_slug}"
+        elif self.target.exists() and _toplevel(self.target) == self.target:
+            repo = "local, no remote yet"  # the roster's wording for a repo with no origin
+        else:
+            repo = "none yet"  # no repo at all (a dry run on a new folder)
         entry = {k: _fill(v, {"name": self.name, "dir": self.label, "repo": repo})
                  for k, v in c["entry"].items()}
         return Result("agent", "needs-" + c["needs"],

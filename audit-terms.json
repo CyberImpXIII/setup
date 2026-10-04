@@ -1,0 +1,15 @@
+{
+  "_comment": "The direction audit (./dev.sh audit direction): setup must work in a repo that has never heard of the delegation layer, so its code, data, templates and tests may not reach for it. `paths` are regexes for the layer's files; `roster_names` are its agent names that are not also repo names (those are caught by the content audit, which discovers repos). This list is a copy of names it cannot read, so it can go stale: TODO.md says so. `allowed_phrases` are stripped before matching: the agent/server components must print the owner of that lane, per PLAN-tools-folder.md §4.",
+  "paths": [
+    "\\.\\./+\\.claude\\b",
+    "agents\\.manifest",
+    "agents\\.sh",
+    "\\.claude/lib\\b",
+    "\\.claude/agents\\b",
+    "wiring\\.json",
+    "dispatches\\.jsonl",
+    "resolve-owner"
+  ],
+  "roster_names": ["harness", "deep-work", "dispatcher", "planner", "email-tools", "job-import-scripts", "cron-scheduler"],
+  "allowed_phrases": ["needs-harness", "needs harness", "\"needs\": \"harness\""]
+}

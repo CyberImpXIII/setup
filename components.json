@@ -1,0 +1,25 @@
+{
+  "_comment": "What setup installs, as data. The code implements one function per component named here, in this order; tests/test_vocab.py holds the two equal, both directions. Templates are relative to this file's folder. Nothing here may name a repo, a repo path or a repo command (./dev.sh audit content).",
+  "components": [
+    {"name": "repo",   "installs": "for a path that does not exist (or an empty folder whose parent is not in a work tree): the folder and git init"},
+    {"name": "rules", "installs": "the shared-rules block of CLAUDE.md, between markers; the repo's own sections untouched", "template": "templates/shared-rules.md", "head": "templates/CLAUDE.md", "file": "CLAUDE.md", "block_id": "rules"},
+    {"name": "hooks",  "installs": "the shared hooks (and their tests) in .claude/hooks/, plus .claude/settings.proposed.json for Jacob when settings.json lacks a registration", "source": ".claude"},
+    {"name": "todo",   "installs": "TODO.md with the four standard headings, if absent", "template": "templates/TODO.md", "file": "TODO.md"},
+    {"name": "check",  "installs": "a ./dev.sh stub that FAILS with 'not implemented: fill in the contract', if absent; never fakes green", "template": "templates/dev.sh", "file": "dev.sh", "stub_marker": "SETUP-STUB"},
+    {"name": "commit", "installs": "in a repo setup just created only: one commit of exactly the files it wrote (never add -A, never the settings proposal)"},
+    {"name": "remote", "installs": "with --github only: a GitHub repo (public by default, --private on request), origin, and a push of the current branch; verified by the pushed sha and the visibility"},
+    {"name": "agent",  "installs": "nothing: a folder agent is a roster entry, which setup does not own", "needs": "harness",
+     "entry": {"name": "{name}", "dir": "{dir}", "repo": "{repo}", "start_here": "{dir}/CLAUDE.md", "precommit": "./dev.sh check"}},
+    {"name": "server", "installs": "nothing: the group-server entry has no defined shape yet (group servers are not built)", "needs": "harness"}
+  ],
+  "statuses": {
+    "installed":     "setup wrote it (or, in --dry-run, would write it)",
+    "unchanged":     "already as setup would make it; nothing written",
+    "drift":         "differs from what setup would make; reported, not overwritten",
+    "needs-jacob":   "a proposal was written for Jacob to apply (settings stay his)",
+    "needs-harness": "outside setup's lane; the line to add is printed",
+    "needs-owner":   "installed, but the repo's owner must fill it in",
+    "none":          "nothing to do: an opt-in step not requested, or a step that does not apply to this repo",
+    "failed":        "setup tried and it did not work; the reason is printed"
+  }
+}

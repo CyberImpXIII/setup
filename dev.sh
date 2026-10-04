@@ -11,7 +11,7 @@ usage() {
   test       the unit tests (tests/), trimmed to the result unless something fails
   hooks      the shared hook copies: present, executable, parse, registered, their own tests pass
   files      the files the tool needs: present, executable where they must be, data parses
-  audit      setup audit content + setup audit direction
+  audit      setup audit content + setup audit direction (content is UNCHECKED, so red, in a lone clone)
   self       ./setup --dry-run on this repo: nothing would be written, nothing drifted
   mutants    break each gate once in a throwaway copy, require red (devtools/mutants.json)
   plans DIR  setup plans DIR (not part of check: the plans belong to whoever holds DIR)

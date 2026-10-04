@@ -10,7 +10,9 @@
 
 Exit: 0 when nothing failed or drifted (needs-* lines are not failures), 1 on
 drift or a failure, 2 when the path is refused or the usage is wrong; a refused
-path has had nothing written. A path named like a subcommand: pass ./<name>.
+path has had nothing written. `audit content` exits 3 when it could not run
+(no sibling repos to compare against, as in a lone clone): UNCHECKED, never a
+pass. A path named like a subcommand: pass ./<name>.
 """
 import argparse
 import json
@@ -54,9 +56,13 @@ def cmd_audit(args):
     findings, note = fn()
     for f in findings:
         print(f"  FAIL  {f}")
-    if not findings:
-        print(f"  ok    {args[0]}: {note}" if not note.startswith("UNCHECKED") else f"  {note}")
-    return 1 if findings else 0
+    if findings:
+        return 1
+    if note.startswith("UNCHECKED"):
+        print(f"  {note}")
+        return 3  # could not run: never a pass
+    print(f"  ok    {args[0]}: {note}")
+    return 0
 
 
 def cmd_setup(argv):

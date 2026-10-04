@@ -93,6 +93,16 @@ class Content(Case):
         self.assertEqual(findings, [])
         self.assertTrue(note.startswith("UNCHECKED"), note)
 
+    def test_the_cli_exits_non_zero_when_it_could_not_run(self):
+        """A lone clone (no sibling repos within two folders) is UNCHECKED and exits 3:
+        `./dev.sh check` counts any non-zero as red, so it never reads as a pass."""
+        copy = self.tmp / "lonely" / "tools" / "tool"
+        shutil.copytree(ROOT, copy, ignore=shutil.ignore_patterns(".git", ".mutants", "__pycache__"))
+        r = subprocess.run([str(copy / "setup"), "audit", "content"], cwd=copy, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
+        self.assertIn("UNCHECKED", r.stdout)
+        self.assertNotIn(" ok ", r.stdout)
+
 
 class Direction(Case):
     def tool(self, planted):

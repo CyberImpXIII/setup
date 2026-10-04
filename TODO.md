@@ -13,6 +13,13 @@
 
 ## Open decisions
 
+- **No GitHub repo yet: Jacob's call.** On 2026-10-03 creating the public
+  `CyberImpXIII/setup` was denied by the permission system (public surface). The
+  repo is committed locally with no origin. To finish, from this folder:
+  `./setup . --github --owner CyberImpXIII` (dry run first with `--dry-run`; add
+  `--private` for a private one). It refuses if the repo exists and verifies the
+  push and the visibility.
+
 - **Hook copies here are a ninth copy, counted by nobody yet.** `.claude/hooks/`
   holds the three shared hooks copied byte for byte from `applications`
   (identical to `site-scrapers`' canonical copies, 2026-10-03). Until

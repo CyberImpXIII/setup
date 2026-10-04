@@ -39,6 +39,16 @@ exits 2. `--dry-run` reports `installed` for what it would write.
 once in a throwaway copy and requires red; `./dev.sh check` runs it, and a
 mutant whose code moved is STALE and fails the check until it is updated.
 
+**A lone clone is red, on purpose.** Two gates need the workspace around this
+folder: `hooks` (the shared troubleshooting hook's own test fails when it cannot
+find its sibling, because the hook then enforces nothing; that test belongs to
+the hooks source) and `audit content` (no sibling repos to compare against:
+`UNCHECKED`, exit 3). Neither reads as a pass. `checks.json` holds this repo's
+parameters for the shared checks runner (`no-roster`: the audit data files
+excluded, as they are from this repo's own audits; `hooks`, `todo` and
+`harness` allowed, being component names and the lane owner `needs harness`
+prints, which the direction audit still checks phrase by phrase).
+
 ### The shared hooks
 
 `.claude/hooks/` holds the three shared hooks and their tests, copied byte for

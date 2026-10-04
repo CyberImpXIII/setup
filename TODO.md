@@ -2,47 +2,69 @@
 
 ## Own bugs
 
-- **`./dev.sh hooks` and the `hooks-gate` mutant only pass inside the workspace.**
-  `test-troubleshooting.sh` (a shared hook test, not ours to edit) fails with
-  "site-scrapers NOT FOUND above" when the repo is cloned elsewhere. Mutant copies
-  live in `.mutants/` inside this repo for that reason. In a lone clone, check
-  will be red on `hooks`: accurate (the hook enforces nothing there), but noted.
-- **Outside the workspace `./setup audit content` prints UNCHECKED and exits 0**
-  (no sibling repos to compare against). The audit itself is proven by the
-  planted-workspace tests, which run anywhere.
-
-- **`tests/test_sync_list.py`'s both-ways comparison has no mutant.** It finds
-  the top level two folders up, and a mutant copy (under `.mutants/run-*/`) has
-  none there, so the comparison skips in a copy. Its red was shown once by hand
-  (2026-10-04: the old section, which named only `../../CLAUDE.md`, failed it).
-  Like the `hooks` gate, it only means something inside the workspace.
+- **A lone clone's `./dev.sh check` is red on `hooks`, `mutants` and `audit`.** By
+  design since 2026-10-04 (CLAUDE.md, "A lone clone is red, on purpose"):
+  `test-troubleshooting.sh` (a shared hook test, owned by tools/hooks: its own
+  TODO.md's first bug) fails with "site-scrapers NOT FOUND above" outside the
+  workspace, which also turns the `hooks-gate` mutant's baseline red; and
+  `./setup audit content` now exits 3 on UNCHECKED (it exited 0 before, a gate
+  that looked green while not running). The content audit is proven by the
+  planted-workspace tests, which run anywhere, and the exit-3 path by
+  `test_the_cli_exits_non_zero_when_it_could_not_run` and its mutant. Nothing
+  left here to fix unless tools/hooks changes how its test finds its sibling.
 - **The agent line's `"repo"` reads "none yet" in a dry run on a new folder**,
   though the real run would make a local repo and print "local, no remote yet".
   Deliberate: it reports the target as it is now (dispatcher's brief, 2026-10-04).
 
 ## Open decisions
 
-- **Hook copies here are a ninth copy, counted by nobody yet.** `.claude/hooks/`
-  holds the three shared hooks copied byte for byte from `applications`
-  (identical to `site-scrapers`' canonical copies, 2026-10-03). Until
-  `tools/setup` is added to `DECLARED` in `site-scrapers/check-hooks.sh` (and
-  `knowledge-base`'s copy of that check), `site-scrapers`' `./dev.sh check`
-  reports this folder as "holds twinned hooks but is not in DECLARED", and
-  nothing checks these copies equal the others (`./dev.sh hooks` checks only that
-  they are present, registered and pass their own tests). Registering the copy is
-  a harness / site-scrapers job (routing-tree §12 S1 takes over hook copies);
-  reported through the dispatcher on 2026-10-03.
-- **The plans gate runs here only as a test.** `./setup plans <dir>` works, but
-  wiring it into the workspace check (PLAN-repo-setup §3 "Every plan has a setup
-  section") belongs to the delegation layer's own check: harness's job, reported
-  2026-10-03.
+- **The check component installing `checks run .` (planner: yes, PLAN-tools-folder
+  §8) collides with the content audit.** Not built, 2026-10-04. The stub would
+  have to name the runner's path (`tools/checks/checks`), and `./dev.sh audit
+  content` fails setup on naming any discovered repo, path or command; the same
+  holds for setup's own `dev.sh` adopting it. §9 (1) (the hooks component
+  defaulting to `tools/hooks/source`) has the same collision. Proposal for the
+  planner: one data file exempt from the content audit, like `audit-terms.json`
+  is from the direction audit, naming the sibling tools setup installs FROM
+  (dependencies, not targets), gated by "each named dependency is a discovered
+  repo, or UNCHECKED"; setup resolves the runner relative to the target at
+  install time and the stub still fails until the owner adds their suite. An
+  existing repo's `dev.sh` is never edited (setup does not overwrite); at most
+  it is reported `needs-owner` when its check does not call the runner.
+  Hinges on: whether setup may depend on named sibling tools at all.
+- **The `hooks` component reading `./hooks list --json` (tools/hooks' report) is
+  PLAN-tools-folder §9 (1), which awaits Jacob's yes** (top-level TODO.md, "Jacob's
+  yes needed on §9 (1), (2)"). Not built, 2026-10-04; it also needs the decision
+  above. Gates it would ship with are in §9 (1).
+- **td-9 (tools/todo: `devtools/mutate.py` duplicated from here), decided
+  2026-10-04: the runner moves to tools/checks, not into a setup component.** A
+  component would install one copy per repo, the eight-copies problem again; the
+  procedure belongs in one place and each repo's `devtools/mutants.json` is the
+  data. Shape: `checks mutants [PATH]` running PATH's mutants.json in throwaway
+  copies, with todo's additions (the `edits` list, the read-only chmod). Then
+  this repo and todo call it from `dev.sh check` and delete their copies, add
+  beside then delete. Until then this copy is the original and todo's the
+  extended one; neither is changed (no fork, no third copy). Needs the
+  dependency decision above for setup's own `dev.sh` to call it. Reported below.
+- **Hook copies here are a ninth copy.** `tools/setup` is now in site-scrapers'
+  `check-hooks.sh` DECLARED (seen 2026-10-04), and `hooks copies` in tools/hooks
+  compares every copy by meaning. unverified: knowledge-base's copy of that check
+  declares it too -- settle (from knowledge-base): `grep -n tools/setup check-hooks.sh`.
 - **`--github` is public by default** (the dispatcher's brief and PLAN-tools-folder),
   while PLAN-repo-setup §2 says private. Followed the brief; the plan text is the
   dispatcher's to update.
 - **The agent entry's `dir` is the path as typed, relative to where setup runs.**
   Run from the workspace root (`tools/setup/setup tools/x`) to get a roster-ready
   `dir`. Could become a `--relative-to` flag if it bites.
-
+- **`audit-terms.json` `roster_names` is a copy of the roster** (not read from it:
+  the direction audit forbids that). Probe run 2026-10-04: the roster's agent
+  names that are not also repo names are exactly the seven listed (harness,
+  deep-work, dispatcher, planner, email-tools, job-import-scripts,
+  cron-scheduler); the rest are repo names the content audit discovers. Not stale
+  today. Retire it when a caller runs tools/checks' `no-roster` here with the
+  names (`checks all --names`, reported to harness by checks); `checks.json`
+  already makes that run green (checked 2026-10-04 with the roster's names).
+  Until then, re-run the probe on each roster change.
 - **`ignore` does not look for a baseline file already tracked** (e.g. a
   committed `local.env`): `.gitignore` cannot untrack it, and `check-ignore
   --no-index` reports it ignored, so setup says `unchanged`. Probe: `git ls-files
@@ -54,31 +76,25 @@
 
 ## Unconfirmed suspicions
 
-- **`audit-terms.json` `roster_names` is a copy of the roster** and goes stale when
-  an agent is added. Not read from the roster on purpose (the direction audit
-  forbids it). Probe: compare it with the roster list after the next roster
-  change.
-- **The `Constraints that don't bend` heading now sits inside a marked block,** with
-  `<!-- /shared -->` right after its last bullet. The roster generator copies that
-  section verbatim for agents that skip the top-level file; whether it would carry
-  the end marker along is unverified. Settle (harness): generate with this folder
-  on the roster and read the rendered definition.
+(none open)
 
 ## Reported to other owners
 
-- 2026-10-03, via the dispatcher: register `tools/setup` hook copies (DECLARED, in
-  `site-scrapers` and `knowledge-base`); add the roster entry; wire `setup plans`
-  into the workspace check; add `tools/setup/CLAUDE.md` to the rules-sync lists
-  (top-level CLAUDE.md, `site-scrapers/test/rules-sync.test.js`,
-  `knowledge-base ./dev.sh sync`).
-- 2026-10-04, via the dispatcher: origin now exists (Jacob approved
-  `./setup . --github --owner CyberImpXIII`; public, SSH remote
-  `git@github.com:CyberImpXIII/setup.git`, main pushed). The roster entry's
-  `"repo"` in `../../.claude/agents.manifest.json` still says "local, no remote
-  yet (...awaits Jacob's permission)"; it should read `github.com/CyberImpXIII/setup`
-  (public), as `./setup .` prints on its agent line. Harness's file.
+- 2026-10-04, via the dispatcher, to checks: take the mutant runner as `checks
+  mutants [PATH]` (td-9 decision above; start from tools/todo's copy, which has
+  the `edits` list). And to todo: td-9 is decided that way, so it waits on checks.
+- 2026-10-04, via the dispatcher, to the planner: the check component and §9 (1)
+  both need setup to name a sibling tool, which its content audit forbids; the
+  proposal is under Open decisions.
 - 2026-10-04, via the dispatcher: the `ignore` component is new (fixes the hub
   scaffold leaving `.claude/settings.proposed.json` untracked and writing no
   `.gitignore`). Every repo set up before it lacks the baseline entries:
   `tools/hub` first (its owner re-runs `./setup tools/hub` from the workspace
   root and commits the appended `.gitignore`), then the rest on their next run.
+- Done, seen 2026-10-04: the roster entry and its `"repo"`
+  (`github.com/CyberImpXIII/setup`); `setup plans` wired into `agents.sh check`
+  (`check_plans`); this CLAUDE.md in the rules-sync lists (the live
+  `test_sync_list` comparison passes); DECLARED in site-scrapers. The
+  "Constraints" end-marker suspicion is settled: the generator copies that section
+  from the top-level CLAUDE.md, which has no markers, and `.claude/agents/setup.md`
+  holds no `/shared` marker.

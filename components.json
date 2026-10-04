@@ -6,7 +6,16 @@
     {"name": "hooks",  "installs": "the shared hooks (and their tests) in .claude/hooks/, plus .claude/settings.proposed.json for Jacob when settings.json lacks a registration", "source": ".claude"},
     {"name": "todo",   "installs": "TODO.md with the four standard headings, if absent", "template": "templates/TODO.md", "file": "TODO.md"},
     {"name": "check",  "installs": "a ./dev.sh stub that FAILS with 'not implemented: fill in the contract', if absent; never fakes green", "template": "templates/dev.sh", "file": "dev.sh", "stub_marker": "SETUP-STUB"},
-    {"name": "commit", "installs": "in a repo setup just created only: one commit of exactly the files it wrote (never add -A, never the settings proposal)"},
+    {"name": "ignore", "installs": ".gitignore with the baseline entries if absent; in an existing one, only the entries git does not already ignore, appended (nothing rewritten or reordered); a negation of one, or missing entries beside any negation, is drift", "file": ".gitignore",
+     "header": "# Baseline from the setup tool: its settings proposal, local env files, backups. Add your own lines anywhere; setup only appends what is missing.",
+     "_entries": "line: what is written; probe: a path that line must make git ignore. Present means git ignores the probe through the repo's own ignore files (by meaning, not bytes).",
+     "entries": [
+       {"line": ".claude/settings.proposed.json", "probe": ".claude/settings.proposed.json"},
+       {"line": ".env", "probe": ".env"},
+       {"line": "*.env", "probe": "local.env"},
+       {"line": "*.bak", "probe": "notes.bak"}
+     ]},
+    {"name": "commit","installs": "in a repo setup just created only: one commit of exactly the files it wrote (never add -A, never the settings proposal)"},
     {"name": "remote", "installs": "with --github only: a GitHub repo (public by default, --private on request), origin, and a push of the current branch; verified by the pushed sha and the visibility"},
     {"name": "agent",  "installs": "nothing: a folder agent is a roster entry, which setup does not own", "needs": "harness",
      "entry": {"name": "{name}", "dir": "{dir}", "repo": "{repo}", "start_here": "{dir}/CLAUDE.md", "precommit": "./dev.sh check"}},

@@ -239,6 +239,35 @@ class Setup:
             return Result("check", "drift", f"./{c['file']} does not parse")
         return Result("check", "unchanged", f"./{c['file']} present, executable, parses")
 
+    def c_ignore(self):
+        c = self.comp["ignore"]
+        entries = c["entries"]
+        text = _read(self.target / c["file"])
+        if text is None:
+            self.w.write(c["file"], "\n".join([c["header"], *(e["line"] for e in entries)]) + "\n")
+            return Result("ignore", "installed", f"{c['file']} with {len(entries)} baseline entries")
+        seen, err = _ignored_by(self.target, [e["probe"] for e in entries])
+        if err:
+            return Result("ignore", "failed", f"git check-ignore: {err}")
+        negated, missing = [], []
+        for e in entries:
+            src, pattern = seen.get(e["probe"], (None, None))
+            if pattern is not None and pattern.startswith("!"):
+                negated.append(f"{src} {pattern} un-ignores {e['probe']}")
+            elif pattern is None:
+                missing.append(e["line"])
+        if negated:
+            return Result("ignore", "drift", "; ".join(negated) + ": not changed (the owner's call)")
+        if not missing:
+            return Result("ignore", "unchanged", f"{c['file']} ignores every baseline entry")
+        if any(ln.lstrip().startswith("!") for ln in text.splitlines()):
+            return Result("ignore", "drift", f"{c['file']} lacks {', '.join(missing)} but holds negations an "
+                                             "appended line could override; not changed: add them where they belong")
+        sep = "" if text == "" or text.endswith("\n") else "\n"
+        self.w.write(c["file"], text + sep + "\n".join(missing) + "\n")
+        did = "would append" if self.dry_run else "appended"
+        return Result("ignore", "installed", f"{did} {', '.join(missing)} to {c['file']}; existing lines untouched")
+
     def c_remote(self):
         r = _git(["remote", "get-url", "origin"], self.target) if self.target.exists() else None
         if r is not None and r.returncode == 0:
@@ -330,6 +359,24 @@ class Setup:
 def _script(command: str):
     m = re.search(r"\.claude/hooks/([^\s/]+)", command)
     return m.group(1) if m else None
+
+
+def _ignored_by(repo: Path, probes):
+    """{probe: (source:line, pattern)} for each probe the repo's OWN ignore files decide
+    (the global excludes file and .git/info/exclude do not travel with a clone, so
+    they do not count). A negation's pattern keeps its leading '!'. Returns (map, error)."""
+    r = _git(["-c", "core.excludesFile=/dev/null", "check-ignore", "-v", "-n", "--no-index",
+              "--", *probes], repo)
+    if r.returncode not in (0, 1):
+        return {}, r.stderr.strip() or f"exit {r.returncode}"
+    out = {}
+    for line in r.stdout.splitlines():
+        info, _, path = line.partition("\t")
+        src, _, rest = info.partition(":")
+        num, _, pattern = rest.partition(":")
+        if src and not src.startswith(".git/") and not Path(src).is_absolute():
+            out[path] = (f"{src}:{num}", pattern)
+    return out, None
 
 
 def _registered(tgt, event, matcher, hook):

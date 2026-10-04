@@ -13,16 +13,17 @@ class Fixture(Case):
         self.assertEqual(code, 0)
         self.assertEqual(self.statuses(res), {
             "repo": "installed", "rules": "installed", "hooks": "needs-jacob",
-            "todo": "installed", "check": "installed", "commit": "installed",
+            "todo": "installed", "check": "installed", "ignore": "installed", "commit": "installed",
             "remote": "none", "agent": "needs-harness", "server": "needs-harness"})
         repo = self.tmp / "fresh"
         self.assertEqual(git(["rev-parse", "--show-toplevel"], repo).stdout.strip(), str(repo))
         tracked = set(git(["ls-files"], repo).stdout.split())
         hooks = {f".claude/hooks/{p.name}" for p in (ROOT / ".claude" / "hooks").glob("*.sh")}
-        self.assertEqual(tracked, {"CLAUDE.md", "TODO.md", "dev.sh"} | hooks)
-        # the settings proposal is Jacob's to apply: written, never committed
-        self.assertEqual(git(["status", "--porcelain"], repo).stdout.strip(),
-                         "?? .claude/settings.proposed.json")
+        self.assertEqual(tracked, {"CLAUDE.md", "TODO.md", "dev.sh", ".gitignore"} | hooks)
+        # the settings proposal is Jacob's to apply: written, never committed,
+        # and ignored, so the fresh repo reads clean and `git add -A` cannot take it
+        self.assertTrue((repo / ".claude/settings.proposed.json").is_file())
+        self.assertEqual(git(["status", "--porcelain", "--untracked-files=all"], repo).stdout, "")
         for h in hooks:
             self.assertEqual((repo / h).read_bytes(), (ROOT / h).read_bytes(), h)
 

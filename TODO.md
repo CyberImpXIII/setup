@@ -43,6 +43,15 @@
   Run from the workspace root (`tools/setup/setup tools/x`) to get a roster-ready
   `dir`. Could become a `--relative-to` flag if it bites.
 
+- **`ignore` does not look for a baseline file already tracked** (e.g. a
+  committed `local.env`): `.gitignore` cannot untrack it, and `check-ignore
+  --no-index` reports it ignored, so setup says `unchanged`. Probe: `git ls-files
+  -ci --exclude-standard` in the target lists such files; could become `drift`.
+- **A repo whose `.gitignore` holds any negation and lacks a baseline entry reads
+  `drift`** (2026-10-04, deliberate: an appended line could re-ignore what the
+  owner un-ignored). If that turns red across the workspace, the alternative is
+  testing each negation's own path after the append (needs a scratch work tree).
+
 ## Unconfirmed suspicions
 
 - **`audit-terms.json` `roster_names` is a copy of the roster** and goes stale when
@@ -68,3 +77,8 @@
   `"repo"` in `../../.claude/agents.manifest.json` still says "local, no remote
   yet (...awaits Jacob's permission)"; it should read `github.com/CyberImpXIII/setup`
   (public), as `./setup .` prints on its agent line. Harness's file.
+- 2026-10-04, via the dispatcher: the `ignore` component is new (fixes the hub
+  scaffold leaving `.claude/settings.proposed.json` untracked and writing no
+  `.gitignore`). Every repo set up before it lacks the baseline entries:
+  `tools/hub` first (its owner re-runs `./setup tools/hub` from the workspace
+  root and commits the appended `.gitignore`), then the rest on their next run.

@@ -6,3 +6,5 @@ __pycache__/
 .claude/settings.local.json
 .claude/settings.proposed.json
 .mutants/
+*.env
+*.bak

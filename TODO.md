@@ -22,13 +22,6 @@
 
 ## Open decisions
 
-- **No GitHub repo yet: Jacob's call.** On 2026-10-03 creating the public
-  `CyberImpXIII/setup` was denied by the permission system (public surface). The
-  repo is committed locally with no origin. To finish, from this folder:
-  `./setup . --github --owner CyberImpXIII` (dry run first with `--dry-run`; add
-  `--private` for a private one). It refuses if the repo exists and verifies the
-  push and the visibility.
-
 - **Hook copies here are a ninth copy, counted by nobody yet.** `.claude/hooks/`
   holds the three shared hooks copied byte for byte from `applications`
   (identical to `site-scrapers`' canonical copies, 2026-10-03). Until
@@ -69,3 +62,9 @@
   into the workspace check; add `tools/setup/CLAUDE.md` to the rules-sync lists
   (top-level CLAUDE.md, `site-scrapers/test/rules-sync.test.js`,
   `knowledge-base ./dev.sh sync`).
+- 2026-10-04, via the dispatcher: origin now exists (Jacob approved
+  `./setup . --github --owner CyberImpXIII`; public, SSH remote
+  `git@github.com:CyberImpXIII/setup.git`, main pushed). The roster entry's
+  `"repo"` in `../../.claude/agents.manifest.json` still says "local, no remote
+  yet (...awaits Jacob's permission)"; it should read `github.com/CyberImpXIII/setup`
+  (public), as `./setup .` prints on its agent line. Harness's file.

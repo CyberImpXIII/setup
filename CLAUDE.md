@@ -226,12 +226,20 @@ These hold across every tool here, whatever the task and however it is framed. T
 
 ## Keeping these rules in sync
 
-The block between the `shared:rules` markers above is installed by `./setup` from
-`templates/shared-rules.md`; its paragraphs are the shared rules of `../../CLAUDE.md`
-and the other tool folders' `CLAUDE.md` copies (taken from `applications` on
-2026-10-03, repo-specific sentences dropped). **Do not edit it here.** Change
-`templates/shared-rules.md` and run `./setup .`, which updates the block; a block
-edited in place is reported as `drift` by `./dev.sh self` and is never
-overwritten. The other copies are still hand-synced until each repo moves to the
-block (PLAN-repo-setup phase 2): change a shared rule in the copies you own, and
-ask the owner for the ones you do not.
+The rules in the block between the `shared:rules` markers above are shared with
+`../../CLAUDE.md`, `../../site-scrapers/CLAUDE.md`, `../../emailTools/CLAUDE.md`,
+`../../scripts/CLAUDE.md`, `../../scriptingTools/data-bridge/CLAUDE.md`,
+`../../scriptingTools/chronjobScheduler/CLAUDE.md`, `../../knowledge-base/CLAUDE.md`,
+`../../applications/CLAUDE.md` and `../../addon-bench/CLAUDE.md` (taken from
+`applications` on 2026-10-03, repo-specific sentences dropped). Each repo carries
+its own copy because a fresh clone won't have the parent file.
+`tests/test_sync_list.py` checks this list against the top level's, both ways, in
+the workspace (skipped, with the reason, in a lone clone).
+
+Here the block is installed by `./setup` from `templates/shared-rules.md`. **Do
+not edit it here.** Change `templates/shared-rules.md` and run `./setup .`, which
+updates the block; a block edited in place is reported as `drift` by `./dev.sh
+self` and is never overwritten. The other copies are still hand-synced until each
+repo moves to the block (PLAN-repo-setup phase 2): **change a shared rule in the
+copies you own, and ask the owner for the ones you don't** — and say which copies
+you updated and which you asked for.

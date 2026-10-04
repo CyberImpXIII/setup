@@ -11,6 +11,15 @@
   (no sibling repos to compare against). The audit itself is proven by the
   planted-workspace tests, which run anywhere.
 
+- **`tests/test_sync_list.py`'s both-ways comparison has no mutant.** It finds
+  the top level two folders up, and a mutant copy (under `.mutants/run-*/`) has
+  none there, so the comparison skips in a copy. Its red was shown once by hand
+  (2026-10-04: the old section, which named only `../../CLAUDE.md`, failed it).
+  Like the `hooks` gate, it only means something inside the workspace.
+- **The agent line's `"repo"` reads "none yet" in a dry run on a new folder**,
+  though the real run would make a local repo and print "local, no remote yet".
+  Deliberate: it reports the target as it is now (dispatcher's brief, 2026-10-04).
+
 ## Open decisions
 
 - **No GitHub repo yet: Jacob's call.** On 2026-10-03 creating the public

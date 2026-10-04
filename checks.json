@@ -1,0 +1,6 @@
+{
+  "no-roster": {
+    "exclude": ["audit-terms.json", "devtools/mutants.json"],
+    "allow_names": ["hooks", "todo", "harness"]
+  }
+}

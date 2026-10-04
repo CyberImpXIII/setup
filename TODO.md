@@ -53,9 +53,6 @@
 - **`--github` is public by default** (the dispatcher's brief and PLAN-tools-folder),
   while PLAN-repo-setup §2 says private. Followed the brief; the plan text is the
   dispatcher's to update.
-- **The agent entry's `dir` is the path as typed, relative to where setup runs.**
-  Run from the workspace root (`tools/setup/setup tools/x`) to get a roster-ready
-  `dir`. Could become a `--relative-to` flag if it bites.
 - **`audit-terms.json` `roster_names` is a copy of the roster** (not read from it:
   the direction audit forbids that). Probe run 2026-10-04: the roster's agent
   names that are not also repo names are exactly the seven listed (harness,

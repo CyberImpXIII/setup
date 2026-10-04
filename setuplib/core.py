@@ -91,6 +91,16 @@ def _fill(text: str, values: dict) -> str:
     return text
 
 
+def roster_dir(target: Path, base: Path):
+    """target relative to base, as a normalised POSIX path ("." for base itself);
+    None when target is not under base: a roster dir is relative, never absolute
+    and never climbing out with '..'."""
+    try:
+        return target.resolve().relative_to(base.resolve()).as_posix()
+    except ValueError:
+        return None
+
+
 def worst(statuses):
     return min(statuses, key=PRECEDENCE.index)
 
@@ -98,8 +108,9 @@ def worst(statuses):
 class Setup:
     def __init__(self, target: Path, *, label: str, name: str, dry_run: bool,
                  github: bool = False, private: bool = False, owner=None,
-                 hooks_from=None, gh: str = "gh", spec=None):
+                 hooks_from=None, dir_base=None, gh: str = "gh", spec=None):
         self.target = target
+        self.dir_base = Path(dir_base) if dir_base is not None else Path.cwd()
         self.label = label
         self.name = name
         self.dry_run = dry_run
@@ -316,10 +327,16 @@ class Setup:
             repo = "local, no remote yet"  # the roster's wording for a repo with no origin
         else:
             repo = "none yet"  # no repo at all (a dry run on a new folder)
-        entry = {k: _fill(v, {"name": self.name, "dir": self.label, "repo": repo})
+        d = roster_dir(self.target, self.dir_base)
+        # a field built from dir has no value when dir has none: null, never the path as typed
+        values = {"name": self.name, "dir": d or "", "repo": repo}
+        entry = {k: None if d is None and "{dir}" in v else _fill(v, values)
                  for k, v in c["entry"].items()}
+        why = "" if d is not None else (
+            f"{self.target} is not under {self.dir_base.resolve()}, so dir is null: re-run from the folder "
+            "the roster's dirs are relative to, or pass --relative-to it; ")
         return Result("agent", "needs-" + c["needs"],
-                      "setup cannot see the roster; add if absent: " + json.dumps(entry))
+                      f"setup cannot see the roster; {why}add if absent: " + json.dumps(entry))
 
     def c_server(self):
         c = self.comp["server"]

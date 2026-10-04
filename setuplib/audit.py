@@ -25,6 +25,8 @@ TERMS_FILE = "audit-terms.json"
 EXEMPT = {TERMS_FILE, "mutants.json"}
 # Names every repo carries by contract, so naming them is not naming a repo.
 CONTRACT_NAMES = {"dev.sh"}
+# Folders every repo carries by contract: a plain name under one is that repo's own.
+CONTRACT_DIRS = [".claude"]
 
 
 def code_files(root: Path, extra_globs=()):
@@ -64,9 +66,12 @@ def repo_terms(repos: dict):
         name = path.name
         if re.search(r"[-_A-Z0-9]", name) or len(name) >= 12:
             terms.append((f"repo name {name}", re.compile(r"(?<![\w-])" + re.escape(name) + r"(?![\w-])")))
-        else:  # a plain word ("scripts") counts only where it reads as a path
+        else:  # a plain word ("scripts") counts only where it reads as a path, not one
+            # under a folder every repo carries (`.claude/hooks` is the repo's own)
+            own = "".join(r"(?<!" + re.escape(d + "/") + r")" for d in CONTRACT_DIRS)
             terms.append((f"repo name {name}", re.compile(
-                r"(?:(?<![\w.-])" + re.escape(name) + r"/|/" + re.escape(name) + r"(?![\w-])|`" + re.escape(name) + r"`)")))
+                r"(?:(?<![\w.-])" + own + re.escape(name) + r"/|/" + own + re.escape(name) + r"(?![\w-])|`"
+                + re.escape(name) + r"`)")))
         if "/" in rel:
             terms.append((f"repo path {rel}", re.compile(re.escape(rel) + r"(?![\w-])")))
         try:

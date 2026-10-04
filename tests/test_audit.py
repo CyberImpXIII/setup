@@ -49,6 +49,19 @@ class Content(Case):
                 findings, _ = self.plant(tool, text)
                 self.assertTrue(any(f.endswith(label) for f in findings), findings)
 
+    def test_a_plain_name_under_a_contract_folder_is_not_the_sibling(self):
+        # a sibling repo named `hooks` beside every repo's own `.claude/hooks/`
+        tool = self.workspace()
+        git_repo(tool.parent / "hooks")
+        for text in ["p = '.claude/hooks/x.sh'", r"rx = r'\.claude/hooks/([^/]+)'", "for h in .claude/hooks"]:
+            with self.subTest(text=text):
+                findings, _ = self.plant(tool, text)
+                self.assertEqual(findings, [])
+        for text in ["p = 'hooks/x.sh'", "p = '../hooks'", "see `hooks`"]:
+            with self.subTest(text=text):
+                findings, _ = self.plant(tool, text)
+                self.assertTrue(any(f.endswith("repo name hooks") for f in findings), findings)
+
     def test_templates_are_in_scope(self):
         tool = self.workspace()
         (tool / "templates").mkdir()

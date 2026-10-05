@@ -14,9 +14,9 @@ import subprocess
 import unittest
 
 from setuplib import core
-from tests.helpers import ROOT, SETUP, Case, git, git_repo, snapshot, workspace_cli
+from tests.helpers import ROOT, SETUP, Case, git, git_repo, hook_listing, snapshot, workspace_cli
 
-HOOK_FILES = sorted(f".claude/hooks/{p.name}" for p in (ROOT / ".claude/hooks").glob("*.sh"))
+HOOK_FILES = sorted(rel for rel, _ in hook_listing() or [])  # what the hooks dependency lists
 GITHOOKS = next(c for c in core.load_spec()["components"] if c["name"] == "githooks")
 SCAFFOLD = ["CLAUDE.md", "TODO.md", "dev.sh", "services.json", "checks.json", ".gitignore",
             ".claude/settings.json", *HOOK_FILES, *(f"{GITHOOKS['dir']}/{f}" for f in GITHOOKS["files"])]

@@ -9,9 +9,9 @@ usage() {
 
   check      every gate below, in order; non-zero if any fails (--json: the one schema, via devtools/checkjson.py)
   test       the unit tests (tests/), trimmed to the result unless something fails
-  hooks      the shared hook copies: present, executable, parse, registered, their own tests pass
+  hooks      the shared hook copies: present, executable, parse, their own tests pass, registered (PENDING: only in the proposal, for Jacob)
   files      the files the tool needs: present, executable where they must be, data parses
-  audit      setup audit content + setup audit direction (content is UNCHECKED, so red, in a lone clone)
+  audit      setup audit content, direction and deps (content and deps are UNCHECKED, so red, in a lone clone)
   self       ./setup --dry-run on this repo: nothing would be written, nothing drifted
   mutants    break each gate once in a throwaway copy, require red (devtools/mutants.json)
   plans DIR  setup plans DIR (not part of check: the plans belong to whoever holds DIR)
@@ -25,8 +25,12 @@ cmd_test() {
   return $code
 }
 
+registers() {  # registers SETTINGS_FILE NAME: does that settings file run .claude/hooks/NAME
+  jq -e --arg n "$2" '[.hooks[][].hooks[].command | select(endswith("/.claude/hooks/" + $n))] | length > 0' "$1" >/dev/null 2>&1
+}
+
 cmd_hooks() {
-  local fails=0 h name t out
+  local fails=0 pending=0 h name t out
   [ -f .claude/settings.json ] && jq -e . .claude/settings.json >/dev/null 2>&1 \
     || { echo "  FAIL  .claude/settings.json missing or does not parse"; return 1; }
   for h in .claude/hooks/*.sh; do
@@ -34,15 +38,24 @@ cmd_hooks() {
     [ -x "$h" ] || { echo "  FAIL  $name is not executable"; fails=$((fails+1)); }
     bash -n "$h" 2>/dev/null || { echo "  FAIL  $name does not parse"; fails=$((fails+1)); }
     case "$name" in test-*) continue ;; esac
-    jq -e --arg n "$name" '[.hooks[][].hooks[].command | select(endswith("/" + $n))] | length > 0' \
-      .claude/settings.json >/dev/null || { echo "  FAIL  $name is not registered in .claude/settings.json"; fails=$((fails+1)); }
+    # settings.json is Jacob's (settings-guard blocks a session's write): a hook the
+    # proposal setup wrote registers is PENDING his copy, said every run; one in
+    # neither runs nowhere and nothing will make it run: FAIL
+    if ! registers .claude/settings.json "$name"; then
+      if [ -f .claude/settings.proposed.json ] && registers .claude/settings.proposed.json "$name"; then
+        echo "  PENDING $name is registered only in .claude/settings.proposed.json: it does not run here until Jacob applies it (cp .claude/settings.proposed.json .claude/settings.json)"
+        pending=$((pending+1))
+      else
+        echo "  FAIL  $name is not registered in .claude/settings.json (nor in a proposal: run ./setup .)"; fails=$((fails+1))
+      fi
+    fi
     t=".claude/hooks/test-$name"
     if [ ! -f "$t" ]; then echo "  FAIL  $name has no test-$name"; fails=$((fails+1)); continue; fi
     if ! out=$(bash "$t" 2>&1); then
       echo "  FAIL  test-$name:"; printf '%s\n' "$out" | grep -E 'FAIL' | sed 's/^/        /'; fails=$((fails+1))
     fi
   done
-  [ $fails -eq 0 ] && echo "  ok    hooks: $(ls .claude/hooks/*.sh | grep -vc /test-) hooks, each executable, registered and passing its own test"
+  [ $fails -eq 0 ] && echo "  ok    hooks: $(ls .claude/hooks/*.sh | grep -vc /test-) hooks, each executable, passing its own test and registered ($pending of them only in the proposal, PENDING Jacob)"
   return $((fails > 0))
 }
 
@@ -51,7 +64,7 @@ cmd_files() {
   for f in setup dev.sh templates/dev.sh tests/fake_gh.py tests/fake_checks.py devtools/mutate.py devtools/checkjson.py; do
     [ -x "$f" ] || { echo "  FAIL  $f missing or not executable"; fails=$((fails+1)); }
   done
-  for f in components.json audit-terms.json devtools/mutants.json checks.json tests/fixtures/*.json; do
+  for f in components.json dependencies.json audit-terms.json devtools/mutants.json checks.json tests/fixtures/*.json; do
     jq -e . "$f" >/dev/null 2>&1 || { echo "  FAIL  $f missing or does not parse"; fails=$((fails+1)); }
   done
   for f in CLAUDE.md TODO.md .gitignore $(jq -r '.components[] | (.template, .head) // empty' components.json 2>/dev/null); do
@@ -70,6 +83,7 @@ cmd_audit() {
   local code=0
   ./setup audit content || code=1
   ./setup audit direction || code=1
+  ./setup audit deps || code=1
   return $code
 }
 

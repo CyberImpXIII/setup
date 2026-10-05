@@ -23,6 +23,46 @@ def workspace_cli(tool):
     return None, None
 
 
+def hook_listing(source=None):
+    """[(installed rel, source file)] the hooks dependency's own `list --json` names
+    for `source` (default: its own): what a repo setup renders must end up holding,
+    taken from the dependency rather than from setup. None in a lone clone."""
+    _, cli = workspace_cli("hooks")
+    if cli is None:
+        return None
+    source = source or cli.parent / "source"
+    r = subprocess.run([str(cli), "list", "--json", "--source", str(source)], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise AssertionError(f"{cli} list --json failed: {r.stderr.strip()[-300:]}")
+    out = []
+    for row in json.loads(r.stdout):
+        out.append((f"{row['dest']}/{row['name']}", source / row["path"]))
+        if row["test_installed"]:
+            out.append((f"{row['dest']}/{Path(row['test']).name}", source / row["test"]))
+    return out
+
+
+_, _HOOKS_CLI = workspace_cli("hooks")
+HOOK_SOURCE = _HOOKS_CLI.parent / "source" if _HOOKS_CLI else None  # the default hook source; None: lone clone
+
+
+def hook_source(path: Path, hooks, settings=None, body="exit 0\n"):
+    """A --hooks-from fixture the hooks dependency's `list` accepts: each hook declared
+    (`# hooks: applies_to=all`) with its test beside it, and settings.json (`settings`,
+    else every hook registered on Stop). Returns path."""
+    (path / "hooks").mkdir(parents=True, exist_ok=True)
+    for n in hooks:
+        for name in (n, f"test-{n}"):
+            f = path / "hooks" / name
+            f.write_text(f"#!/bin/sh\n# hooks: applies_to=all\n{body}")
+            f.chmod(0o755)
+    if settings is None:
+        settings = {"hooks": {"Stop": [{"hooks": [
+            {"type": "command", "command": f"$CLAUDE_PROJECT_DIR/.claude/hooks/{n}"} for n in hooks]}]}}
+    (path / "settings.json").write_text(settings if isinstance(settings, str) else json.dumps(settings))
+    return path
+
+
 def git(args, cwd):
     return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
 

@@ -16,10 +16,10 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from tests.helpers import ROOT, Case, git_repo, workspace_cli
+from tests.helpers import HOOK_SOURCE, Case, git_repo, hook_listing, workspace_cli
 
-SRC = ROOT / ".claude/hooks"
-HOOKS = sorted(p.name for p in SRC.glob("*.sh") if not p.name.startswith("test-"))
+SRC = HOOK_SOURCE / "hooks" if HOOK_SOURCE else None  # the default source; None: lone clone
+HOOKS = sorted(p.name for p in SRC.glob("*.sh") if not p.name.startswith("test-")) if SRC else []
 BLOBS = "no-inline-blobs.sh"
 
 
@@ -53,8 +53,8 @@ class UserScope(Case):
         if not f.exists():
             return None
         prop = json.loads(f.read_text())
-        return sorted(h["command"].rsplit("/", 1)[1] for groups in prop.get("hooks", {}).values()
-                      for g in groups for h in g.get("hooks", []))
+        return sorted({h["command"].rsplit("/", 1)[1] for groups in prop.get("hooks", {}).values()
+                       for g in groups for h in g.get("hooks", [])})  # a hook may register twice
 
     def per_repo_settings(self, repo):
         """The repo's settings.json as setup's own proposal would make it today (every
@@ -105,7 +105,14 @@ class UserScope(Case):
         code, res = self.run_json("r", "--user-scope", self.report({n: True for n in HOOKS}))
         self.assertEqual(self.copies(repo), [])
         self.assertIsNone(self.proposed(repo))
-        self.assertEqual(res["hooks"]["status"], "unchanged")
+        # what user scope does not run is still rendered: the libraries the listing
+        # names (registered: false), which the hooks dependency's copies check expects
+        # in every location; nothing else
+        written = sorted(str(p.relative_to(repo)) for p in (repo / ".claude").rglob("*") if p.is_file())
+        unregistered = sorted(rel for rel, _ in hook_listing() if not rel.startswith(".claude/hooks/"))
+        self.assertTrue(unregistered)
+        self.assertEqual(written, unregistered)
+        self.assertEqual(res["hooks"]["status"], "installed" if unregistered else "unchanged")
 
     # ---- unknown is never covered ----------------------------------------------
 

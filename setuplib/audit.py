@@ -5,6 +5,9 @@ content    setup's code, data and templates name no repo, repo path or repo comm
            never listed, so a new sibling is covered without an edit here.
 direction  nothing here reads the delegation layer: the patterns are data in
            audit-terms.json (the one file exempt from this audit).
+deps       each sibling dependencies.json names (the tools setup installs FROM,
+           exempt from `content` for that reason) resolves to a discovered repo,
+           with its CLI executable and its source a folder (setuplib/deps.py).
 plans      every PLAN-*.md in a folder whose status is not done has a
            "Setup component" heading.
 """
@@ -13,27 +16,33 @@ import os
 import re
 from pathlib import Path
 
+from . import deps
 from .core import TOOL_ROOT
 
 # What is setup's own code, data and templates: the scope of both audits. Prose
 # about this repo (CLAUDE.md, TODO.md) and the hook copies (.claude/, owned by
 # their canonical repo) are out of scope by design.
-CODE_GLOBS = ["setup", "dev.sh", "components.json", "setuplib/*.py", "templates/*", "devtools/*"]
+CODE_GLOBS = ["setup", "dev.sh", "components.json", "dependencies.json", "setuplib/*.py", "templates/*",
+              "devtools/*"]
 TERMS_FILE = "audit-terms.json"
 # Exempt by design: the audit's own term list, and the mutants that plant a
 # finding on purpose to prove these audits go red (devtools/mutants.json).
 EXEMPT = {TERMS_FILE, "mutants.json"}
+# Exempt from the content audit only: the sibling tools setup installs FROM, which
+# must be named to be found (setuplib/deps.py; `setup audit deps` gates each one).
+# The direction audit still reads it.
+CONTENT_EXEMPT = EXEMPT | {"dependencies.json"}
 # Names every repo carries by contract, so naming them is not naming a repo.
 CONTRACT_NAMES = {"dev.sh"}
 # Folders every repo carries by contract: a plain name under one is that repo's own.
 CONTRACT_DIRS = [".claude"]
 
 
-def code_files(root: Path, extra_globs=()):
+def code_files(root: Path, extra_globs=(), exempt=EXEMPT):
     out = []
     for g in [*CODE_GLOBS, *extra_globs]:
         out += [p for p in sorted(root.glob(g)) if p.is_file() and "__pycache__" not in p.parts]
-    return [p for p in dict.fromkeys(out) if p.name not in EXEMPT]
+    return [p for p in dict.fromkeys(out) if p.name not in exempt]
 
 
 def discover_repos(tool_root: Path, levels: int = 2, depth: int = 3):
@@ -106,7 +115,7 @@ def audit_content(tool_root: Path = TOOL_ROOT, levels: int = 2):
     repos = discover_repos(tool_root, levels)
     if not repos:
         return [], f"UNCHECKED: no sibling git repos within {levels} folders above {tool_root}; nothing to compare against"
-    files = code_files(tool_root)
+    files = code_files(tool_root, exempt=CONTENT_EXEMPT)
     return scan(files, repo_terms(repos)), f"{len(files)} files against {len(repos)} discovered repos"
 
 
@@ -125,6 +134,12 @@ def audit_direction(tool_root: Path = TOOL_ROOT):
         return [f"{TERMS_FILE}: no terms loaded; the audit would pass everything"], ""
     files = code_files(tool_root, extra_globs=["tests/*.py"])
     return scan(files, terms, strip), f"{len(files)} files against {len(terms)} terms"
+
+
+def audit_deps(tool_root: Path = TOOL_ROOT, levels: int = 2):
+    """(findings, note): dependencies.json against the repos discovered as `content`
+    discovers them. None discovered (a lone clone): UNCHECKED, never a pass."""
+    return deps.audit(tool_root, list(discover_repos(tool_root, levels)))
 
 
 STATUS_RX = re.compile(r"\*\*Status:\s*([A-Za-z-]+)")

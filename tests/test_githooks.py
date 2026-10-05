@@ -44,8 +44,9 @@ class Base(Case):
         (src / "hooks").mkdir(parents=True, exist_ok=True)
         pre, post = [], []
         for name, want, groups in (("git-stamp.sh", stamp, pre), ("write-ledger.sh", ledger, post)):
-            (src / "hooks" / name).write_text("#!/bin/sh\nexit 0\n")
-            os.chmod(src / "hooks" / name, 0o755)
+            for f in (name, f"test-{name}"):  # declared, with its test: the hooks listing's shape
+                (src / "hooks" / f).write_text("#!/bin/sh\n# hooks: applies_to=all\nexit 0\n")
+                os.chmod(src / "hooks" / f, 0o755)
             if want:
                 groups.append({"hooks": [{"type": "command",
                                           "command": f"$CLAUDE_PROJECT_DIR/.claude/hooks/{name}"}]})

@@ -3,7 +3,7 @@ component, and its check stub fails by name rather than faking green."""
 import json
 import subprocess
 
-from tests.helpers import ROOT, Case, git
+from tests.helpers import HOOK_SOURCE, Case, git, hook_listing
 
 
 class Fixture(Case):
@@ -14,14 +14,15 @@ class Fixture(Case):
             "repo": "installed", "rules": "installed", "hooks": "installed",
             "todo": "installed", "check": "installed", "services": "installed", "cli": "none",
             "data": "none", "params": "installed", "ignore": "installed",
-            # the default hook source (this tool's own copies) registers no git-stamp.sh yet
-            "githooks": "needs-jacob", "commit": "installed",
+            # the default hook source (the hooks dependency) registers git-stamp.sh and write-ledger.sh
+            "githooks": "installed", "commit": "installed",
             "remote": "none", "agent": "needs-harness", "server": "needs-harness",
             "node": "none", "registry": "none", "gates": "none"})
         repo = self.tmp / "fresh"
         self.assertEqual(git(["rev-parse", "--show-toplevel"], repo).stdout.strip(), str(repo))
         tracked = set(git(["ls-files"], repo).stdout.split())
-        hooks = {f".claude/hooks/{p.name}" for p in (ROOT / ".claude" / "hooks").glob("*.sh")}
+        listed = dict(hook_listing())
+        hooks = set(listed)
         # §7.9: a repo setup creates commits its settings.json (tests/test_settings_new.py
         # holds it to the proposal render); no proposal is written beside it
         githooks = {".githooks/check-pass", ".githooks/commit-msg", ".githooks/pre-commit"}
@@ -31,7 +32,7 @@ class Fixture(Case):
         self.assertFalse((repo / ".claude/settings.proposed.json").exists())
         self.assertEqual(git(["status", "--porcelain", "--untracked-files=all"], repo).stdout, "")
         for h in hooks:
-            self.assertEqual((repo / h).read_bytes(), (ROOT / h).read_bytes(), h)
+            self.assertEqual((repo / h).read_bytes(), listed[h].read_bytes(), h)
 
     def test_check_stub_fails_by_name(self):
         self.run_json("fresh")
@@ -53,7 +54,7 @@ class Fixture(Case):
         _, res = self.run_json("fresh")
         self.assertEqual(res["hooks"]["status"], "unchanged")
         wired = json.loads((repo / ".claude/settings.json").read_text())
-        source = json.loads((ROOT / ".claude/settings.json").read_text())
+        source = json.loads((HOOK_SOURCE / "settings.json").read_text())
         self.assertEqual(wired, source)
 
     def test_name_flag_changes_the_output(self):

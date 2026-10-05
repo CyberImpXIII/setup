@@ -2,7 +2,8 @@
 
 Content-agnostic: nothing here knows what the target repo does. What gets
 installed is declared in components.json; the files come from templates/ and
-from the hook source folder (default: this tool's own .claude/). Every write
+from the hook source (default: the hooks dependency's, dependencies.json; never
+this tool's own copies, which are rendered like any other). Every write
 goes through fsw.Writer, the one place --dry-run is enforced.
 """
 import copy
@@ -14,6 +15,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import deps
 from . import node as nodefile
 from .fsw import Writer, ignore_verdicts
 
@@ -177,6 +179,47 @@ def worst(statuses):
     return min(statuses, key=PRECEDENCE.index)
 
 
+LISTING_KEYS = {"name": str, "path": str, "applies_to": str, "dest": str, "registered": bool,
+                "executable": bool, "test": (str, type(None)), "test_installed": bool}
+
+
+def _listing_files(rows, source: Path):
+    """The hooks dependency's `list --json` rows as [(row, [file, ...])], each file
+    {rel, src, exec, main}: the row's own file at <dest>/<name>, and its test beside it
+    when the listing says the test is installed. (None, why) on any row outside that
+    shape, or naming a file outside the source or a destination outside the repo: the
+    whole listing is refused, never read in part."""
+    if not isinstance(rows, list) or not rows:
+        return None, "not a non-empty list"
+    src_root = source.resolve()
+    out, seen = [], set()
+    for i, row in enumerate(rows):
+        if not isinstance(row, dict):
+            return None, f"row {i} is not an object"
+        for k, t in LISTING_KEYS.items():
+            if k not in row or not isinstance(row[k], t):
+                return None, f"row {i} has no {k} of the expected type"
+        if not _inside(row["dest"]) or "/" in row["name"]:
+            return None, f"row {i} ({row['name']}) would land outside the repo"
+        fs = []
+        pairs = [(row["path"], row["name"], row["executable"], row["registered"])]
+        if row["test_installed"]:
+            if row["test"] is None:
+                return None, f"row {i} ({row['name']}) installs a test it does not name"
+            pairs.append((row["test"], Path(row["test"]).name, True, False))  # run by ./dev.sh hooks
+        for path, name, exe, main in pairs:
+            src = (source / path).resolve()
+            if src_root not in src.parents or not src.is_file():
+                return None, f"row {i}: {path} is not a file inside {source}"
+            rel = f"{Path(row['dest']).as_posix()}/{name}"
+            if rel in seen:
+                return None, f"row {i}: {rel} is named twice"
+            seen.add(rel)
+            fs.append({"rel": rel, "src": src, "exec": exe, "main": main})
+        out.append((row, fs))
+    return out, None
+
+
 class Setup:
     def __init__(self, target: Path, *, label: str, name: str, dry_run: bool,
                  github: bool = False, private: bool = False, owner=None,
@@ -204,8 +247,17 @@ class Setup:
         self.gh = gh
         self.spec = spec or load_spec()
         self.comp = {c["name"]: c for c in self.spec["components"]}
-        hf = self.comp["hooks"]["source"]
-        self.hooks_from = Path(hooks_from) if hooks_from else TOOL_ROOT / hf
+        # The hook source is the hooks dependency's (dependencies.json), never this
+        # tool's own .claude/ (PLAN-repo-setup §7.12); --hooks-from overrides it.
+        self.hooks_dep = self.comp["hooks"]["dependency"]
+        self.deps, why = deps.load()
+        self.dep_where, self.dep_why = (None, why) if why else deps.resolve(self.hooks_dep, deps=self.deps)
+        if hooks_from:
+            self.hooks_from = Path(hooks_from).resolve()
+        elif self.dep_where is not None:
+            self.hooks_from = self.dep_where / self.deps[self.hooks_dep]["source"]
+        else:
+            self.hooks_from = None  # c_hooks fails, naming why
         self.plugins_from = Path(plugins_from) if plugins_from else None
         self.user_scope_from = Path(user_scope_from) if user_scope_from else None
         self.w =Writer(target, dry_run)
@@ -255,39 +307,72 @@ class Setup:
         return Result("rules", "installed", f"block updated @{mark} -> @{sha12(tmpl)} (was behind the template)")
 
     def c_hooks(self):
-        src_dir = self.hooks_from / "hooks"
-        srcs = sorted(src_dir.glob("*.sh")) if src_dir.is_dir() else []
-        if not srcs:
-            return Result("hooks", "failed", f"no hooks found in {src_dir}")
-        cover, statuses, notes = self._user_scope()
+        """Every file the hook source's listing names, rendered into the repo (PLAN-repo-
+        setup §7.12): absent, installed; equal by meaning (the hooks dependency's one
+        comparator: comments and blank lines aside) but not byte for byte, rewritten from
+        the source ("header refreshed"); differing in logic, drift, left byte-unchanged.
+        Without the dependency (--hooks-from DIR in a workspace lacking it) there is no
+        listing and no comparator: DIR's hooks folder, compared byte for byte."""
+        files, how, statuses, notes = self._hook_files()
+        if files is None:
+            return Result("hooks", "failed", "; ".join(notes))
+        if not files:
+            return Result("hooks", "failed", "; ".join([f"no hook file in {self.hooks_from} applies here ({how})",
+                                                        *notes]))
+        meaning, by = self._hook_comparator()
+        if meaning is None and by is not None and self.hooks_from_listing:
+            return Result("hooks", "failed", f"the listing came from the hooks dependency, but its comparator "
+                                             f"did not load ({by}); nothing compared, nothing written")
+        cover, us_statuses, us_notes = self._user_scope()
+        statuses += us_statuses
+        notes += us_notes
         n_new = n_same = 0
-        covered, unknown = [], {}
-        for s in srcs:
-            rel = f".claude/hooks/{s.name}"
+        covered, unknown, refreshed = [], {}, []
+        for f in files:
+            rel, src, name = f["rel"], f["src"], Path(f["rel"]).name
             dst = self.target / rel
             state, why = cover(rel)
             if state is None:
-                unknown.setdefault(why, []).append(s.name)
+                unknown.setdefault(why, []).append(name)
             if state is True:  # user scope runs it from its source: no copy, an existing one kept
-                covered.append(s.name)
-                if dst.exists() and not os.access(dst, os.X_OK):
+                covered.append(name)
+                if dst.exists() and f["exec"] and not os.access(dst, os.X_OK):
                     statuses.append("drift")
-                    notes.append(f"{s.name} is not executable (a broken copy, whatever user scope runs)")
+                    notes.append(f"{name} is not executable (a broken copy, whatever user scope runs)")
                 else:
                     statuses.append("unchanged")
-            elif not dst.exists():
-                self.w.write(rel, s.read_bytes(), mode=0o755)
+                continue
+            body = src.read_bytes()
+            mode = 0o755 if f["exec"] else 0o644
+            if not dst.exists():
+                self.w.write(rel, body, mode=mode)
                 n_new += 1
                 statuses.append("installed")
-            elif dst.read_bytes() != s.read_bytes():
-                statuses.append("drift")
-                notes.append(f"{s.name} differs from the source copy (not overwritten)")
-            elif not os.access(dst, os.X_OK):
-                statuses.append("drift")
-                notes.append(f"{s.name} is not executable")
+            elif dst.read_bytes() == body:
+                if f["exec"] and not os.access(dst, os.X_OK):
+                    statuses.append("drift")
+                    notes.append(f"{rel} is not executable")
+                else:
+                    n_same += 1
+                    statuses.append("unchanged")
+            elif meaning is not None and meaning(dst) == meaning(src):
+                try:
+                    self.w.write(rel, body, mode=mode)
+                except OSError as e:
+                    statuses.append("failed")
+                    notes.append(f"{rel}: equal by meaning, but rewriting it failed ({e.__class__.__name__})")
+                    continue
+                refreshed.append(rel)
+                statuses.append("installed")
             else:
-                n_same += 1
-                statuses.append("unchanged")
+                statuses.append("drift")
+                notes.append(f"{rel}: its logic differs from the source (drift, not overwritten; replacing a "
+                             "drifted copy waits on Jacob, PLAN-repo-setup §7.12)" if meaning is not None else
+                             f"{rel} differs from the source byte for byte (drift, not overwritten; no comparator "
+                             "by meaning without the hooks dependency)")
+        if refreshed:
+            did = "would refresh" if self.dry_run else "refreshed"
+            notes.append(f"header {did} (equal by meaning, rewritten from the source): {', '.join(refreshed)}")
         if covered:
             notes.append(f"covered by user scope: {', '.join(covered)} (not copied; a copy already here is kept)")
         elif self.user_scope_from is not None and not statuses.count("failed"):
@@ -295,13 +380,83 @@ class Setup:
         for why, names in unknown.items():
             notes.append(f"user scope could not tell ({why}): treated as not covered for {', '.join(names)}")
         extra, p_statuses, p_notes = self._plugin_wants()
-        st, note = self._settings([s.name for s in srcs if s.name not in covered], extra, drop=covered)
+        names = [Path(f["rel"]).name for f in files if f["main"]]
+        st, note = self._settings([n for n in names if n not in covered], extra, drop=covered)
         statuses += [st, *p_statuses]
         if note:
             notes.append(note)
         notes += p_notes
-        head = f"{n_new} installed, {n_same} unchanged of {len(srcs)}, against {src_dir}"
+        head = (f"{n_new} installed, {len(refreshed)} header refreshed, {n_same} unchanged of {len(files)}, "
+                f"against {self.hooks_from} ({how}; compared {by})")
         return Result("hooks", worst(statuses), "; ".join([head, *notes]))
+
+    def _hook_comparator(self):
+        """(meaning(path) -> hash, how it compares). The hooks dependency's own function
+        when it resolves; (None, "byte for byte") without it. (None, why) when it
+        resolves and the function does not load: the caller fails rather than compare
+        by bytes and call a header refresh drift, or worse."""
+        if self.dep_where is None:
+            return None, "byte for byte (no hooks dependency)"
+        fn, why = deps.comparator(self.hooks_dep, self.dep_where, self.deps)
+        if fn is None:
+            return None, why
+        c = self.deps[self.hooks_dep]["comparator"]
+        return fn, f"by meaning, {c['module']}.{c['function']}"
+
+    def _hook_files(self):
+        """(files, how, statuses, notes): what the hooks component renders, each
+        {rel, src, exec, main}. From the hooks dependency's listing (`<cli> list --json
+        --source <source>`) when it resolves, else a glob of the source's hooks folder.
+        files is None when there is no source or the listing cannot be read: no guess."""
+        self.hooks_from_listing = False
+        if self.hooks_from is None:
+            return None, "", [], [f"no hook source: {self.dep_why}; pass --hooks-from DIR"]
+        if not self.hooks_from.is_dir():
+            return None, "", [], [f"the hook source {self.hooks_from} is not a folder"]
+        exe = deps.cli(self.hooks_dep, self.dep_where, self.deps) if self.dep_where is not None else None
+        if exe is None:
+            if self.dep_where is not None:
+                return None, "", [], [f"the hooks dependency at {self.dep_where} has no executable "
+                                      f"{self.deps[self.hooks_dep]['cli']}: no listing, nothing installed"]
+            folder = self.hooks_from / "hooks"
+            files = [{"rel": f".claude/hooks/{p.name}", "src": p, "exec": True, "main": True}
+                     for p in sorted(folder.glob("*.sh"))] if folder.is_dir() else []
+            return files, f"no hooks dependency ({self.dep_why}): every *.sh in {folder}", [], []
+        try:
+            r = subprocess.run([str(exe), "list", "--json", "--source", str(self.hooks_from)],
+                               capture_output=True, text=True, timeout=120)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return None, "", [], [f"{exe} list could not run ({e.__class__.__name__})"]
+        if r.returncode != 0:
+            tail = (r.stderr.strip() or r.stdout.strip()).splitlines()[-3:]
+            return None, "", [], [f"{exe} list --json --source {self.hooks_from} exited {r.returncode}: "
+                                  + " | ".join(tail)]
+        try:
+            rows = json.loads(r.stdout)
+        except ValueError:
+            return None, "", [], [f"{exe} list --json printed no JSON"]
+        files, why = _listing_files(rows, self.hooks_from)
+        if why:
+            return None, "", [], [f"the listing from {exe} is not in the shape read here ({why}); nothing installed"]
+        self.hooks_from_listing = True
+        top = deps.workspace_top(self.hooks_dep, deps=self.deps)
+        here = roster_dir(self.stands_for, top) if top is not None else None
+        out, statuses, notes, elsewhere = [], [], [], 0
+        for row, fs in files:
+            a = row["applies_to"]
+            where = "yes" if a == "all" else _applies(a, here)
+            if where == "yes":
+                out += fs
+            elif where == "no":
+                elsewhere += 1
+            elif where == "roles":
+                statuses.append("needs-harness")
+                notes.append(f"{row['path']}: applies_to={a} names roles, which setup cannot resolve; not installed")
+            else:
+                statuses.append("failed")
+                notes.append(f"{row['path']}: applies_to={a!r} not understood; not installed")
+        how = f"{len(files)} listed by {exe} list --json" + (f", {elsewhere} applying elsewhere" if elsewhere else "")
+        return out, how, statuses, notes
 
     def _user_scope(self):
         """(cover, statuses, notes) from the report given with --user-scope: the JSON
@@ -386,6 +541,8 @@ class Setup:
         In a repo setup is creating (PLAN-repo-setup §7.9) nothing of Jacob's exists
         yet, so the same render is written as settings.json itself and committed with
         the scaffold, and no proposal is written."""
+        if self.hooks_from is None:
+            return "failed", f"no hook source, so no settings.json to propose from ({self.dep_why})"
         try:
             src = json.loads((self.hooks_from / "settings.json").read_text())
         except (FileNotFoundError, json.JSONDecodeError) as e:
@@ -848,6 +1005,8 @@ class Setup:
         (--user-scope), or .claude/settings.json makes every registration the hook
         source's settings.json makes for it. A source that registers none: unknown,
         never wired. In a repo setup is creating, settings.json is the source's render."""
+        if self.hooks_from is None:
+            return {n: f"no hook source ({self.dep_why})" for n in names}
         try:
             src = json.loads((self.hooks_from / "settings.json").read_text())
         except (OSError, ValueError) as e:

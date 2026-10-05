@@ -38,10 +38,11 @@
   setup plans <dir>           every PLAN-*.md there that is not done has a "Setup component" heading
   setup audit content         setup names no repo, repo path or repo command
   setup audit direction       setup reads nothing of the delegation layer
+  setup audit deps            each tool dependencies.json names (installed FROM) is a discovered repo
 
 Exit: 0 when nothing failed or drifted (needs-* lines are not failures), 1 on
 drift or a failure, 2 when the path is refused or the usage is wrong; a refused
-path has had nothing written. `audit content` exits 3 when it could not run
+path has had nothing written. `audit content` and `audit deps` exit 3 when they could not run
 (no sibling repos to compare against, as in a lone clone): UNCHECKED, never a
 pass. A path named like a subcommand: pass ./<name>.
 """
@@ -83,10 +84,10 @@ def cmd_plans(args):
 
 
 def cmd_audit(args):
-    if args not in (["content"], ["direction"]):
-        print("usage: setup audit content|direction", file=sys.stderr)
+    if args not in (["content"], ["direction"], ["deps"]):
+        print("usage: setup audit content|direction|deps", file=sys.stderr)
         return 2
-    fn = audit.audit_content if args[0] == "content" else audit.audit_direction
+    fn = {"content": audit.audit_content, "direction": audit.audit_direction, "deps": audit.audit_deps}[args[0]]
     findings, note = fn()
     for f in findings:
         print(f"  FAIL  {f}")

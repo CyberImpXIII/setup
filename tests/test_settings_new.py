@@ -11,7 +11,7 @@ import subprocess
 import unittest
 
 from setuplib.fsw import Writer
-from tests.helpers import ROOT, Case, git, git_repo, snapshot, workspace_cli
+from tests.helpers import HOOK_SOURCE, Case, git, git_repo, hook_source, snapshot, workspace_cli
 from tests import test_userscope as us  # a module, so its TestCase is not collected twice
 
 BLOBS = us.BLOBS
@@ -31,7 +31,7 @@ class CreatedRepo(Case):
         self.assertEqual(git(["rev-list", "--count", "HEAD"], repo).stdout.strip(), "1")
         self.assertIn(SETTINGS, git(["show", "--name-only", "--format=", "HEAD"], repo).stdout.split())
         self.assertEqual(json.loads((repo / SETTINGS).read_text()),
-                         json.loads((ROOT / SETTINGS).read_text()))
+                         json.loads((HOOK_SOURCE / "settings.json").read_text()))
         # no proposal: it would hold the same thing, and settings.json already does
         self.assertFalse((repo / PROPOSAL).exists())
         self.assertEqual(git(["status", "--porcelain", "--untracked-files=all"], repo).stdout, "")
@@ -64,11 +64,7 @@ class SameRender(Case):
         self.assertEqual(written, proposal)
 
     def test_another_hook_source(self):
-        src = self.tmp / "src"
-        (src / "hooks").mkdir(parents=True)
-        (src / "hooks/only-one.sh").write_text("#!/bin/sh\nexit 0\n")
-        (src / "settings.json").write_text(json.dumps({"hooks": {"Stop": [{"hooks": [
-            {"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/only-one.sh"}]}]}}))
+        src = hook_source(self.tmp / "src", ["only-one.sh"])
         proposal, written = self.both("--hooks-from", str(src))
         self.assertEqual(written, proposal)
         self.assertEqual(list(json.loads(written)["hooks"]), ["Stop"])
@@ -78,7 +74,7 @@ class SameRender(Case):
         proposal, written = self.both("--user-scope", report)
         self.assertEqual(written, proposal)
         # counterfactual: the source wiring registers the covered hook, the render does not
-        self.assertIn(BLOBS, (ROOT / SETTINGS).read_text())
+        self.assertIn(BLOBS, (HOOK_SOURCE / "settings.json").read_text())
         self.assertNotIn(BLOBS, written.decode())
 
 
@@ -104,18 +100,14 @@ class ExistingRepo(Case):
         self.run_json("fresh")
         repo = self.tmp / "fresh"
         before = (repo / SETTINGS).read_bytes()
-        src = self.tmp / "src"
-        (src / "hooks").mkdir(parents=True)
-        (src / "hooks/only-one.sh").write_text("#!/bin/sh\nexit 0\n")
-        (src / "settings.json").write_text(json.dumps({"hooks": {"Stop": [{"hooks": [
-            {"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/only-one.sh"}]}]}}))
+        src = hook_source(self.tmp / "src", ["only-one.sh"])
         _, res = self.run_json("fresh", "--hooks-from", str(src))
         self.assertEqual(res["hooks"]["status"], "needs-jacob")
         self.assertEqual((repo / SETTINGS).read_bytes(), before)
         self.assertIn("Stop", json.loads((repo / PROPOSAL).read_text())["hooks"])
-        # the proposal is ignored, so the repo shows only the new hook copy
+        # the proposal is ignored, so the repo shows only the new hook copy and its test
         self.assertEqual(git(["status", "--porcelain", "--untracked-files=all"], repo).stdout,
-                         "?? .claude/hooks/only-one.sh\n")
+                         "?? .claude/hooks/only-one.sh\n?? .claude/hooks/test-only-one.sh\n")
 
 
 CHECKS_CLI = workspace_cli("checks")[1]

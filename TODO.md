@@ -185,9 +185,29 @@
   node with a plug-in exists -- settle: `checks one regenerate .` on that node.
 - **Should a parent's .gitignore list its child paths?** Today a nested child shows as
   untracked `child/` in the parent and both readers skip it as a child. Not decided.
-- **A node with children needs a registry** (checks' registry-matches); the item-(1)
-  fixture holds a hand-written `{"services": {}}` as a record until setup renders the
-  registry (§14.8, next item).
+- **A node with children needs a registry** (checks' registry-matches): settled
+  2026-10-05 (§14.8). Setup renders `registry.proposed.json`; the fixtures copy it to
+  the registry node.json names (Jacob's step) and pass `checks run` on every repo.
+- **§14.8's `cli.json` skeleton `{store, cli, verbs: []}` is not installed** (2026-10-05).
+  No skeleton passes checks' cli.schema.json (`store` minLength/minItems 1, `cli`
+  executable), and their `accessor` accepts no store with no cli.json, so writing one
+  would turn every new repo red for nothing. The `cli` component reports `none`
+  ("a repo with a store adds {store, cli, verbs}"). Hinges on the planner: change the
+  plan's table row, or checks accepts an unfilled skeleton as needs-owner.
+- **The registry renders only `services`** (2026-10-05): §14.6 also gives a registry
+  roles, owners and the server entry, which have no defined shape here (and roles are
+  the roster's, which setup must not read). Hinges on the hub's registry plan.
+- **A fresh node with children exits 1 under `--checks` until Jacob applies the
+  registry proposal**: registry-matches is red (children, no `registry`), and that is
+  the true state; the registry line says `needs-jacob` with the copy command.
+- **`check-json` is gated to the audit role in checks, so `checks run` skips it**; the
+  gates component runs it by name (`checks one`), since it is a §14.8 contract gate.
+  On this repo it takes ~4 min (the full suite); every `--checks` run on a repo with a
+  real suite pays it. Hinges on checks (a shape-only mode) or accepting the cost.
+- **Setup's own run under `--checks` is red** (2026-10-05, before this commit):
+  `hooks-installed` fails, `.claude/hooks/ask-first.sh` missing here (the shared source
+  has a hook this repo's copies lack), and `check-json` errored (exit 1) while this
+  suite was mid-change. Re-check after the commit: `./setup . --checks ../checks/checks`.
 
 ## Unconfirmed suspicions
 

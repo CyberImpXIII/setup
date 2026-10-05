@@ -2,7 +2,7 @@
 """setup: bring a git repo (or a new folder) to the shared baseline.
 
   setup <path> [--dry-run] [--github [--private] [--owner O]] [--name N] [--hooks-from DIR]
-               [--plugins FILE] [--user-scope FILE] [--relative-to DIR] [--json]
+               [--plugins FILE] [--user-scope FILE] [--relative-to DIR] [--checks CLI] [--json]
       install every component in components.json; one line each, then a result line.
       A repo setup creates gets .claude/settings.json (the render a proposal would
       hold), committed; an existing repo only ever gets settings.proposed.json.
@@ -14,7 +14,11 @@
       --user-scope: the hook copies report (JSON with user_scope{exists, error,
       hooks[file, kind, test, registered]}); a shared hook the user settings
       already run is not copied, and the proposal does not register it per
-      repo ("covered by user scope: <files>"). Without it, nothing is covered
+      repo ("covered by user scope: <files>"). Without it, nothing is covered.
+      --checks CLI: the shared checks, run last, once everything is rendered
+      (`CLI run <path>`, then each contract gate it left out by name, in
+      sequence; never in a dry run): their result is the gates line, and a
+      contract gate the CLI lacks fails it. Without it, the gates line is none.
   setup <path> --node [--rebuild] [...]
       also set up each child <path>/node.json lists (created as a repo nested in
       this one when absent; a child with its own node.json recurses; never
@@ -52,7 +56,7 @@ SUBCOMMANDS = ["components", "plans", "audit"]
 def cmd_components(_):
     spec = core.load_spec()
     for c in spec["components"]:
-        print(f"  {c['name']:<7} {c['installs']}")
+        print(f"  {c['name']:<8} {c['installs']}")
     print("statuses:")
     for k, v in spec["statuses"].items():
         print(f"  {k:<13} {v}")
@@ -103,6 +107,7 @@ def cmd_setup(argv):
     p.add_argument("--plugins")
     p.add_argument("--user-scope")
     p.add_argument("--relative-to")
+    p.add_argument("--checks")
     p.add_argument("--node", action="store_true")
     p.add_argument("--rebuild", action="store_true")
     p.add_argument("--json", action="store_true")
@@ -133,7 +138,7 @@ def cmd_setup(argv):
                    github=a.github, private=a.private, owner=a.owner,
                    hooks_from=a.hooks_from, plugins_from=a.plugins, user_scope_from=a.user_scope,
                    dir_base=dir_base, gh=os.environ.get("SETUP_GH", "gh"),
-                   node=a.node, rebuild=a.rebuild, rebuild_dry=rebuild_dry)
+                   node=a.node, rebuild=a.rebuild, rebuild_dry=rebuild_dry, checks_cli=a.checks)
     try:
         results = s.run()
     except core.Refused as e:
@@ -156,7 +161,7 @@ def cmd_setup(argv):
 
 def print_doc(doc, pad):
     for r in doc["results"]:
-        print(f"{pad}  {r['component']:<7} {r['status']:<13} {r['detail']}")
+        print(f"{pad}  {r['component']:<8} {r['status']:<13} {r['detail']}")
     for x in doc.get("rebuild", []):
         print(f"{pad}    {x['status']:<12} {x['path']}  {x['detail']}")
     for kid in doc.get("children", []):

@@ -12,17 +12,18 @@ class Fixture(Case):
         self.assertEqual(code, 0)
         self.assertEqual(self.statuses(res), {
             "repo": "installed", "rules": "installed", "hooks": "installed",
-            "todo": "installed", "check": "installed", "ignore": "installed", "commit": "installed",
+            "todo": "installed", "check": "installed", "services": "installed", "cli": "none",
+            "params": "installed", "ignore": "installed", "commit": "installed",
             "remote": "none", "agent": "needs-harness", "server": "needs-harness",
-            "node": "none"})
+            "node": "none", "registry": "none", "gates": "none"})
         repo = self.tmp / "fresh"
         self.assertEqual(git(["rev-parse", "--show-toplevel"], repo).stdout.strip(), str(repo))
         tracked = set(git(["ls-files"], repo).stdout.split())
         hooks = {f".claude/hooks/{p.name}" for p in (ROOT / ".claude" / "hooks").glob("*.sh")}
         # §7.9: a repo setup creates commits its settings.json (tests/test_settings_new.py
         # holds it to the proposal render); no proposal is written beside it
-        self.assertEqual(tracked, {"CLAUDE.md", "TODO.md", "dev.sh", ".gitignore",
-                                   ".claude/settings.json"} | hooks)
+        self.assertEqual(tracked, {"CLAUDE.md", "TODO.md", "dev.sh", "services.json", "checks.json",
+                                   ".gitignore", ".claude/settings.json"} | hooks)
         self.assertFalse((repo / ".claude/settings.proposed.json").exists())
         self.assertEqual(git(["status", "--porcelain", "--untracked-files=all"], repo).stdout, "")
         for h in hooks:

@@ -22,7 +22,7 @@ class Idempotent(Case):
         code, res = self.run_json("fresh")
         self.assertEqual(code, 0)
         st = self.statuses(res)
-        for comp in ("repo", "rules", "hooks", "todo", "check", "ignore"):
+        for comp in ("repo", "rules", "hooks", "todo", "check", "services", "params", "ignore"):
             self.assertEqual(st[comp], "unchanged", comp)
-        self.assertEqual((st["commit"], st["remote"], st["agent"], st["server"]),
-                         ("none", "none", "needs-harness", "needs-harness"))
+        self.assertEqual((st["commit"], st["remote"], st["agent"], st["server"], st["cli"], st["registry"],
+                          st["gates"]), ("none", "none", "needs-harness", "needs-harness", "none", "none", "none"))

@@ -17,7 +17,8 @@ from setuplib import core
 from tests.helpers import ROOT, SETUP, Case, git, git_repo, snapshot, workspace_cli
 
 HOOK_FILES = sorted(f".claude/hooks/{p.name}" for p in (ROOT / ".claude/hooks").glob("*.sh"))
-SCAFFOLD = ["CLAUDE.md", "TODO.md", "dev.sh", ".gitignore", ".claude/settings.json", *HOOK_FILES]
+SCAFFOLD = ["CLAUDE.md", "TODO.md", "dev.sh", "services.json", "checks.json", ".gitignore",
+            ".claude/settings.json", *HOOK_FILES]
 CHECKS_CLI = workspace_cli("checks")[1]
 REBUILD = [str(SETUP), ".", "--node", "--rebuild"]
 ID = ["-c", "user.email=t@example.invalid", "-c", "user.name=t"]
@@ -36,6 +37,12 @@ def write_node(repo, children=(), generated=SCAFFOLD, record=(), commit=True, **
     (repo / "node.json").write_text(json.dumps(doc, indent=2) + "\n")
     if commit:
         commit_all(repo)
+
+
+def node_line(doc):
+    """The node component's result in a run's document."""
+    (line,) = [r for r in doc["results"] if r["component"] == "node"]
+    return line
 
 
 def statuses(doc):
@@ -96,7 +103,7 @@ class Node(NodeCase):
             self.assertEqual(git(["rev-parse", "--show-toplevel"], repo).stdout.strip(), str(repo))
             self.assertEqual(sorted(git(["ls-files"], repo).stdout.split()), sorted(SCAFFOLD))
             self.assertEqual((repo / "TODO.md").read_text().splitlines()[0], f"# {name} TODO")
-        self.assertIn("2 created", doc["results"][-1]["detail"])
+        self.assertIn("2 created", node_line(doc)["detail"])
         # the second level: alpha becomes a node of its own, and the top recurses into it
         write_node(top / "alpha", children=["gamma"], record=["node.json"])
         code, doc = self.run_doc("top", "--node")
@@ -218,7 +225,7 @@ class Rebuild(NodeCase):
             self.assertEqual(lines[p]["status"], "regenerated", p)
         self.assertEqual(lines["node.json"]["status"], "record")
         self.assertEqual({x["status"] for x in doc["rebuild"]}, {"regenerated", "record"})
-        self.assertEqual(doc["results"][-1]["status"], "unchanged")
+        self.assertEqual(node_line(doc)["status"], "unchanged")
         self.assertEqual(snapshot(top), before)
 
     def test_deleted_generated_files_are_rendered_back(self):
@@ -246,7 +253,7 @@ class Rebuild(NodeCase):
         self.assertEqual(lines["CLAUDE.md"]["status"], "regenerated")
         self.assertEqual((top / "TODO.md").read_text(), rendered)
         self.assertIn("-edited by hand", git(["diff"], top).stdout)
-        self.assertEqual(doc["results"][-1]["status"], "installed")
+        self.assertEqual(node_line(doc)["status"], "installed")
 
     def test_dry_run_reports_the_drift_and_writes_nothing(self):
         top = self.tree()
@@ -312,7 +319,7 @@ class Rebuild(NodeCase):
         write_node(top, generated=[*SCAFFOLD, "out.txt"])
         code, doc, lines = self.rebuild()
         self.assertEqual((code, lines["out.txt"]["status"]), (1, "failed"))
-        self.assertEqual(doc["results"][-1]["status"], "failed")
+        self.assertEqual(node_line(doc)["status"], "failed")
         self.assertEqual((top / "out.txt").read_text(), "one\n")
 
     def test_a_generated_file_in_neither_the_tree_nor_the_commit_is_drift_and_rendered(self):
@@ -410,14 +417,19 @@ class LiveChecks(NodeCase):
 
     def test_every_repo_of_a_two_level_tree_passes_the_shared_checks(self):
         top = self.tree()
-        # a node with children names a registry (registry-matches). Until setup renders
-        # one, the fixture holds the union of no services.json: an empty one, a record
-        (top / "registry.json").write_text('{"services": {}}\n')
+        # a node with children names a registry (registry-matches): Jacob applies the
+        # proposal setup renders, the union of the services.json files under the node
         write_node(top, children=["alpha", "beta"], record=["registry.json"], registry="registry.json")
         self.run_doc("top", "--node")
-        (top / "alpha/registry.json").write_text('{"services": {}}\n')
         write_node(top / "alpha", children=["gamma"], record=["registry.json"], registry="registry.json")
         self.run_doc("top", "--node")
+        for node in (top, top / "alpha"):
+            (node / "registry.proposed.json").replace(node / "registry.json")
+            for args in (["add", "registry.json"], [*ID, "commit", "-q", "-m", "registry"]):
+                self.assertEqual(git(args, node).returncode, 0, node)
+        code, doc = self.run_doc("top", "--node")
+        self.assertEqual(code, 0, doc)
+        self.assertEqual({r["component"]: r["status"] for r in doc["results"]}["registry"], "unchanged")
         for repo in (top, top / "alpha", top / "beta", top / "alpha/gamma"):
             red = [(k, x["status"], x.get("lines")) for k, x in self.run_all(repo).items()
                    if x["status"] in ("fail", "error")]

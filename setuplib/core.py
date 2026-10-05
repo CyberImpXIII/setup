@@ -96,6 +96,47 @@ def _fill(text: str, values: dict) -> str:
     return text
 
 
+def _fill_doc(doc, values: dict):
+    """_fill on every string inside a JSON document, so a value is never parsed as JSON."""
+    if isinstance(doc, dict):
+        return {k: _fill_doc(v, values) for k, v in doc.items()}
+    if isinstance(doc, list):
+        return [_fill_doc(v, values) for v in doc]
+    return _fill(doc, values) if isinstance(doc, str) else doc
+
+
+def _json_file(p: Path):
+    """(document, None), or (None, why) for a file that is missing or does not parse."""
+    try:
+        return json.loads(p.read_text()), None
+    except OSError as e:
+        return None, f"cannot be read ({e.__class__.__name__})"
+    except ValueError as e:
+        return None, f"does not parse ({e})"
+
+
+CHECKS_TIMEOUT = 1800  # seconds for one call of the shared checks CLI; past it the gates line fails
+
+
+def _names(doc):
+    """The check names in a `list --json` document, or None when it is not that shape."""
+    rows = doc.get("checks")
+    if not isinstance(rows, list) or not all(isinstance(x, dict) and isinstance(x.get("name"), str) for x in rows):
+        return None
+    return {x["name"] for x in rows}
+
+
+def _rows(doc):
+    """([{check, status, lines}], faults) from a `run`/`one --json` document; rows None
+    when it is not that shape."""
+    rows = doc.get("results")
+    if not isinstance(rows, list) or not all(isinstance(r, dict) and isinstance(r.get("check"), str)
+                                             and isinstance(r.get("status"), str) for r in rows):
+        return None, []
+    faults = doc.get("faults") or []
+    return list(rows), list(faults) if isinstance(faults, list) else [f"faults is not a list: {faults!r}"]
+
+
 def roster_dir(target: Path, base: Path):
     """target relative to base, as a normalised POSIX path ("." for base itself);
     None when target is not under base: a roster dir is relative, never absolute
@@ -114,9 +155,12 @@ class Setup:
     def __init__(self, target: Path, *, label: str, name: str, dry_run: bool,
                  github: bool = False, private: bool = False, owner=None,
                  hooks_from=None, plugins_from=None, user_scope_from=None, dir_base=None, gh: str = "gh",
-                 spec=None, node=False, rebuild=False, rebuild_dry=False, nest_in=None, stands_for=None):
+                 spec=None, node=False, rebuild=False, rebuild_dry=False, nest_in=None, stands_for=None,
+                 checks_cli=None):
         self.target = target
+        self.checks_cli = checks_cli  # --checks: the shared checks CLI the gates component runs last
         self.node = node  # False, True (--node: node.json required) or "auto" (a child: a node if it has one)
+        self.node_cfg = None  # node.json, once c_node has read it without a finding
         self.rebuild = rebuild  # with it the setup pass is a dry run (dry_run=True) and only the rebuild writes,
         self.rebuild_dry = rebuild_dry  # unless this is set too (--rebuild --dry-run)
         self.nest_in = nest_in
@@ -378,6 +422,157 @@ class Setup:
             return Result("check", "drift", f"./{c['file']} does not parse")
         return Result("check", "unchanged", f"./{c['file']} present, executable, parses")
 
+    # ---- the contract files (PLAN-routing-tree.md §14.8) ----------------------
+
+    def skeleton(self, name=None):
+        """The services.json setup writes for a repo called name (default: this one)."""
+        return _fill_doc(self.comp["services"]["skeleton"], {"name": name or self.name})
+
+    def c_services(self):
+        c = self.comp["services"]
+        if (self.target / c["file"]).exists():
+            return Result("services", "unchanged", f"{c['file']} present: the owner's, not read here "
+                                                   "(the shared services-valid gates it)")
+        self.w.write(c["file"], json.dumps(self.skeleton(), indent=2) + "\n")
+        return Result("services", "installed", f"{c['file']} skeleton: the name and its check entry only; "
+                                               "the owner adds write entries and tags")
+
+    def c_cli(self):
+        c = self.comp["cli"]
+        if (self.target / c["file"]).exists():
+            return Result("cli", "unchanged", f"{c['file']} present: the owner's (the shared accessor gates it)")
+        return Result("cli", "none", f"no {c['file']}, and none written: no skeleton passes its schema; "
+                                     "a repo with a store adds {store, cli, verbs}")
+
+    def c_params(self):
+        c = self.comp["params"]
+        if (self.target / c["file"]).exists():
+            return Result("params", "unchanged", f"{c['file']} present: the owner's")
+        self.w.write(c["file"], json.dumps(c["baseline"], indent=2) + "\n")
+        return Result("params", "installed", f"{c['file']}, the baseline: no parameter set, every check at its defaults")
+
+    def c_registry(self):
+        """In a node run, after the children: the union of every services.json under
+        the node, proposed for Jacob (never written to the registry itself)."""
+        c = self.comp["registry"]
+        cfg = self.node_cfg
+        if cfg is None:
+            return Result("registry", "none", "not a node run (or node.json not read)")
+        live = cfg.get("registry")
+        if not cfg["children"] and live is None:
+            return Result("registry", "none", "a node with no children and no registry: nothing to hold")
+        rows, bad = self._service_rows(cfg["children"])
+        if bad:
+            return Result("registry", "failed", "; ".join(bad) + f": its row cannot be rendered, {c['file']} not written")
+        doc = {"services": rows}
+        if live is not None:
+            cur, why = _json_file(self.target / live)
+            if why is None and cur == doc:
+                return Result("registry", "unchanged", f"{live} holds the union of {len(rows)} services.json")
+            if why is None:
+                old = cur.get("services") if isinstance(cur, dict) else None
+                old = old if isinstance(old, dict) else {}
+                diff = sorted(k for k in set(old) | set(rows) if old.get(k) != rows.get(k))
+                why = "rows differ: " + ", ".join(f"`{k}`" for k in diff) if diff else "differs outside its rows"
+            how = f"{live} {why}; apply with: cp {c['file']} {live}"
+        else:
+            how = (f"{nodefile.NODE_FILE} names no `registry`: copy {c['file']} to a record file and name it there "
+                   "as `registry`")
+        text = json.dumps(doc, indent=2) + "\n"
+        if _read(self.target / c["file"]) == text:
+            did = "already holds it"
+        else:
+            self.w.write(c["file"], text, commit=False)
+            did = "would write it" if self.dry_run else "written"
+        return Result("registry", "needs-" + c["needs"],
+                      f"{c['file']} ({len(rows)} row(s)) {did}; {how}; only `services` is rendered")
+
+    def _service_rows(self, children):
+        """{path: that repo's services.json} for the node (`.`) and each child that has
+        one. In a dry run a repo without one counts the skeleton setup would write
+        there. ({rows}, [why a file could not be read])."""
+        rows, bad = {}, []
+        f = self.comp["services"]["file"]
+        for rel in [".", *children]:
+            p = self.target / f if rel == "." else self.target / rel / f
+            label = f if rel == "." else f"{rel}/{f}"
+            if not p.is_file():
+                if self.dry_run:
+                    rows[rel] = self.skeleton(None if rel == "." else Path(rel).name)
+                continue
+            doc, why = _json_file(p)
+            if why:
+                bad.append(f"{label} {why}")
+            else:
+                rows[rel] = doc
+        return rows, bad
+
+    def c_gates(self):
+        """Last: the shared checks on what setup rendered, in sequence (never alongside
+        a write). `run` first; then, by name, each contract gate it left out (one that
+        applies only under a role). Their results are this line."""
+        c = self.comp["gates"]
+        if self.checks_cli is None:
+            return Result("gates", "none", "no --checks CLI given: the shared checks were not run here")
+        if self.dry_run:
+            return Result("gates", "none", "a dry run (or a rebuild's setup pass): nothing rendered to check")
+        lst, err = self._checks("list")
+        names = _names(lst) if err is None else None
+        if names is None:
+            return Result("gates", "failed", err or "`list` is not {checks: [{name}]}")
+        run, err = self._checks("run", str(self.target))
+        rows, faults = _rows(run) if err is None else (None, [])
+        if rows is None:
+            return Result("gates", "failed", err or "`run` is not {results: [{check, status}]}")
+        missing = [g for g in c["contract"] if g not in names]
+        for g in c["contract"]:
+            if g in names and g not in {r["check"] for r in rows}:
+                one, err = self._checks("one", g, str(self.target))
+                got, more = _rows(one) if err is None else (None, [])
+                if got is None:
+                    faults.append(f"`one {g}`: {err or 'not {results: [{check, status}]}'}")
+                    continue
+                rows += got
+                faults += more
+        silent = [g for g in c["contract"] if g in names and g not in {r["check"] for r in rows}]
+        by = {}
+        for r in rows:
+            by.setdefault(r["status"], []).append(r)
+        notes = [f"{len(rows)} check(s): " + ", ".join(f"{len(v)} {k}" for k, v in sorted(by.items()))]
+        for st in ("fail", "error"):
+            if by.get(st):
+                notes.append(f"{st}: " + "; ".join(f"{r['check']}: {(r.get('lines') or ['(no line)'])[0]}"
+                                                    for r in by[st]))
+        if by.get("unchecked"):
+            notes.append("unchecked: " + ", ".join(r["check"] for r in by["unchecked"]))
+        if missing:
+            notes.append("not in the shared checks: " + ", ".join(missing) + " (unchecked, never a pass)")
+        if silent:
+            notes.append("reported nothing: " + ", ".join(silent) + " (unchecked, never a pass)")
+        if faults:
+            notes.append("faults: " + "; ".join(str(f) for f in faults))
+        statuses = ["unchanged"]
+        if by.get("fail"):
+            statuses.append("drift")
+        if by.get("error") or missing or silent or faults or set(by) - {"ok", "fail", "error", "unchecked"}:
+            statuses.append("failed")
+        return Result("gates", worst(statuses), "; ".join(notes))
+
+    def _checks(self, *args):
+        """(the document `<checks CLI> <args> --json` printed, None) or (None, why).
+        Read from its output, never its exit code (a red run exits non-zero)."""
+        argv = [self.checks_cli, *args, "--json"]
+        try:
+            r = subprocess.run(argv, capture_output=True, text=True, timeout=CHECKS_TIMEOUT)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return None, f"`{args[0]}` could not run ({e.__class__.__name__}: {e})"
+        try:
+            doc = json.loads(r.stdout)
+        except ValueError:
+            tail = (r.stderr.strip() or r.stdout.strip())[-200:]
+            return None, f"`{args[0]}` printed no JSON (exit {r.returncode}): {tail}"
+        return (doc, None) if isinstance(doc, dict) else (None, f"`{args[0]}` printed JSON that is not an object")
+
     def c_ignore(self):
         c = self.comp["ignore"]
         res = self._ignore_lines(c)
@@ -530,6 +725,7 @@ class Setup:
         cfg, why = nodefile.load(self.target / f)
         if why:
             return Result("node", "failed", f"{f}: {why}; no child set up, nothing rebuilt")
+        self.node_cfg = cfg
         bad, created = [], 0
         for rel in cfg["children"]:
             kid = self._child(rel)
@@ -557,7 +753,7 @@ class Setup:
                     hooks_from=self.hooks_from, plugins_from=self.plugins_from,
                     user_scope_from=self.user_scope_from, dir_base=self.dir_base, gh=self.gh,
                     spec=self.spec, node="auto", rebuild=self.rebuild, rebuild_dry=self.rebuild_dry,
-                    nest_in=self.target)
+                    nest_in=self.target, checks_cli=self.checks_cli)
         try:
             results = kid.run()
         except Refused as e:

@@ -8,3 +8,4 @@ __pycache__/
 .mutants/
 *.env
 *.bak
+registry.proposed.json

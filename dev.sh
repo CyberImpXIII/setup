@@ -48,7 +48,7 @@ cmd_hooks() {
 
 cmd_files() {
   local fails=0 f
-  for f in setup dev.sh templates/dev.sh tests/fake_gh.py devtools/mutate.py devtools/checkjson.py; do
+  for f in setup dev.sh templates/dev.sh tests/fake_gh.py tests/fake_checks.py devtools/mutate.py devtools/checkjson.py; do
     [ -x "$f" ] || { echo "  FAIL  $f missing or not executable"; fails=$((fails+1)); }
   done
   for f in components.json audit-terms.json devtools/mutants.json checks.json tests/fixtures/*.json; do

@@ -11,7 +11,7 @@ tests/test_node.py's live tests hold the two readings together:
   record     the record files, committed as content and never generated (globs)
   children   (optional) child repos, set up in turn by --node; nothing under a
              child is this node's
-  registry   (optional) the node's registry file; not read here
+  registry   (optional) the node's registry file; read only by the registry component
 
 `rebuild` renders setup's baseline afresh, as a new repo in a throwaway folder,
 for this node's path and name, and writes each generated file it renders over the

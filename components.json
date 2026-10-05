@@ -6,6 +6,11 @@
     {"name": "hooks",  "installs": "the shared hooks (and their tests) in .claude/hooks/, plus .claude/settings.proposed.json for Jacob when settings.json lacks a registration (in a repo setup is creating, that same render is written as .claude/settings.json itself and committed, with no proposal: PLAN-repo-setup §7.9; an existing repo's settings.json is never touched), including (with --plugins FILE) each plug-in hook the registry says applies here: run in place, never copied; with --user-scope FILE (the hook copies report), a shared hook the user settings already run is neither copied nor registered per repo in the proposal (\"covered by user scope: <files>\"; an existing copy is kept, an existing per-repo registration left out of the proposal so it does not run twice); unknown coverage is never covered", "source": ".claude"},
     {"name": "todo",   "installs": "TODO.md with the four standard headings, if absent", "template": "templates/TODO.md", "file": "TODO.md"},
     {"name": "check",  "installs": "a ./dev.sh stub that FAILS with 'not implemented: fill in the contract' (with --json: the one check schema's red report, check `stub-unfilled`), if absent; never fakes green", "template": "templates/dev.sh", "file": "dev.sh", "stub_marker": "SETUP-STUB"},
+    {"name": "services", "installs": "services.json, if absent (PLAN-routing-tree.md §14.8): the skeleton, the repo's name and its `check` entry only (the check stub's command); the owner adds `write` entries and tags. An existing one is the owner's, never touched; the shared `services-valid` gates it", "file": "services.json",
+     "skeleton": {"name": "{name}", "services": [{"service": "check", "run": "dev.sh", "verbs": ["check"]}]}},
+    {"name": "cli",    "installs": "nothing: cli.json ({store, cli, verbs}) is the owner's to write when the repo has a store. No skeleton passes its schema (a store and an executable cli are required), and a repo with no store needs none; the shared `accessor` gates both", "file": "cli.json"},
+    {"name": "params", "installs": "checks.json, if absent: the baseline, no parameter set, so every shared check runs at its defaults where it says it applies. An existing one is the owner's", "file": "checks.json",
+     "baseline": {"_comment": "Parameters for the shared checks: {\"<check>\": {\"<param>\": value}}. None set: every check at its defaults. Keys starting with _ are comments."}},
     {"name": "ignore", "installs": ".gitignore with the baseline entries if absent; in an existing one, only the entries git does not already ignore, appended (nothing rewritten or reordered); a negation of one is drift, as is an append that would re-ignore what a root negation keeps (git decides, in a scratch repo; a negation with a pattern in it cannot be tested and blocks the append); a committed file a baseline line covers is drift, never untracked", "file": ".gitignore",
      "header": "# Baseline from the setup tool: its settings proposal, local env files, backups. Add your own lines anywhere; setup only appends what is missing.",
      "_entries": "line: what is written; probe: a path that line must make git ignore. Present means git ignores the probe through the repo's own ignore files (by meaning, not bytes).",
@@ -13,7 +18,8 @@
        {"line": ".claude/settings.proposed.json", "probe": ".claude/settings.proposed.json"},
        {"line": ".env", "probe": ".env"},
        {"line": "*.env", "probe": "local.env"},
-       {"line": "*.bak", "probe": "notes.bak"}
+       {"line": "*.bak", "probe": "notes.bak"},
+       {"line": "registry.proposed.json", "probe": "registry.proposed.json"}
      ]},
     {"name": "commit","installs": "in a repo setup just created only: one commit of exactly the files it wrote, .claude/settings.json among them (never add -A, never the settings proposal)"},
     {"name": "remote", "installs": "with --github only: a GitHub repo (public by default, --private on request), origin, and a push of the current branch; verified by the pushed sha and the visibility"},
@@ -22,7 +28,11 @@
     {"name": "server", "installs": "nothing: the group-server entry has no defined shape yet (group servers are not built)", "needs": "harness"},
     {"name": "node",   "installs": "with --node only (PLAN-repo-setup §7.5, §7.10): each child node.json lists, set up in turn, created as a repo nested in this one when absent, a child with its own node.json recursing, never with --github; with --rebuild, every file node.json lists as generated, rendered again in place (the setup pass is then a dry run), one line per file (rebuild_statuses); never a record, never a generated file with uncommitted changes",
      "_render": "the components a --rebuild renders afresh, as a new repo in a throwaway folder, for the node's path and name",
-     "render": ["repo", "rules", "hooks", "todo", "check", "ignore"]}
+     "render": ["repo", "rules", "hooks", "todo", "check", "services", "params", "ignore"]},
+    {"name": "registry", "installs": "in a node run only, once its children are set up: registry.proposed.json, the union of the node's and each child's services.json keyed by path (`.` for the node), for Jacob to apply to the registry node.json names (as the settings proposal); nothing when it already equals that union. Only the registry's `services` is rendered: its roles and owners have no defined shape here", "file": "registry.proposed.json", "needs": "jacob"},
+    {"name": "gates",  "installs": "nothing: with --checks CLI only, and last, once everything is rendered (never in a dry run or a rebuild): `CLI list`, then `CLI run <path>`, then `CLI one <gate> <path>` for each contract gate below that `run` left out (one that applies only under a role, as the audit's), in sequence; their results are this line (a fail is drift, an error or a fault failed, unchecked named). A contract gate not in the list, or reporting nothing, fails the line by name: unchecked, never a pass",
+     "_contract": "PLAN-routing-tree.md §14.8: the shared checks beside the contract files",
+     "contract": ["check-json", "accessor", "services-valid", "registry-matches", "rendered-matches"]}
   ],
   "rebuild_statuses": {
     "regenerated": "a generated file rendered byte for byte, mode included, as the tree holds it (or, absent there, as the last commit does: written back)",

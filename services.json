@@ -1,0 +1,12 @@
+{
+  "name": "setup",
+  "services": [
+    {
+      "service": "check",
+      "run": "dev.sh",
+      "verbs": [
+        "check"
+      ]
+    }
+  ]
+}

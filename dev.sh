@@ -58,6 +58,10 @@ cmd_files() {
     [ -f "$f" ] || { echo "  FAIL  $f missing"; fails=$((fails+1)); }
   done
   bash -n templates/dev.sh 2>/dev/null || { echo "  FAIL  templates/dev.sh does not parse"; fails=$((fails+1)); }
+  # a component installing a folder of scripts (githooks): each one present and parsing
+  for f in $(jq -r '.components[] | select(.templates and .files) | .templates as $t | .files[] | "\($t)/\(.)"' components.json 2>/dev/null); do
+    { [ -f "$f" ] && bash -n "$f" 2>/dev/null; } || { echo "  FAIL  $f missing or does not parse"; fails=$((fails+1)); }
+  done
   [ $fails -eq 0 ] && echo "  ok    files: present, executable and parsing"
   return $((fails > 0))
 }
@@ -95,8 +99,10 @@ gate_role() { case "$1" in audit) echo audit ;; mutants) echo tests ;; *) echo c
 # --json: stdout is exactly one document (devtools/checkjson.py), each gate's
 # output captured to a scratch file so its finding lines become the failures.
 cmd_check() {
-  local json=0 g code fails=0 capdir="" dest rows=()
+  local json=0 g code fails=0 capdir="" dest rows=() tree=""
   [ "${1:-}" = "--json" ] && json=1
+  # the tree the gates run on, taken first, so an edit made meanwhile is never recorded as checked
+  [ -x .githooks/check-pass ] && tree=$(.githooks/check-pass tree 2>/dev/null)
   [ $json -eq 1 ] && capdir=$(mktemp -d 2>/dev/null)
   for g in "${GATES[@]}"; do
     if [ $json -eq 1 ]; then
@@ -109,10 +115,20 @@ cmd_check() {
   if [ $json -eq 1 ]; then
     python3 devtools/checkjson.py "${rows[@]}"; code=$?
     [ -n "$capdir" ] && rm -rf "$capdir"
+    [ $code -eq 0 ] && record_pass "$tree" >&2
     return $code
   fi
   [ $fails -eq 0 ] && echo "check: all ${#GATES[@]} gates green" || echo "check: $fails of ${#GATES[@]} gates FAILED"
+  [ $fails -eq 0 ] && record_pass "$tree"
   return $((fails > 0))
+}
+
+# A green check records the tree it ran on for the git pre-commit hook (the githooks
+# component); a tree that changed while the gates ran is not recorded. Not recording
+# never turns a green check red: the commit is what is refused.
+record_pass() {
+  [ -n "$1" ] || return 0
+  .githooks/check-pass record --from "$1" || echo "check: green, but the pass was not recorded (see above)"
 }
 
 case "${1:-}" in

@@ -13,7 +13,9 @@ class Fixture(Case):
         self.assertEqual(self.statuses(res), {
             "repo": "installed", "rules": "installed", "hooks": "installed",
             "todo": "installed", "check": "installed", "services": "installed", "cli": "none",
-            "data": "none", "params": "installed", "ignore": "installed", "commit": "installed",
+            "data": "none", "params": "installed", "ignore": "installed",
+            # the default hook source (this tool's own copies) registers no git-stamp.sh yet
+            "githooks": "needs-jacob", "commit": "installed",
             "remote": "none", "agent": "needs-harness", "server": "needs-harness",
             "node": "none", "registry": "none", "gates": "none"})
         repo = self.tmp / "fresh"
@@ -22,8 +24,10 @@ class Fixture(Case):
         hooks = {f".claude/hooks/{p.name}" for p in (ROOT / ".claude" / "hooks").glob("*.sh")}
         # §7.9: a repo setup creates commits its settings.json (tests/test_settings_new.py
         # holds it to the proposal render); no proposal is written beside it
+        githooks = {".githooks/check-pass", ".githooks/commit-msg", ".githooks/pre-commit"}
         self.assertEqual(tracked, {"CLAUDE.md", "TODO.md", "dev.sh", "services.json", "checks.json",
-                                   ".gitignore", ".claude/settings.json"} | hooks)
+                                   ".gitignore", ".claude/settings.json"} | hooks | githooks)
+        self.assertEqual(git(["config", "--get", "core.hooksPath"], repo).stdout, "")
         self.assertFalse((repo / ".claude/settings.proposed.json").exists())
         self.assertEqual(git(["status", "--porcelain", "--untracked-files=all"], repo).stdout, "")
         for h in hooks:

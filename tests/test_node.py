@@ -17,8 +17,9 @@ from setuplib import core
 from tests.helpers import ROOT, SETUP, Case, git, git_repo, snapshot, workspace_cli
 
 HOOK_FILES = sorted(f".claude/hooks/{p.name}" for p in (ROOT / ".claude/hooks").glob("*.sh"))
+GITHOOKS = next(c for c in core.load_spec()["components"] if c["name"] == "githooks")
 SCAFFOLD = ["CLAUDE.md", "TODO.md", "dev.sh", "services.json", "checks.json", ".gitignore",
-            ".claude/settings.json", *HOOK_FILES]
+            ".claude/settings.json", *HOOK_FILES, *(f"{GITHOOKS['dir']}/{f}" for f in GITHOOKS["files"])]
 CHECKS_CLI = workspace_cli("checks")[1]
 REBUILD = [str(SETUP), ".", "--node", "--rebuild"]
 ID = ["-c", "user.email=t@example.invalid", "-c", "user.name=t"]

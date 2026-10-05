@@ -733,6 +733,160 @@ class Setup:
         did = "would append" if self.dry_run else "appended"
         return Result("ignore", "installed", f"{did} {', '.join(missing)} to {c['file']}; existing lines untouched")
 
+    # ---- the git-side gates (PLAN-hard-gates.md §7 phase 2, §7a) ----------------
+
+    def c_githooks(self):
+        """The git hooks that refuse what the session hooks missed: commit-msg (who made
+        it, and what checked it), pre-commit (the check pass and no-secrets), and
+        check-pass, the one recorder and matcher both read. Installed if absent, a
+        changed one drift. core.hooksPath is set only when nothing would be refused for
+        want of wiring (_unready); until then it is left unset and the line says what is
+        missing, so a repo is never left unable to commit. Never set in a repo setup is
+        creating, and never over another core.hooksPath."""
+        c = self.comp["githooks"]
+        statuses, notes = [], []
+        n_new = 0
+        for name in c["files"]:
+            rel = f"{c['dir']}/{name}"
+            body = (TOOL_ROOT / c["templates"] / name).read_bytes()
+            dst = self.target / rel
+            if not dst.exists():
+                self.w.write(rel, body, mode=0o755)
+                n_new += 1
+                statuses.append("installed")
+            elif dst.read_bytes() != body:
+                statuses.append("drift")
+                notes.append(f"{rel} differs from the template (not overwritten)")
+            elif not os.access(dst, os.X_OK):
+                statuses.append("drift")
+                notes.append(f"{rel} is not executable")
+        did = "would install" if self.dry_run else "installed"
+        notes.insert(0, f"{did} {n_new} of {len(c['files'])} in {c['dir']}/" if n_new
+                     else f"{c['dir']}/ holds the {len(c['files'])} hooks")
+        st, note = self._checks_config(c)
+        statuses.append(st)
+        notes.append(note)
+        unwired = self._unwired(c["hooks"])
+        if unwired:
+            statuses.append("needs-" + c["needs"])
+            notes.append("settings do not run " + "; ".join(f"{n} ({why})" for n, why in unwired.items())
+                         + ": apply the settings proposal")
+        st, note = self._hooks_path(c, files_ok="drift" not in statuses, unwired=unwired)
+        statuses.append(st)
+        notes.append(note)
+        return Result("githooks", worst(statuses or ["unchanged"]), "; ".join(notes))
+
+    def _checks_config(self, c):
+        """(status, note) for the checks CLI the pre-commit runs: --checks, kept as an
+        absolute path in this clone's git config (never a tracked file)."""
+        have = self._config(c["config"])
+        if self.checks_cli is None:
+            return "unchanged", (f"{c['config']} = {have}" if have else f"{c['config']} unset (no --checks given)")
+        want = os.path.abspath(self.checks_cli)
+        if not os.access(want, os.X_OK):
+            return "failed", f"--checks {self.checks_cli} is not an executable: {c['config']} not set"
+        if have == want:
+            return "unchanged", f"{c['config']} = {want}"
+        err = self.w.git_config(c["config"], want) if self.target.exists() else None
+        if err:
+            return "failed", err
+        return "installed", f"{'would set' if self.dry_run else 'set'} {c['config']} = {want}"
+
+    def _hooks_path(self, c, files_ok, unwired):
+        """(status, note) for core.hooksPath: active, set now, or why not."""
+        if self.is_new:
+            return "unchanged", ("core.hooksPath not set: a repo setup is creating has the stub check, "
+                                 "which records no pass")
+        local = self._config("core.hooksPath", local=True)
+        origin, value = self._config_origin("core.hooksPath")
+        unready = self._unready(c, unwired, active=local == c["dir"])
+        if local == c["dir"]:
+            if unready:
+                return "drift", ("core.hooksPath is active but " + "; ".join(unready)
+                                 + ": every commit is refused until that is fixed")
+            return "unchanged", f"core.hooksPath = {c['dir']} (active)"
+        if value is not None and value != c["dir"]:
+            return "drift", f"core.hooksPath is {value} ({origin}): setup never overrides it, the gates are off"
+        if unready or not files_ok:
+            why = unready + ([] if files_ok else ["a hook there differs from the template"])
+            return ("needs-jacob" if unready == [f"{c['stamp']} is not registered"] else "needs-owner",
+                    "core.hooksPath not set, so the gates are off: " + "; ".join(why))
+        err = self.w.git_config("core.hooksPath", c["dir"])
+        if err:
+            return "failed", err
+        return "installed", f"{'would set' if self.dry_run else 'set'} core.hooksPath = {c['dir']}: the gates are on"
+
+    def _unready(self, c, unwired, active):
+        """What would make the git hooks refuse every commit, as a list of reasons (empty
+        when none): the check does not record its pass (a text probe: the check file
+        names the recorder), no runnable checks CLI configured, the stamp hook not
+        registered, or a hook in the default hooks folder that core.hooksPath would
+        silently switch off."""
+        why = []
+        text = _read(self.target / c["check_file"]) or ""
+        if c["record"] not in text or self.comp["check"]["stub_marker"] in text:
+            why.append(f"./{c['check_file']} does not run `{c['record']}` when its check passes "
+                       "(the pre-commit would refuse every commit)")
+        checks = os.path.abspath(self.checks_cli) if self.checks_cli else self._config(c["config"])
+        if not checks or not os.access(checks, os.X_OK):
+            why.append(f"no runnable checks CLI in {c['config']} (re-run with --checks CLI)")
+        if c["stamp"] in unwired:
+            why.append(f"{c['stamp']} is not registered")
+        if active:  # the default folder is already off
+            return why
+        # the default folder itself, not --git-path hooks (which follows core.hooksPath)
+        r = _git(["rev-parse", "--path-format=absolute", "--git-common-dir"], self.target)
+        d = Path(r.stdout.strip()) / "hooks" if r.returncode == 0 and r.stdout.strip() else None
+        own = sorted(p.name for p in d.iterdir() if p.is_file() and not p.name.endswith(".sample")) \
+            if d is not None and d.is_dir() else []
+        if own:
+            why.append(f"{', '.join(own)} in {d} would be switched off (move them into {c['dir']}/ or remove them)")
+        return why
+
+    def _unwired(self, names):
+        """{hook: why} for each of names the settings do not run: user scope covers it
+        (--user-scope), or .claude/settings.json makes every registration the hook
+        source's settings.json makes for it. A source that registers none: unknown,
+        never wired. In a repo setup is creating, settings.json is the source's render."""
+        try:
+            src = json.loads((self.hooks_from / "settings.json").read_text())
+        except (OSError, ValueError) as e:
+            return {n: f"the hook source's settings.json is unreadable ({e.__class__.__name__})" for n in names}
+        text = _read(self.target / ".claude" / "settings.json")
+        try:
+            tgt = json.loads(text) if text is not None else (src if self.is_new else {})
+        except ValueError:
+            return {n: ".claude/settings.json does not parse" for n in names}
+        cover, _, _ = self._user_scope()
+        out = {}
+        for n in names:
+            if cover(f".claude/hooks/{n}")[0] is True:
+                continue
+            regs = [(event, g.get("matcher"), h) for event, groups in (src.get("hooks") or {}).items()
+                    for g in groups for h in g.get("hooks", []) if _script(h.get("command", "")) == n]
+            if not regs:
+                out[n] = f"the hook source {self.hooks_from} registers none"
+            elif not all(_registered(tgt, *r) for r in regs):
+                out[n] = "not in .claude/settings.json"
+        return out
+
+    def _config(self, key, local=False):
+        """A git config value in the target, or None (unset, or no repo yet)."""
+        if not self.target.exists():
+            return None
+        r = _git(["config", "--get", *(["--local"] if local else []), key], self.target)
+        return r.stdout.strip() or None if r.returncode == 0 else None
+
+    def _config_origin(self, key):
+        """(where it is set, value) for a git config key at any scope, or (None, None)."""
+        if not self.target.exists():
+            return None, None
+        r = _git(["config", "--show-origin", "--get", key], self.target)
+        if r.returncode != 0 or "\t" not in r.stdout:
+            return None, None
+        origin, value = r.stdout.rstrip("\n").split("\t", 1)
+        return origin, value
+
     def c_remote(self):
         r = _git(["remote", "get-url", "origin"], self.target) if self.target.exists() else None
         if r is not None and r.returncode == 0:

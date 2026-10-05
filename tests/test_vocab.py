@@ -68,7 +68,8 @@ class DevSh(Case):
 # Anything that changes disk or a remote. Only setuplib/fsw.py may contain these.
 WRITES = re.compile(r"write_text|write_bytes|\.mkdir\(|chmod|unlink|rmtree|os\.remove|\.rename\(|shutil\."
                     r"|open\([^)]*['\"][wax]"
-                    r"|(?:\[\"git\", |_git\(\[)\"(?:init|add|commit|push|config|tag|reset|checkout|remote\", \"(?:add|set-url))\""
+                    r"|(?:\[\"git\", |_git\(\[)\"(?:init|add|commit|push|tag|reset|checkout|remote\", \"(?:add|set-url))\""
+                    r"|(?:\[\"git\", |_git\(\[)\"config\"(?!, \"--(?:get|show-origin)\")"
                     r"|\"repo\", \"(?:create|edit|delete)\"")
 
 
@@ -87,5 +88,9 @@ class OneWriter(Case):
     def test_the_pattern_catches_a_write(self):
         for line in ['p.write_text("x")', 'subprocess.run(["git", "commit"])', "open(p, 'w')",
                      "shutil.copy(a, b)", 'run([gh, "repo", "create", s])', '_git(["add", "x"], t)',
-                     '_git(["remote", "add", "origin", u], t)']:
+                     '_git(["remote", "add", "origin", u], t)', '_git(["config", "core.hooksPath", p], t)',
+                     '_git(["config", "--local", "k", v], t)', '["git", "config", "--unset", k]']:
             self.assertRegex(line, WRITES)
+        # a read of git config is not a write
+        for line in ['_git(["config", "--get", k], t)', '_git(["config", "--show-origin", "--get", k], t)']:
+            self.assertNotRegex(line, WRITES)

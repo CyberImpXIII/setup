@@ -1,6 +1,6 @@
 """The ONLY module in setuplib that changes anything on disk or on a remote.
 
-Every file write, chmod, folder creation, `git init`, commit, `gh repo create` and
+Every file write, chmod, folder creation, `git init`, `git config`, commit, `gh repo create` and
 the repo CLI's own write setup asks for (the data component's `import`) goes
 through a Writer, so `--dry-run` is enforced in one place: a dry Writer
 records what it would have done and touches nothing. tests/test_vocab.py
@@ -100,6 +100,15 @@ class Writer:
         r = subprocess.run(["git", "commit", "-q", "-m", message], cwd=self.root,
                            capture_output=True, text=True)
         return None if r.returncode == 0 else (r.stderr.strip() or r.stdout.strip() or "git commit failed")
+
+    def git_config(self, key: str, value: str):
+        """`git config --local key value` in the repo (the githooks component:
+        core.hooksPath, and the checks CLI its pre-commit runs). None, or why it failed."""
+        if self.dry_run:
+            return None
+        r = subprocess.run(["git", "config", "--local", key, value], cwd=self.root,
+                           capture_output=True, text=True)
+        return None if r.returncode == 0 else (r.stderr.strip() or f"git config {key} failed")
 
     def run_repo_cli(self, argv, env, timeout):
         """A write the repo's own CLI does (the data component's `import`), run in the

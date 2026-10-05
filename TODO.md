@@ -16,7 +16,34 @@
   though the real run would make a local repo and print "local, no remote yet".
   Deliberate: it reports the target as it is now (dispatcher's brief, 2026-10-04).
 
+- **Setup's own `record_pass` in dev.sh has no test or mutant** (2026-10-05):
+  recording only on a green check is proven for the stub contract only by reading.
+  Running `./dev.sh check` from a test recurses into the whole suite. Settle: a test
+  that runs `cmd_check` with GATES overridden to one stub gate (dev.sh would need a
+  `GATES` env override, which is itself a seam to guard).
+
 ## Open decisions
+
+- **githooks (PLAN-hard-gates §7 phase 2), built 2026-10-05; decisions for Jacob.**
+  (1) *Strict match*: pre-commit accepts only a staged tree equal to the working
+  tree the check passed on, so a partial commit (staging some changes, leaving
+  others) is refused, and so is any commit in a tree holding another agent's
+  uncommitted work. Open: keep strict, or record the *index* tree instead (then an
+  unstaged edit the check saw goes in unchecked). (2) *CLAUDECODE as the session
+  marker* (probed: set in every Bash call of a session): a `!` command typed in
+  Claude Code has it too, so Jacob's own commit from there is refused unstamped;
+  and a cron or script commit outside any session is stamped `Agent: jacob` (false
+  attribution). (3) A merge commit in a session (`git pull`, `git merge`) runs
+  commit-msg and carries no Agent trailer (git-stamp stamps `git commit` only), so
+  it is refused. (4) `git commit --no-verify` skips both hooks; only a session hook
+  can block it (reported to hooks, below). (5) Activation is gated: core.hooksPath
+  is set only when the check records its pass, `--checks` is given, git-stamp.sh is
+  wired, and the default hooks folder is empty; no repo has all four today (setup's
+  own copies of the shared hooks lack git-stamp.sh, so the source is not wired and
+  every new repo is needs-jacob). (6) The plan names it `git-gates` (§7a) and
+  `git-hooks` (§7); built as `githooks` (a component name is a method name).
+  (7) `resumed_from` waits on harness `progress.sh`; the seam is `check-pass record
+  --resumed-from K/N`. gates.json (§7a) is phase 3, not built here.
 
 - **§7.11 data component, built 2026-10-05; three parts of §7.11 not built here.**
   (1) The `--node --rebuild` store row (`emerged`, `same`, `drift`, `state`): the
@@ -227,6 +254,17 @@
 (none open)
 
 ## Reported to other owners
+
+- 2026-10-05, via the dispatcher, to checks: PLAN-hard-gates §3 row 6 says the
+  pre-commit runs no-secrets on the *staged diff*; `checks one no-secrets <repo>`
+  scans tracked plus would-be-committed working-tree files, so a secret staged and
+  then deleted from the working tree is not seen. The githooks pre-commit calls it
+  as is (`one no-secrets <top> --json`). Expected: a `--staged` mode, or the plan
+  amended. To hooks: `git commit --no-verify` skips the githooks gates; git-stamp.sh
+  (or phase 3) is the only place that can refuse it. And: this repo's copies of the
+  shared hooks lack git-stamp.sh and write-ledger.sh (source at bd0413c registers
+  both), so setup's default source wires neither; refreshing the copies is ours, once
+  the source settles.
 
 - 2026-10-05, via the dispatcher, to checks: setup now consumes node.json
   (`setuplib/node.py` mirrors schema/node.schema.json), so a schema change there

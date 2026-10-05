@@ -12,6 +12,11 @@
   planted-workspace tests, which run anywhere, and the exit-3 path by
   `test_the_cli_exits_non_zero_when_it_could_not_run` and its mutant. Nothing
   left here to fix unless tools/hooks changes how its test finds its sibling.
+  Since §7.12 (2026-10-05) `audit deps` is UNCHECKED there too, and the hooks
+  component fails without `--hooks-from`. unverified: which other test modules go
+  red in a lone clone because their fixtures use the default hook source (the
+  LoneClone classes in test_hooks and test_deps are the only ones proven) --
+  settle: copy this folder outside the workspace, `git init`, `./dev.sh test`.
 - **The agent line's `"repo"` reads "none yet" in a dry run on a new folder**,
   though the real run would make a local repo and print "local, no remote yet".
   Deliberate: it reports the target as it is now (dispatcher's brief, 2026-10-04).
@@ -38,9 +43,9 @@
   it is refused. (4) `git commit --no-verify` skips both hooks; only a session hook
   can block it (reported to hooks, below). (5) Activation is gated: core.hooksPath
   is set only when the check records its pass, `--checks` is given, git-stamp.sh is
-  wired, and the default hooks folder is empty; no repo has all four today (setup's
-  own copies of the shared hooks lack git-stamp.sh, so the source is not wired and
-  every new repo is needs-jacob). (6) The plan names it `git-gates` (§7a) and
+  wired, and the default hooks folder is empty. Since §7.12 the source is the hooks
+  dependency, which registers git-stamp.sh, so a new repo is wired (githooks
+  `installed` in tests/test_fixture.py); an existing one waits on its settings. (6) The plan names it `git-gates` (§7a) and
   `git-hooks` (§7); built as `githooks` (a component name is a method name).
   (7) `resumed_from` waits on harness `progress.sh`; the seam is `check-pass record
   --resumed-from K/N`. gates.json (§7a) is phase 3, not built here.
@@ -58,49 +63,35 @@
   folder absent from the data repo): its `import` decides (exit non-zero: setup's
   line is failed). And the plan says cli.json "declares `stores`"; the shared
   schema's field is `store` (string or list): setup follows the schema.
-- **The check component installing `checks run .` (planner: yes, PLAN-tools-folder
-  §8) collides with the content audit.** Not built, 2026-10-04. The stub would
-  have to name the runner's path (`tools/checks/checks`), and `./dev.sh audit
-  content` fails setup on naming any discovered repo, path or command; the same
-  holds for setup's own `dev.sh` adopting it. §9 (1) (the hooks component
-  defaulting to `tools/hooks/source`) has the same collision. Proposal for the
-  planner: one data file exempt from the content audit, like `audit-terms.json`
-  is from the direction audit, naming the sibling tools setup installs FROM
-  (dependencies, not targets), gated by "each named dependency is a discovered
-  repo, or UNCHECKED"; setup resolves the runner relative to the target at
-  install time and the stub still fails until the owner adds their suite. An
-  existing repo's `dev.sh` is never edited (setup does not overwrite); at most
-  it is reported `needs-owner` when its check does not call the runner.
-  Hinges on: whether setup may depend on named sibling tools at all.
-- **The `hooks` component reading `./hooks list --json` (tools/hooks' report) is
-  PLAN-tools-folder §9 (1), which awaits Jacob's yes** (top-level TODO.md, "Jacob's
-  yes needed on §9 (1), (2)"). Not built, 2026-10-04; it also needs the decision
-  above. Gates it would ship with are in §9 (1).
-- **Defaulting the hooks source to tools/hooks/source: asked by the dispatcher
-  2026-10-04, not built.** Evidence relayed from data-bridge: `setup --dry-run` there
-  printed `hooks unchanged ... 6 unchanged of 6` while `hooks copies` printed DRIFT
-  for 5 of those files, because setup compared against its own `.claude/hooks/`, which
-  lagged the source. Fixed for today by reinstalling those copies (59ed067; re-run
-  after it: data-bridge byte-equal to the source, setup `unchanged` correctly). The
-  class stays: whenever the source moves first, setup's "unchanged" means "agrees with
-  my stale copy". Mitigated, not solved: the hooks line now says `against <dir>`.
-  Not built because it is PLAN-tools-folder §9 (1), which the plan and the top-level
-  TODO say waits on Jacob's yes, and because it collides with the content audit (the
-  decision above). Hinges on: Jacob's yes on §9 (1), then the dependency decision.
-- **A replace path for a drifted hook copy** (three agents report setup has none;
-  dispatcher, 2026-10-04: record, do not decide). Evidence: today's reinstall here was
-  6 hand `cp`s from tools/hooks/source/hooks/ because `setup . --hooks-from
-  ../hooks/source` reports all 6 as drift "not overwritten". Options: an explicit
-  flag (e.g. `--replace-hooks`, never default) that overwrites a copy differing from
-  the source, or §9 (1)'s "header refreshed" path, which replaces only copies equal by
-  meaning and still leaves a logic change (today's case) to a hand copy. Hinges on:
-  whether setup may ever overwrite a file in a repo it did not create (CLAUDE.md
-  "What setup never does" says no today). Waits on Jacob (planner decisions 33-35);
-  not built. **Moot for the applies_to=all hooks once user scope is on** (2026-10-04,
-  `--user-scope`): a covered hook runs from its one source, so its per-repo copy is
-  neither replaced nor read (a drifted copy of a covered hook is no longer drift).
-  It stays live for any hook user scope does not cover (a `repos:` hook, or before
-  Jacob applies the user-scope proposal).
+- **§7.12 built 2026-10-05: the hooks component renders from the hooks dependency**
+  (`dependencies.json`, `setuplib/deps.py`, `setup audit deps`). This settles three
+  old items: reading `hooks list --json`, defaulting the source to tools/hooks/source
+  (the data-bridge "6 unchanged of 6" against a stale copy), and the content-audit
+  collision (dependencies.json is exempt from content and gated by `audit deps`).
+  Also fixed: `setup <repo> --dry-run` on an old six-file repo said "0 installed, 6
+  unchanged of 6" (the income report); it now lists the 22 files the listing names
+  (`test_old_six_file_repo_gets_the_rest_installed`). Still open, below.
+- **Replacing a drifted hook copy waits on Jacob (§7.12 end).** A copy whose logic
+  differs from the source is `drift` and byte-unchanged under a plain run and under
+  `--rebuild`; only a copy equal by meaning is rewritten ("header refreshed"). Options:
+  an explicit flag (never default), or `--rebuild` overwriting in a repo setup did not
+  create. Hinges on: whether setup may ever overwrite logic in a repo it did not
+  create. The five DRIFT files in other repos stay until then. Moot for any hook user
+  scope covers (`--user-scope`): its per-repo copy is neither replaced nor read.
+- **Other repos owe a reinstall (§7.12 step 2, dispatched per owner).** `hooks copies
+  <top> --gate <loc>` showed ~18-21 non-ok files per location before this change;
+  `setup <repo>` now installs the MISSING ones. Not run here (the brief: step 2).
+- **7 hooks here run only once Jacob applies the proposal.** `./setup .` rendered the
+  dependency's 10 hooks and 2 libraries; `.claude/settings.json` (Jacob's) registers 3,
+  so `./dev.sh hooks` prints 7 `PENDING` lines and passes. Settle: Jacob runs `cp
+  .claude/settings.proposed.json .claude/settings.json` here.
+- **The checks dependency is named but not read yet.** `dependencies.json` names
+  tools/checks so a future `checks run .` in the stub can resolve it; nothing in code
+  consumes it today (`_used_by` says so). `audit deps` still gates it.
+- **The hook source is the dependency's working tree, not a commit.** Another agent's
+  uncommitted edit in tools/hooks/source is what setup installs. Options: install from
+  `git show HEAD:` in the dependency, or refuse a dirty source. Hinges on whether a
+  hooks agent's in-progress edit should ever reach other repos.
 - **`--user-scope` has no default** (built 2026-10-04, decision 19). The workspace run
   is `./setup <path> --user-scope <(cd tools/hooks && ./hooks copies .. --json)`; without
   it the hooks line says "user scope not checked" and behaviour is as before. A default
@@ -261,10 +252,9 @@
   then deleted from the working tree is not seen. The githooks pre-commit calls it
   as is (`one no-secrets <top> --json`). Expected: a `--staged` mode, or the plan
   amended. To hooks: `git commit --no-verify` skips the githooks gates; git-stamp.sh
-  (or phase 3) is the only place that can refuse it. And: this repo's copies of the
-  shared hooks lack git-stamp.sh and write-ledger.sh (source at bd0413c registers
-  both), so setup's default source wires neither; refreshing the copies is ours, once
-  the source settles.
+  (or phase 3) is the only place that can refuse it. (Settled 2026-10-05, §7.12: this
+  repo now renders git-stamp.sh and write-ledger.sh from the hooks dependency, and a
+  new repo is wired from its settings.json.)
 
 - 2026-10-05, via the dispatcher, to checks: setup now consumes node.json
   (`setuplib/node.py` mirrors schema/node.schema.json), so a schema change there

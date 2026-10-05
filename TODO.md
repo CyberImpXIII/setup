@@ -164,11 +164,43 @@
 - **PLAN-repo-setup §2 and §7.6 still say setup only writes `settings.proposed.json`**;
   §7.9 is the exception, built here. The plan text is the planner's to reconcile.
 
+- **node.json is read twice: by setuplib/node.py and by tools/checks' contract** (built
+  2026-10-05, §7.5/§7.10). Setup may not import a sibling tool, so `load` mirrors
+  checks' `schema/node.schema.json` and its x-rules; the live tests (test_node
+  LiveChecks: `checks run` on every repo of a two-level tree, and `checks one
+  rendered-matches|regenerate` ok on a scaffold, fail on a committed edit) hold the
+  readings together, both ways. Built against checks' then-UNCOMMITTED node schema
+  (96ceef9 plus their working tree, 2026-10-05). One rule is setup's own: a child
+  inside another child is refused (checks accepts it); a record glob matching nothing
+  is not flagged (as in checks).
+- **Two comparers of a rebuild exist by design**: setup's per-file report and checks'
+  regen engine (which distrusts the generator and counts from git and bytes). Only
+  `failed` exits 1 here; drift and unaccounted are progress, `regenerate` is the gate.
+- **A generated file setup does not render is `failed`**: node.json's one `rebuild`
+  is setup's, so a second generator (a file another tool renders) has no place yet.
+  Hinges on the plan saying how a node composes generators.
+- **In checks' clone a plug-in registered at the top reads as drift**: the render's
+  path is the clone's (`stands_for`), so `repos:.` matched against the registry root
+  fails there. CHECKS_ORIGIN is deliberately not read (coupling). Unverified until a
+  node with a plug-in exists -- settle: `checks one regenerate .` on that node.
+- **Should a parent's .gitignore list its child paths?** Today a nested child shows as
+  untracked `child/` in the parent and both readers skip it as a child. Not decided.
+- **A node with children needs a registry** (checks' registry-matches); the item-(1)
+  fixture holds a hand-written `{"services": {}}` as a record until setup renders the
+  registry (§14.8, next item).
+
 ## Unconfirmed suspicions
 
 (none open)
 
 ## Reported to other owners
+
+- 2026-10-05, via the dispatcher, to checks: setup now consumes node.json
+  (`setuplib/node.py` mirrors schema/node.schema.json), so a schema change there
+  needs a matching change here; the live tests in tests/test_node.py go red if not.
+  Divergence: setup refuses a child inside another child, checks accepts it.
+  `setup . --node --rebuild` exits 1 only on a failed line (their engine reads any
+  non-zero exit as a `rebuild` finding, which is then correct).
 
 - 2026-10-05, via the dispatcher, to checks: `checks one check-json tools/setup`
   took 242.7 s against check-json's 280 s limit (an earlier run, 228.5 s): this

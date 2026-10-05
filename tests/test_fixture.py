@@ -13,7 +13,8 @@ class Fixture(Case):
         self.assertEqual(self.statuses(res), {
             "repo": "installed", "rules": "installed", "hooks": "installed",
             "todo": "installed", "check": "installed", "ignore": "installed", "commit": "installed",
-            "remote": "none", "agent": "needs-harness", "server": "needs-harness"})
+            "remote": "none", "agent": "needs-harness", "server": "needs-harness",
+            "node": "none"})
         repo = self.tmp / "fresh"
         self.assertEqual(git(["rev-parse", "--show-toplevel"], repo).stdout.strip(), str(repo))
         tracked = set(git(["ls-files"], repo).stdout.split())

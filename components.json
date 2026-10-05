@@ -19,8 +19,18 @@
     {"name": "remote", "installs": "with --github only: a GitHub repo (public by default, --private on request), origin, and a push of the current branch; verified by the pushed sha and the visibility"},
     {"name": "agent",  "installs": "nothing: a folder agent is a roster entry, which setup does not own", "needs": "harness",
      "entry": {"name": "{name}", "dir": "{dir}", "repo": "{repo}", "start_here": "{dir}/CLAUDE.md", "precommit": "./dev.sh check"}},
-    {"name": "server", "installs": "nothing: the group-server entry has no defined shape yet (group servers are not built)", "needs": "harness"}
+    {"name": "server", "installs": "nothing: the group-server entry has no defined shape yet (group servers are not built)", "needs": "harness"},
+    {"name": "node",   "installs": "with --node only (PLAN-repo-setup §7.5, §7.10): each child node.json lists, set up in turn, created as a repo nested in this one when absent, a child with its own node.json recursing, never with --github; with --rebuild, every file node.json lists as generated, rendered again in place (the setup pass is then a dry run), one line per file (rebuild_statuses); never a record, never a generated file with uncommitted changes",
+     "_render": "the components a --rebuild renders afresh, as a new repo in a throwaway folder, for the node's path and name",
+     "render": ["repo", "rules", "hooks", "todo", "check", "ignore"]}
   ],
+  "rebuild_statuses": {
+    "regenerated": "a generated file rendered byte for byte, mode included, as the tree holds it (or, absent there, as the last commit does: written back)",
+    "drift":       "a generated file rendered otherwise, or in neither the tree nor the last commit: the render is written and git diff is the finding; one with uncommitted changes is kept, not rendered",
+    "record":      "a file node.json lists as content (or node.json itself): never written",
+    "unaccounted": "in the tree (tracked, or untracked and not ignored), not under a child, named by neither list",
+    "failed":      "the setup render failed, or setup renders no such file; nothing written for it"
+  },
   "statuses": {
     "installed":     "setup wrote it (or, in --dry-run, would write it)",
     "unchanged":     "already as setup would make it; nothing written",

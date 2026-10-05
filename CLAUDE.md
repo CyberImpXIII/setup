@@ -21,6 +21,8 @@ command, or read the delegation layer.
 | also propose the plug-in hooks that apply | `--plugins FILE`: the JSON tools/hooks' `./hooks plugins --json` prints (a plug-in runs in place from its owner's repo, never copied); one whose registration would run from below the registry's root fails rather than guess |
 | skip the shared hooks user scope already runs | `--user-scope FILE`: the JSON tools/hooks' `./hooks copies <top> --json` prints; only its `user_scope` is read (never the user settings). A hook every `kind: source` row of which is `registered: true` is not copied and not registered per repo in the proposal (it would run twice); the line says `covered by user scope: <files>`. `null`, an `error`, or no user settings file: not covered, behaviour unchanged. The rule is tools/checks' `hooks-installed` rule, mirrored (setup may not import a sibling tool); an existing copy is never deleted |
 | also create the GitHub repo | `--github` (public by default), `--private` on request, `--owner O` |
+| set up a node and its children | `--node`: reads `<path>/node.json` (the shared checks' shape: `rebuild`, `generated`, `record`, `children`, `registry`; `setuplib/node.py` mirrors their schema, `tests/test_node.py`'s live tests hold the two readings together). Each child is set up in turn, created as a repo nested in the node when absent (never `--github`); one with its own node.json recurses |
+| re-render a node's generated files | `--node --rebuild` (PLAN-repo-setup §7.10): renders the baseline afresh in a throwaway folder for this path and name, writes each generated file over the tree's copy, and prints one line per file: `regenerated`, `drift` (written: `git diff` is the finding), `record`, `unaccounted`, `failed`. Only `failed` exits 1; the zero-drift gate is the shared checks' `regenerate`, which runs this in a clone. **Run it on fixtures and scratch copies, not the real top level**; `--dry-run` writes nothing |
 | what each component does, and the statuses | `./setup components` |
 | check a folder of plans | `./setup plans <dir>` |
 | before committing | `./dev.sh check` (tests, hooks, files, audits, self, mutants) |
@@ -28,8 +30,11 @@ command, or read the delegation layer.
 | what is open | `TODO.md` |
 
 **What setup never does:** write to a path it refused (a non-empty folder that is
-not a repo, a subfolder of a repo, a new repo nested in a work tree, a missing
-parent); overwrite something that differs (that is `drift`, reported); touch an
+not a repo, a subfolder of a repo, a new repo nested in a work tree unless that
+tree's node.json declares it a child, a missing parent); overwrite something that
+differs (that is `drift`, reported; the one exception is `--rebuild`, which writes
+a generated file's render over a committed copy so `git diff` shows the drift,
+and never writes a record or a generated file with uncommitted changes); touch an
 existing repo's `settings.json` (it writes `settings.proposed.json` and prints the
 copy command), including on a later run in a repo it created; commit in a repo it
 did not create; push into a GitHub repo that already exists.

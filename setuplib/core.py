@@ -14,6 +14,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import node as nodefile
 from .fsw import Writer, ignore_verdicts
 
 TOOL_ROOT = Path(__file__).resolve().parent.parent
@@ -54,13 +55,17 @@ def _toplevel(p: Path):
     return Path(r.stdout.strip()).resolve() if r.returncode == 0 else None
 
 
-def preflight(target: Path):
-    """Decide what the path is, or refuse. Returns (is_new, existed_empty). Writes nothing."""
+def preflight(target: Path, nest_in=None):
+    """Decide what the path is, or refuse. Returns (is_new, existed_empty). Writes nothing.
+    nest_in: the top of the node that declares target as a child (node.json); a new
+    repo, or an empty folder, may then nest in that work tree and in no other."""
     if target.exists():
         if not target.is_dir():
             raise Refused(f"{target} exists and is not a directory")
         top = _toplevel(target)
         if top is not None and top != target:
+            if nest_in is not None and top == nest_in and not any(target.iterdir()):
+                return True, True
             raise Refused(f"{target} is inside the git work tree {top}, not its top level; "
                           "setup works on a whole repo")
         if top == target:
@@ -73,7 +78,7 @@ def preflight(target: Path):
     if not parent.is_dir():
         raise Refused(f"the parent folder {parent} does not exist; create it first")
     top = _toplevel(parent)
-    if top is not None:
+    if top is not None and top != nest_in:
         raise Refused(f"{parent} is inside the git work tree {top}; a new repo there would nest")
     return True, False
 
@@ -109,8 +114,15 @@ class Setup:
     def __init__(self, target: Path, *, label: str, name: str, dry_run: bool,
                  github: bool = False, private: bool = False, owner=None,
                  hooks_from=None, plugins_from=None, user_scope_from=None, dir_base=None, gh: str = "gh",
-                 spec=None):
+                 spec=None, node=False, rebuild=False, rebuild_dry=False, nest_in=None, stands_for=None):
         self.target = target
+        self.node = node  # False, True (--node: node.json required) or "auto" (a child: a node if it has one)
+        self.rebuild = rebuild  # with it the setup pass is a dry run (dry_run=True) and only the rebuild writes,
+        self.rebuild_dry = rebuild_dry  # unless this is set too (--rebuild --dry-run)
+        self.nest_in = nest_in
+        self.stands_for = stands_for or target  # a rebuild renders in a copy for the real path
+        self.children = []
+        self.rebuild_lines = None
         self.dir_base = Path(dir_base) if dir_base is not None else Path.cwd()
         self.label = label
         self.name = name
@@ -261,7 +273,7 @@ class Setup:
                 or not isinstance(reg.get("plugins"), list)):
             return [], ["failed"], ["plug-in registry is not ok (its own check found a fault, or it "
                                     "lacks root or plugins); none proposed from it"]
-        rel = roster_dir(self.target, Path(reg["root"]))
+        rel = roster_dir(self.stands_for, Path(reg["root"]))
         wanted, statuses, notes, applied = [], [], [], []
         for p in reg["plugins"]:
             name = p.get("name") if isinstance(p, dict) else None
@@ -480,7 +492,7 @@ class Setup:
 
     def run(self):
         """Run every declared component in order. Raises Refused before any write."""
-        self.is_new, self._existed_empty = preflight(self.target)
+        self.is_new, self._existed_empty = preflight(self.target, self.nest_in)
         results = []
         for c in self.spec["components"]:
             res = getattr(self, "c_" + c["name"])()
@@ -502,9 +514,88 @@ class Setup:
         n = sum(1 for _, keep in self.w.written if keep)
         return Result("commit", "installed", f"{sha} with exactly the {n} file(s) setup wrote")
 
+    def c_node(self):
+        """--node (PLAN-repo-setup §7.5, §7.10): each child node.json declares is set up
+        in turn, created as a repo nested in this one when absent; a child with its own
+        node.json recurses; one child's failure does not stop the others. --rebuild
+        adds node.rebuild: every generated file rendered again in place, one line per
+        file (a child node rebuilds its own). Children never get --github."""
+        f = nodefile.NODE_FILE
+        if not self.node:
+            return Result("node", "none", "not a node run (--node not given)")
+        if not (self.target / f).is_file():
+            if self.node == "auto":
+                return Result("node", "none", f"no {f}: not a node")
+            return Result("node", "failed", f"--node, but no {f} in {self.label}; nothing set up below it")
+        cfg, why = nodefile.load(self.target / f)
+        if why:
+            return Result("node", "failed", f"{f}: {why}; no child set up, nothing rebuilt")
+        bad, created = [], 0
+        for rel in cfg["children"]:
+            kid = self._child(rel)
+            self.children.append(kid)
+            st = [r["status"] for r in kid["results"]]
+            bad += [s for s in st if s in BAD]
+            created += kid["results"][0]["component"] == "repo" and kid["results"][0]["status"] == "installed"
+        notes = [f"{len(cfg['children'])} child(ren), {created} created, "
+                 f"{sum(not k['ok'] for k in self.children)} with a failure or drift"]
+        rs = "unchanged"
+        if self.rebuild:
+            rw = Writer(self.target, self.rebuild_dry)  # the rebuild's own writes; the setup pass is dry
+            self.rebuild_lines = nodefile.rebuild(self.target, cfg, self._render, rw)
+            rs = nodefile.overall(self.rebuild_lines, bool(rw.written))
+            if rs in BAD:
+                bad.append(rs)
+            notes.append(f"rebuild{' (dry run)' if self.rebuild_dry else ''}: "
+                         f"{nodefile.counts(self.rebuild_lines) or 'nothing listed'}")
+        status = worst(bad) if bad else ("installed" if created or rs == "installed" else "unchanged")
+        return Result("node", status, "; ".join(notes))
+
+    def _child(self, rel):
+        label = rel if self.label == "." else f"{self.label}/{rel}"
+        kid = Setup(self.target / rel, label=label, name=Path(rel).name, dry_run=self.dry_run,
+                    hooks_from=self.hooks_from, plugins_from=self.plugins_from,
+                    user_scope_from=self.user_scope_from, dir_base=self.dir_base, gh=self.gh,
+                    spec=self.spec, node="auto", rebuild=self.rebuild, rebuild_dry=self.rebuild_dry,
+                    nest_in=self.target)
+        try:
+            results = kid.run()
+        except Refused as e:
+            results = [Result("repo", "failed", f"refused: {e}. Nothing was written there")]
+        return tree_doc(label, results, kid)
+
+    def _render(self, folder: Path):
+        """setup's baseline, rendered fresh as a new repo at folder, for the real path
+        (so a plug-in that applies here applies there). The components rendered are the
+        node entry's `render` list. None, or why it failed."""
+        spec = dict(self.spec)
+        keep = self.comp["node"]["render"]
+        spec["components"] = [c for c in self.spec["components"] if c["name"] in keep]
+        s = Setup(folder, label=str(folder), name=self.name, dry_run=False, hooks_from=self.hooks_from,
+                  plugins_from=self.plugins_from, user_scope_from=self.user_scope_from,
+                  dir_base=folder, gh=self.gh, spec=spec, stands_for=self.target)
+        try:
+            results = s.run()
+        except Refused as e:
+            return f"refused: {e}"
+        failed = [f"{r.component}: {r.detail}" for r in results if r.status == "failed"]
+        return "; ".join(failed) or None
+
     def _gh_login(self):
         r = subprocess.run([self.gh, "api", "user", "--jq", ".login"], capture_output=True, text=True)
         return r.stdout.strip() if r.returncode == 0 else None
+
+
+def tree_doc(label, results, s):
+    """One run as the JSON document prints it: {path, ok, results}, plus `children`
+    (each the same shape) in a node run and `rebuild` (its lines) in a rebuild."""
+    doc = {"path": label, "ok": not any(r.status in BAD for r in results),
+           "results": [r.__dict__ for r in results]}
+    if s.node:
+        doc["children"] = s.children
+    if s.rebuild_lines is not None:
+        doc["rebuild"] = [x.__dict__ for x in s.rebuild_lines]
+    return doc
 
 
 def _script(command: str):

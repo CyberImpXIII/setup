@@ -4,9 +4,10 @@ Every file write, chmod, folder creation, `git init`, commit and `gh repo create
 goes through a Writer, so `--dry-run` is enforced in one place: a dry Writer
 records what it would have done and touches nothing. tests/test_vocab.py
 (OneWriter) audits that no other module in setuplib writes, and
-tests/test_dryrun.py that a dry run leaves the target byte-identical. The one
-write outside a Writer is ignore_verdicts' throwaway repo in the system temp
-folder, which never touches the target and is removed before it returns.
+tests/test_dryrun.py that a dry run leaves the target byte-identical. The two
+writes outside a Writer are throwaway folders in the system temp folder, which
+never touch the target and are removed before they return: ignore_verdicts' repo,
+and Scratch, the copy `--rebuild` renders into.
 """
 import os
 import subprocess
@@ -42,6 +43,20 @@ def ignore_verdicts(texts, paths, as_folders=False):
                 got[f[i + 3]] = (int(f[i + 1]) if f[i + 1] else 0, f[i + 2])
             out.append(got)
     return out, None
+
+
+class Scratch:
+    """The throwaway folder `--rebuild` renders setup's baseline into (setuplib/node.py):
+    in the system temp folder, removed on exit. The caller renders into a subfolder of
+    `path` through its own Writer; nothing here touches the target."""
+
+    def __enter__(self):
+        self._d = tempfile.TemporaryDirectory(prefix="setup-rebuild-")
+        self.path = Path(self._d.name).resolve()
+        return self
+
+    def __exit__(self, *exc):
+        self._d.cleanup()
 
 
 class Writer:

@@ -14,7 +14,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from .fsw import Writer
+from .fsw import Writer, ignore_verdicts
 
 TOOL_ROOT = Path(__file__).resolve().parent.parent
 SPEC_PATH = TOOL_ROOT / "components.json"
@@ -285,11 +285,15 @@ class Setup:
             return Result("ignore", "drift", "; ".join(negated) + ": not changed (the owner's call)")
         if not missing:
             return Result("ignore", "unchanged", f"{c['file']} ignores every baseline entry")
-        if any(ln.lstrip().startswith("!") for ln in text.splitlines()):
-            return Result("ignore", "drift", f"{c['file']} lacks {', '.join(missing)} but holds negations an "
-                                             "appended line could override; not changed: add them where they belong")
         sep = "" if text == "" or text.endswith("\n") else "\n"
-        self.w.write(c["file"], text + sep + "\n".join(missing) + "\n")
+        new = text + sep + "\n".join(missing) + "\n"
+        blocked, err = _overridden_negations(text, new)
+        if err:
+            return Result("ignore", "failed", f"git check-ignore: {err}")
+        if blocked:
+            return Result("ignore", "drift", f"{c['file']} lacks {', '.join(missing)}, but " + "; ".join(blocked)
+                          + ": not changed, add them where they belong")
+        self.w.write(c["file"], new)
         did = "would append" if self.dry_run else "appended"
         return Result("ignore", "installed", f"{did} {', '.join(missing)} to {c['file']}; existing lines untouched")
 
@@ -408,6 +412,45 @@ def _ignored_by(repo: Path, probes):
         if src and not src.startswith(".git/") and not Path(src).is_absolute():
             out[path] = (f"{src}:{num}", pattern)
     return out, None
+
+
+GLOB = re.compile(r"[*?\[\\]")
+
+
+def _overridden_negations(old: str, new: str):
+    """Why appending turns `old` into `new` would undo a negation, as sentences ([] when
+    it would not). Only the root .gitignore's negations count: a deeper .gitignore
+    outranks the root, so a root append cannot override it. Each literal negation
+    !B is tested by git itself on B as a file and as a folder: a path B the negation
+    keeps before the append and an appended line ignores after it is overridden. A
+    negation with a pattern in it (* ? [, an escape, or a '..') names no single path
+    to test, so it blocks the append with that reason rather than a guess. Returns
+    (sentences, error)."""
+    lines = old.splitlines()
+    blocked, probes = [], []
+    for n, ln in enumerate(lines, 1):
+        if not ln.startswith("!"):
+            continue
+        body = ln[1:].rstrip(" ")
+        if not body.strip("/") or GLOB.search(body) or ".." in body.split("/"):
+            blocked.append(f"{ln} (.gitignore:{n}) is a pattern, so whether an appended line re-ignores what "
+                           "it keeps cannot be tested without guessing")
+            continue
+        probes.append(body.strip("/"))
+    probes = list(dict.fromkeys(probes))
+    for as_folders, suffix in ((False, ""), (True, "/")):
+        if not probes:
+            break
+        verdicts, err = ignore_verdicts([old, new], probes, as_folders)
+        if err:
+            return [], err
+        before, after = verdicts
+        for q in probes:
+            bn, bp = before.get(q, (0, ""))
+            an, ap = after.get(q, (0, ""))
+            if bp.startswith("!") and an > len(lines) and not ap.startswith("!"):
+                blocked.append(f"{ap} would re-ignore {q}{suffix}, which {bp} (.gitignore:{bn}) keeps")
+    return blocked, None
 
 
 def _tracked_but_covered(repo: Path, lines):

@@ -4,8 +4,9 @@ Brings one git repo (or a new folder) to the shared baseline, from its path
 alone: the shared-rules block of `CLAUDE.md`, the shared hooks and a settings
 proposal, `TODO.md`, a `./dev.sh check` stub that fails until it is filled in,
 a baseline `.gitignore` (the proposal, local env files, backups: in an existing
-one only what git does not already ignore is appended, and a negation of an
-entry is drift), and on request a GitHub repo. Spec: `PLAN-repo-setup.md` §2 one level up from
+one only what git does not already ignore is appended; a negation of an entry,
+an append that would re-ignore what a negation keeps, and a committed file an
+entry covers are drift), and on request a GitHub repo. Spec: `PLAN-repo-setup.md` §2 one level up from
 `tools/`, minus the `agent` and `server` components, which belong to the
 delegation layer: setup prints "needs harness" and the line to add instead.
 

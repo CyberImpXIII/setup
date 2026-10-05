@@ -70,16 +70,56 @@ class Ignore(Case):
         self.assertIn("!local.env", res["ignore"]["detail"])
         self.assertEqual((repo / ".gitignore").read_text(), "*.env\n!local.env\n")
 
-    def test_missing_lines_beside_any_negation_is_drift_and_untouched(self):
-        # an appended line could re-ignore what the owner un-ignored: theirs to place
+    def test_negation_an_append_would_override_is_drift_and_untouched(self):
+        # appending *.bak after !keep.bak would re-ignore keep.bak: the owner's to place
         repo = git_repo(self.tmp / "old")
         (repo / ".gitignore").write_text("*.cfg\n!keep.bak\n")
         code, res = self.run_json("old")
-        self.assertEqual(code, 1)
-        self.assertEqual(res["ignore"]["status"], "drift")
-        for x in LINES:
-            self.assertIn(x, res["ignore"]["detail"])
+        self.assertEqual((code, res["ignore"]["status"]), (1, "drift"), res["ignore"])
+        detail = res["ignore"]["detail"]
+        self.assertIn("*.bak would re-ignore keep.bak", detail)
+        self.assertIn("!keep.bak (.gitignore:2)", detail)
         self.assertEqual((repo / ".gitignore").read_text(), "*.cfg\n!keep.bak\n")
+
+    def test_negation_no_append_overrides_is_kept_and_the_lines_appended(self):
+        repo = git_repo(self.tmp / "old")
+        old = "build/*\n!build/keep.txt\n"
+        (repo / ".gitignore").write_text(old)
+        code, res = self.run_json("old")
+        self.assertEqual((code, res["ignore"]["status"]), (0, "installed"), res["ignore"])
+        new = (repo / ".gitignore").read_text()
+        self.assertEqual(new, old + "".join(x + "\n" for x in LINES))
+        # by meaning: the owner's kept path is still kept after the append
+        r = git(["-c", "core.excludesFile=/dev/null", "check-ignore", "-v", "-n", "--no-index",
+                 "--", "build/keep.txt"], repo)
+        self.assertIn("!build/keep.txt", r.stdout)
+        code, res = self.run_json("old")
+        self.assertEqual(res["ignore"]["status"], "unchanged", res["ignore"])
+
+    def test_directory_negation_an_append_would_override_is_caught(self):
+        # !keep.bak/ keeps a folder; *.bak would re-ignore the folder itself
+        repo = git_repo(self.tmp / "old")
+        (repo / ".gitignore").write_text("*.d\n!keep.bak/\n")
+        code, res = self.run_json("old")
+        self.assertEqual((code, res["ignore"]["status"]), (1, "drift"), res["ignore"])
+        self.assertIn("*.bak would re-ignore keep.bak/", res["ignore"]["detail"])
+
+    def test_glob_negation_is_drift_with_the_reason_not_a_guess(self):
+        repo = git_repo(self.tmp / "old")
+        (repo / ".gitignore").write_text("*.txt\n!keep*.txt\n")
+        code, res = self.run_json("old")
+        self.assertEqual((code, res["ignore"]["status"]), (1, "drift"), res["ignore"])
+        self.assertIn("!keep*.txt (.gitignore:2) is a pattern", res["ignore"]["detail"])
+        self.assertEqual((repo / ".gitignore").read_text(), "*.txt\n!keep*.txt\n")
+
+    def test_negation_in_a_subfolder_gitignore_does_not_block(self):
+        # a deeper .gitignore outranks the root one: a root append cannot override it
+        repo = git_repo(self.tmp / "old")
+        (repo / ".gitignore").write_text("dist\n")
+        (repo / "sub").mkdir()
+        (repo / "sub" / ".gitignore").write_text("!keep.bak\n")
+        code, res = self.run_json("old")
+        self.assertEqual(res["ignore"]["status"], "installed", res["ignore"])
 
     def commit_files(self, repo, *paths):
         for p in paths:

@@ -6,7 +6,7 @@
     {"name": "hooks",  "installs": "the shared hooks (and their tests) in .claude/hooks/, plus .claude/settings.proposed.json for Jacob when settings.json lacks a registration", "source": ".claude"},
     {"name": "todo",   "installs": "TODO.md with the four standard headings, if absent", "template": "templates/TODO.md", "file": "TODO.md"},
     {"name": "check",  "installs": "a ./dev.sh stub that FAILS with 'not implemented: fill in the contract', if absent; never fakes green", "template": "templates/dev.sh", "file": "dev.sh", "stub_marker": "SETUP-STUB"},
-    {"name": "ignore", "installs": ".gitignore with the baseline entries if absent; in an existing one, only the entries git does not already ignore, appended (nothing rewritten or reordered); a negation of one, or missing entries beside any negation, is drift", "file": ".gitignore",
+    {"name": "ignore", "installs": ".gitignore with the baseline entries if absent; in an existing one, only the entries git does not already ignore, appended (nothing rewritten or reordered); a negation of one is drift, as is an append that would re-ignore what a root negation keeps (git decides, in a scratch repo; a negation with a pattern in it cannot be tested and blocks the append); a committed file a baseline line covers is drift, never untracked", "file": ".gitignore",
      "header": "# Baseline from the setup tool: its settings proposal, local env files, backups. Add your own lines anywhere; setup only appends what is missing.",
      "_entries": "line: what is written; probe: a path that line must make git ignore. Present means git ignores the probe through the repo's own ignore files (by meaning, not bytes).",
      "entries": [

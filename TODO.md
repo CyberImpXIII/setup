@@ -62,10 +62,16 @@
   names (`checks all --names`, reported to harness by checks); `checks.json`
   already makes that run green (checked 2026-10-04 with the roster's names).
   Until then, re-run the probe on each roster change.
-- **A repo whose `.gitignore` holds any negation and lacks a baseline entry reads
-  `drift`** (2026-10-04, deliberate: an appended line could re-ignore what the
-  owner un-ignored). If that turns red across the workspace, the alternative is
-  testing each negation's own path after the append (needs a scratch work tree).
+- **A root `.gitignore` negation with a pattern in it (`!keep*.txt`) still blocks
+  the append as drift** (2026-10-04): literal negations are now tested by git in a
+  scratch repo (as a file and as a folder), but a pattern names no single path, and
+  a representative path would be a guess. No workspace `.gitignore` holds any
+  negation today (probe: `grep -n '^!'` over them, 2026-10-04). Revisit if one does.
+- **The negation test covers the negated path itself, not files inside a kept
+  folder** (decided 2026-10-04): after `build/*` and `!build/keep/`, an appended
+  `*.bak` ignores `build/keep/x.bak`, which is the baseline doing its job, not an
+  override (the negation's last match is the folder, not the file). Hinges on
+  whether an owner ever means "keep everything in here" by a folder negation.
 
 ## Unconfirmed suspicions
 

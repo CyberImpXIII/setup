@@ -1,6 +1,6 @@
 """PLAN-repo-setup §3 "Idempotent": a second run writes nothing and installs nothing;
-once the owner and Jacob have done their parts, everything setup owns is unchanged."""
-import shutil
+once the owner has filled in the check, everything setup owns is unchanged (a repo
+setup created already carries its settings.json, PLAN-repo-setup §7.9)."""
 
 from tests.helpers import Case, snapshot
 
@@ -18,7 +18,6 @@ class Idempotent(Case):
     def test_settled_repo_is_all_unchanged(self):
         self.run_json("fresh")
         repo = self.tmp / "fresh"
-        shutil.copy(repo / ".claude/settings.proposed.json", repo / ".claude/settings.json")
         (repo / "dev.sh").write_text("#!/usr/bin/env bash\necho ok\n")
         code, res = self.run_json("fresh")
         self.assertEqual(code, 0)

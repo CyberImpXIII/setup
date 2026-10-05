@@ -4,6 +4,8 @@
   setup <path> [--dry-run] [--github [--private] [--owner O]] [--name N] [--hooks-from DIR]
                [--plugins FILE] [--user-scope FILE] [--relative-to DIR] [--json]
       install every component in components.json; one line each, then a result line.
+      A repo setup creates gets .claude/settings.json (the render a proposal would
+      hold), committed; an existing repo only ever gets settings.proposed.json.
       The roster line's dir is <path> relative to DIR (default: the working
       folder), normalised; null when <path> is not under DIR. --plugins: a
       plug-in hook registry (JSON: root, ok, plugins[name, applies_to, faults,

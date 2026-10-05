@@ -2,7 +2,7 @@
 
 Brings one git repo (or a new folder) to the shared baseline, from its path
 alone: the shared-rules block of `CLAUDE.md`, the shared hooks and a settings
-proposal, `TODO.md`, a `./dev.sh check` stub that fails until it is filled in,
+proposal (in a repo setup creates, `settings.json` itself, committed), `TODO.md`, a `./dev.sh check` stub that fails until it is filled in,
 a baseline `.gitignore` (the proposal, local env files, backups: in an existing
 one only what git does not already ignore is appended; a negation of an entry,
 an append that would re-ignore what a negation keeps, and a committed file an
@@ -29,11 +29,16 @@ command, or read the delegation layer.
 
 **What setup never does:** write to a path it refused (a non-empty folder that is
 not a repo, a subfolder of a repo, a new repo nested in a work tree, a missing
-parent); overwrite something that differs (that is `drift`, reported); touch
-`settings.json` (it writes `settings.proposed.json` and prints the copy command);
-commit in a repo it did not create; push into a GitHub repo that already exists.
+parent); overwrite something that differs (that is `drift`, reported); touch an
+existing repo's `settings.json` (it writes `settings.proposed.json` and prints the
+copy command), including on a later run in a repo it created; commit in a repo it
+did not create; push into a GitHub repo that already exists.
 Every write goes through `setuplib/fsw.py`, the one place `--dry-run` is
-enforced, and a test fails if any other module writes.
+enforced, and a test fails if any other module writes. **The one exception for
+settings** (PLAN-repo-setup §7.9): in a repo it is creating, where nothing of
+Jacob's exists yet, setup writes `.claude/settings.json` from the same render the
+proposal would hold and puts it in the scaffold commit, with no proposal beside it
+(`tests/test_settings_new.py` holds the file equal to that proposal, byte for byte).
 
 **Statuses**, worst first: `failed`, `drift` (both exit 1), `needs-jacob`,
 `needs-owner`, `needs-harness`, `installed`, `none`, `unchanged`. A refused path

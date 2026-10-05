@@ -299,7 +299,10 @@ class Setup:
         """Registrations the source settings.json makes for these hooks, plus `extra`
         (event, matcher, hook) wanted besides, against the target's. A shared hook in
         `drop` runs at user scope: a per-repo registration of it would run it twice, so
-        the proposal leaves it out (settings.json itself is never touched)."""
+        the proposal leaves it out. An existing repo's settings.json is never touched.
+        In a repo setup is creating (PLAN-repo-setup §7.9) nothing of Jacob's exists
+        yet, so the same render is written as settings.json itself and committed with
+        the scaffold, and no proposal is written."""
         try:
             src = json.loads((self.hooks_from / "settings.json").read_text())
         except (FileNotFoundError, json.JSONDecodeError) as e:
@@ -323,8 +326,14 @@ class Setup:
         if not missing and not twice:
             return "unchanged", None
         prop = _merge(kept, missing)
-        rel = ".claude/settings.proposed.json"
         body = json.dumps(prop, indent=2) + "\n"
+        if self.is_new and text is None:
+            live = ".claude/settings.json"
+            self.w.write(live, body)
+            did = "would write" if self.dry_run else "wrote"
+            return "installed", (f"{did} {live} ({len(missing)} registration(s), the render a proposal would "
+                                 "hold): a repo setup created, so the wiring is committed with the scaffold")
+        rel = ".claude/settings.proposed.json"
         if _read(self.target / rel) != body:
             self.w.write(rel, body, commit=False)
         why = []

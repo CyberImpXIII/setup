@@ -154,6 +154,16 @@
   2026-10-05, `grep -l SETUP-STUB */dev.sh */*/dev.sh` from the workspace top: none
   carry the stub today, so nothing to migrate.
 
+- **A created repo whose render is empty gets no settings.json** (§7.9, built
+  2026-10-05). With `--user-scope` covering every shared hook and no plug-in applying,
+  nothing is missing, so the hooks line is `unchanged` and no file is written or
+  committed. §7.9 says the file also holds "the permission mode", but the render (the
+  source settings.json) carries hooks only, so a created repo carries no permission
+  mode either. Hinges on: whether every created repo must carry a settings.json (then
+  write the empty render too) and whether a permission mode belongs in the source.
+- **PLAN-repo-setup §2 and §7.6 still say setup only writes `settings.proposed.json`**;
+  §7.9 is the exception, built here. The plan text is the planner's to reconcile.
+
 ## Unconfirmed suspicions
 
 (none open)

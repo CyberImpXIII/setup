@@ -62,10 +62,6 @@
   names (`checks all --names`, reported to harness by checks); `checks.json`
   already makes that run green (checked 2026-10-04 with the roster's names).
   Until then, re-run the probe on each roster change.
-- **`ignore` does not look for a baseline file already tracked** (e.g. a
-  committed `local.env`): `.gitignore` cannot untrack it, and `check-ignore
-  --no-index` reports it ignored, so setup says `unchanged`. Probe: `git ls-files
-  -ci --exclude-standard` in the target lists such files; could become `drift`.
 - **A repo whose `.gitignore` holds any negation and lacks a baseline entry reads
   `drift`** (2026-10-04, deliberate: an appended line could re-ignore what the
   owner un-ignored). If that turns red across the workspace, the alternative is

@@ -81,6 +81,43 @@ class Ignore(Case):
             self.assertIn(x, res["ignore"]["detail"])
         self.assertEqual((repo / ".gitignore").read_text(), "*.cfg\n!keep.bak\n")
 
+    def commit_files(self, repo, *paths):
+        for p in paths:
+            (repo / p).parent.mkdir(parents=True, exist_ok=True)
+            (repo / p).write_text("x\n")
+        git(["add", "--", *paths], repo)
+        git(["commit", "-q", "-m", "tracked"], repo)
+
+    def test_tracked_file_the_baseline_covers_is_drift_and_stays_tracked(self):
+        # .gitignore cannot untrack a committed file; setup says so and never untracks it
+        repo = git_repo(self.tmp / "old")
+        self.commit_files(repo, "local.env", "sub/notes.bak", "kept.txt")
+        (repo / ".gitignore").write_text("dist\n")
+        git(["add", ".gitignore"], repo)
+        git(["commit", "-q", "-m", "gi"], repo)
+        before = snapshot(repo)
+        code, res = self.run_json("old", "--dry-run")
+        self.assertEqual(snapshot(repo), before)
+        self.assertEqual((code, res["ignore"]["status"]), (1, "drift"), res["ignore"])
+        code, res = self.run_json("old")
+        self.assertEqual((code, res["ignore"]["status"]), (1, "drift"), res["ignore"])
+        detail = res["ignore"]["detail"]
+        self.assertIn("local.env", detail)
+        self.assertIn("sub/notes.bak", detail)
+        self.assertNotIn("kept.txt", detail)
+        self.assertIn("git rm --cached", detail)
+        # still tracked, nothing staged; the missing lines were still appended
+        self.assertIn("local.env", git(["ls-files"], repo).stdout.split())
+        self.assertEqual(git(["diff", "--cached", "--name-only"], repo).stdout, "")
+        self.assertIn("*.env", (repo / ".gitignore").read_text().splitlines())
+
+    def test_tracked_file_the_owner_negated_is_not_flagged(self):
+        repo = git_repo(self.tmp / "old")
+        self.commit_files(repo, "keep.env")
+        (repo / ".gitignore").write_text("".join(x + "\n" for x in LINES) + "!keep.env\n")
+        code, res = self.run_json("old")
+        self.assertEqual((code, res["ignore"]["status"]), (0, "unchanged"), res["ignore"])
+
     def test_ignored_only_by_info_exclude_still_gets_the_line(self):
         # .git/info/exclude is not in a clone; the repo's own .gitignore must carry it
         repo = git_repo(self.tmp / "old")

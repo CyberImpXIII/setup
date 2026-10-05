@@ -252,6 +252,20 @@ class Setup:
 
     def c_ignore(self):
         c = self.comp["ignore"]
+        res = self._ignore_lines(c)
+        if self.is_new:  # nothing tracked yet (and no repo at all in a dry run)
+            return res
+        tracked, err = _tracked_but_covered(self.target, [e["line"] for e in c["entries"]])
+        if err:
+            return Result("ignore", "failed", f"git ls-files: {err}")
+        if not tracked:
+            return res
+        return Result("ignore", worst([res.status, "drift"]),
+                      f"{', '.join(tracked)} tracked though a baseline line ignores it: a .gitignore cannot "
+                      "untrack a committed file, and setup never does; `git rm --cached <path>` is the "
+                      f"owner's call; {res.detail}")
+
+    def _ignore_lines(self, c):
         entries = c["entries"]
         text = _read(self.target / c["file"])
         if text is None:
@@ -394,6 +408,25 @@ def _ignored_by(repo: Path, probes):
         if src and not src.startswith(".git/") and not Path(src).is_absolute():
             out[path] = (f"{src}:{num}", pattern)
     return out, None
+
+
+def _tracked_but_covered(repo: Path, lines):
+    """Committed files a baseline line matches, minus those the repo's own ignore
+    files deliberately keep (their last match is a negation). Matching is git's own
+    (`ls-files -i -x`, the lines alone), so it is by meaning. Returns (paths, error)."""
+    args = ["-c", "core.excludesFile=/dev/null", "ls-files", "-z", "--cached", "--ignored"]
+    for ln in lines:
+        args += ["-x", ln]
+    r = _git(args, repo)
+    if r.returncode != 0:
+        return [], r.stderr.strip() or f"exit {r.returncode}"
+    paths = [p for p in r.stdout.split("\0") if p]
+    if not paths:
+        return [], None
+    seen, err = _ignored_by(repo, paths)
+    if err:
+        return [], err
+    return [p for p in paths if not seen.get(p, (None, ""))[1].startswith("!")], None
 
 
 def _registered(tgt, event, matcher, hook):

@@ -3,7 +3,7 @@
   "components": [
     {"name": "repo",   "installs": "for a path that does not exist (or an empty folder whose parent is not in a work tree): the folder and git init"},
     {"name": "rules", "installs": "the shared-rules block of CLAUDE.md, between markers; the repo's own sections untouched", "template": "templates/shared-rules.md", "head": "templates/CLAUDE.md", "file": "CLAUDE.md", "block_id": "rules"},
-    {"name": "hooks",  "installs": "the shared hooks (and their tests) in .claude/hooks/, plus .claude/settings.proposed.json for Jacob when settings.json lacks a registration", "source": ".claude"},
+    {"name": "hooks",  "installs": "the shared hooks (and their tests) in .claude/hooks/, plus .claude/settings.proposed.json for Jacob when settings.json lacks a registration, including (with --plugins FILE) each plug-in hook the registry says applies here: run in place, never copied", "source": ".claude"},
     {"name": "todo",   "installs": "TODO.md with the four standard headings, if absent", "template": "templates/TODO.md", "file": "TODO.md"},
     {"name": "check",  "installs": "a ./dev.sh stub that FAILS with 'not implemented: fill in the contract', if absent; never fakes green", "template": "templates/dev.sh", "file": "dev.sh", "stub_marker": "SETUP-STUB"},
     {"name": "ignore", "installs": ".gitignore with the baseline entries if absent; in an existing one, only the entries git does not already ignore, appended (nothing rewritten or reordered); a negation of one is drift, as is an append that would re-ignore what a root negation keeps (git decides, in a scratch repo; a negation with a pattern in it cannot be tested and blocks the append); a committed file a baseline line covers is drift, never untracked", "file": ".gitignore",

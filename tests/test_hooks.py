@@ -55,6 +55,19 @@ class Hooks(Case):
         self.assertEqual(list(prop["hooks"]), ["Stop"])
         self.assertIn("1 installed", res["hooks"]["detail"])
 
+    def test_detail_names_the_source_it_compared_against(self):
+        # "unchanged" is only as true as the source: say which one, so a stale
+        # source is visible rather than read as agreement with the real one
+        src = self.tmp / "src"
+        (src / "hooks").mkdir(parents=True)
+        (src / "hooks/only-one.sh").write_text("#!/bin/sh\nexit 0\n")
+        (src / "settings.json").write_text("{}")
+        git_repo(self.tmp / "r")
+        _, res = self.run_json("r", "--hooks-from", str(src))
+        self.assertIn(f"against {src / 'hooks'}", res["hooks"]["detail"])
+        _, res = self.run_json("r", "--dry-run")
+        self.assertIn(f"against {ROOT / '.claude/hooks'}", res["hooks"]["detail"])
+
     def test_empty_hook_source_fails(self):
         (self.tmp / "empty").mkdir()
         git_repo(self.tmp / "r")

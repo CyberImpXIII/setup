@@ -108,7 +108,7 @@ def worst(statuses):
 class Setup:
     def __init__(self, target: Path, *, label: str, name: str, dry_run: bool,
                  github: bool = False, private: bool = False, owner=None,
-                 hooks_from=None, dir_base=None, gh: str = "gh", spec=None):
+                 hooks_from=None, plugins_from=None, dir_base=None, gh: str = "gh", spec=None):
         self.target = target
         self.dir_base = Path(dir_base) if dir_base is not None else Path.cwd()
         self.label = label
@@ -122,6 +122,7 @@ class Setup:
         self.comp = {c["name"]: c for c in self.spec["components"]}
         hf = self.comp["hooks"]["source"]
         self.hooks_from = Path(hooks_from) if hooks_from else TOOL_ROOT / hf
+        self.plugins_from = Path(plugins_from) if plugins_from else None
         self.w = Writer(target, dry_run)
         self.is_new = False
         self.repo_slug = None
@@ -191,15 +192,70 @@ class Setup:
             else:
                 n_same += 1
                 statuses.append("unchanged")
-        st, note = self._settings([s.name for s in srcs])
-        statuses.append(st)
+        extra, p_statuses, p_notes = self._plugin_wants()
+        st, note = self._settings([s.name for s in srcs], extra)
+        statuses += [st, *p_statuses]
         if note:
             notes.append(note)
-        head = f"{n_new} installed, {n_same} unchanged of {len(srcs)}"
+        notes += p_notes
+        head = f"{n_new} installed, {n_same} unchanged of {len(srcs)}, against {src_dir}"
         return Result("hooks", worst(statuses), "; ".join([head, *notes]))
 
-    def _settings(self, names):
-        """Registrations the source settings.json makes for these hooks, against the target's."""
+    def _plugin_wants(self):
+        """(wanted, statuses, notes) from the plug-in registry given with --plugins: the
+        JSON the shared hooks source prints for the hooks it registers to run in place
+        ({root, ok, plugins: [{name, applies_to, faults, registration}]}). A plug-in is
+        proposed only where its applies_to resolves to this target. Its registration
+        runs from the registry's root, so one that applies below the root fails rather
+        than guess its command from there; roles: are outside setup's lane (needs-*)."""
+        if self.plugins_from is None:
+            return [], [], ["plug-in hooks not checked (no --plugins registry given)"]
+        try:
+            reg = json.loads(self.plugins_from.read_text())
+        except (OSError, ValueError) as e:
+            return [], ["failed"], [f"plug-in registry {self.plugins_from} unreadable "
+                                    f"({e.__class__.__name__}); none proposed"]
+        if (not isinstance(reg, dict) or reg.get("ok") is not True or not reg.get("root")
+                or not isinstance(reg.get("plugins"), list)):
+            return [], ["failed"], ["plug-in registry is not ok (its own check found a fault, or it "
+                                    "lacks root or plugins); none proposed from it"]
+        rel = roster_dir(self.target, Path(reg["root"]))
+        wanted, statuses, notes, applied = [], [], [], []
+        for p in reg["plugins"]:
+            name = p.get("name") if isinstance(p, dict) else None
+            regn = p.get("registration") if name else None
+            if not name or not isinstance(regn, dict) or p.get("faults"):
+                statuses.append("failed")
+                notes.append(f"plug-in {name or '?'}: malformed, or faulty in its registry; not proposed")
+                continue
+            where = _applies(p.get("applies_to"), rel)
+            if where == "no":
+                continue
+            if where == "unknown":
+                statuses.append("failed")
+                notes.append(f"plug-in {name}: applies_to={p.get('applies_to')!r} not understood; not proposed")
+                continue
+            if where == "roles":
+                statuses.append("needs-harness")
+                notes.append(f"plug-in {name}: applies_to={p['applies_to']} names roles, which setup "
+                             f"cannot resolve; where they live, register: {json.dumps(regn)}")
+                continue
+            if rel != ".":
+                statuses.append("failed")
+                notes.append(f"plug-in {name} applies to {rel}, but its registration runs from the workspace "
+                             f"top {reg['root']}; none given for {rel}, so none proposed")
+                continue
+            for event, groups in regn.items():
+                for g in groups:
+                    for h in g.get("hooks", []):
+                        wanted.append((event, g.get("matcher"), h))
+            applied.append(name)
+        notes.append(f"plug-in hooks that apply here: {', '.join(applied) or 'none'}")
+        return wanted, statuses, notes
+
+    def _settings(self, names, extra=()):
+        """Registrations the source settings.json makes for these hooks, plus `extra`
+        (event, matcher, hook) wanted besides, against the target's."""
         try:
             src = json.loads((self.hooks_from / "settings.json").read_text())
         except (FileNotFoundError, json.JSONDecodeError) as e:
@@ -217,6 +273,7 @@ class Setup:
                     script = _script(h.get("command", ""))
                     if script in names:
                         wanted.append((event, g.get("matcher"), h))
+        wanted += list(extra)
         missing = [w for w in wanted if not _registered(tgt, *w)]
         if not missing:
             return "unchanged", None
@@ -472,12 +529,43 @@ def _tracked_but_covered(repo: Path, lines):
     return [p for p in paths if not seen.get(p, (None, ""))[1].startswith("!")], None
 
 
+_PROJECT_DIR = re.compile(r'^\s*"?\$(?:CLAUDE_PROJECT_DIR|\{CLAUDE_PROJECT_DIR\})"?/')
+
+
+def _key(command: str):
+    """What a registered command runs, by meaning: a shared hook by its name under
+    .claude/hooks, anything else by its path from the project dir, quoting and the
+    ${} form aside. None for an empty command."""
+    script = _script(command)
+    if script is not None:
+        return ("hook", script)
+    rest = _PROJECT_DIR.sub("", command or "", count=1).split()
+    return ("path", rest[0].strip("\"'")) if rest else None
+
+
+def _applies(applies_to, rel):
+    """Does a plug-in apply at rel (the target relative to the registry's root, None
+    when outside it)? "yes", "no", "roles" (setup cannot resolve a role) or "unknown"
+    (a value outside the declaration vocabulary: never guessed)."""
+    if not isinstance(applies_to, str):
+        return "unknown"
+    if applies_to == "all":
+        return "yes" if rel is not None else "no"
+    kind, _, names = applies_to.partition(":")
+    items = [n for n in names.split(",") if n]
+    if not items or kind not in ("repos", "roles"):
+        return "unknown"
+    if kind == "roles":
+        return "roles"
+    return "yes" if rel is not None and rel in {Path(n).as_posix() for n in items} else "no"
+
+
 def _registered(tgt, event, matcher, hook):
-    script = _script(hook.get("command", ""))
+    key = _key(hook.get("command", ""))
     for g in (tgt.get("hooks") or {}).get(event, []):
         if g.get("matcher") != matcher:
             continue
-        if any(_script(h.get("command", "")) == script for h in g.get("hooks", [])):
+        if any(_key(h.get("command", "")) == key for h in g.get("hooks", [])):
             return True
     return False
 

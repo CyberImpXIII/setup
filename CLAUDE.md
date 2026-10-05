@@ -18,6 +18,7 @@ command, or read the delegation layer.
 | doing this | use |
 |---|---|
 | set a repo up, or see its drift | `./setup <path> [--dry-run]`; run it from the folder the roster's `dir` is relative to, or pass `--relative-to DIR` (the agent line's `dir` is null when `<path>` is not under it) |
+| also propose the plug-in hooks that apply | `--plugins FILE`: the JSON tools/hooks' `./hooks plugins --json` prints (a plug-in runs in place from its owner's repo, never copied); one whose registration would run from below the registry's root fails rather than guess |
 | also create the GitHub repo | `--github` (public by default), `--private` on request, `--owner O` |
 | what each component does, and the statuses | `./setup components` |
 | check a folder of plans | `./setup plans <dir>` |
@@ -53,8 +54,10 @@ prints, which the direction audit still checks phrase by phrase).
 ### The shared hooks
 
 `.claude/hooks/` holds the three shared hooks and their tests, copied byte for
-byte from the other tool folders: they are both this repo's own enforcement and
-the default source `setup` installs from. **Never hand-edit them**; a change is
+byte from tools/hooks' `source/hooks/` (the one source): they are both this
+repo's own enforcement and the default source `setup` installs from, so they
+lag the source until reinstalled, and the hooks line says what it compared
+against. **Never hand-edit them**; a change is
 made in the canonical copy and copied to all. `./dev.sh hooks` checks they are
 present, executable, registered in `.claude/settings.json`, and pass their own
 tests. That they equal the other copies is checked from outside, once this

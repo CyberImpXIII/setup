@@ -36,6 +36,45 @@
   PLAN-tools-folder §9 (1), which awaits Jacob's yes** (top-level TODO.md, "Jacob's
   yes needed on §9 (1), (2)"). Not built, 2026-10-04; it also needs the decision
   above. Gates it would ship with are in §9 (1).
+- **Defaulting the hooks source to tools/hooks/source: asked by the dispatcher
+  2026-10-04, not built.** Evidence relayed from data-bridge: `setup --dry-run` there
+  printed `hooks unchanged ... 6 unchanged of 6` while `hooks copies` printed DRIFT
+  for 5 of those files, because setup compared against its own `.claude/hooks/`, which
+  lagged the source. Fixed for today by reinstalling those copies (59ed067; re-run
+  after it: data-bridge byte-equal to the source, setup `unchanged` correctly). The
+  class stays: whenever the source moves first, setup's "unchanged" means "agrees with
+  my stale copy". Mitigated, not solved: the hooks line now says `against <dir>`.
+  Not built because it is PLAN-tools-folder §9 (1), which the plan and the top-level
+  TODO say waits on Jacob's yes, and because it collides with the content audit (the
+  decision above). Hinges on: Jacob's yes on §9 (1), then the dependency decision.
+- **A replace path for a drifted hook copy** (three agents report setup has none;
+  dispatcher, 2026-10-04: record, do not decide). Evidence: today's reinstall here was
+  6 hand `cp`s from tools/hooks/source/hooks/ because `setup . --hooks-from
+  ../hooks/source` reports all 6 as drift "not overwritten". Options: an explicit
+  flag (e.g. `--replace-hooks`, never default) that overwrites a copy differing from
+  the source, or §9 (1)'s "header refreshed" path, which replaces only copies equal by
+  meaning and still leaves a logic change (today's case) to a hand copy. Hinges on:
+  whether setup may ever overwrite a file in a repo it did not create (CLAUDE.md
+  "What setup never does" says no today).
+- **Plug-ins whose registration runs from below the registry's root fail** (built
+  2026-10-04, `--plugins`): tools/hooks gives one `registration`, with a command
+  relative to the workspace top, so it is correct only for applies_to `repos:.`. A
+  plug-in applying to another repo (or `all`, on any repo but the top) is `failed`
+  with the reason, never a guessed path. Hinges on tools/hooks giving a per-repo
+  registration if one is ever needed (none is today: kb-pointers is `repos:.`).
+- **kb-pointers cannot be proposed today: the workspace top is not a git repo, and
+  setup refuses it** (run 2026-10-04 from the top: `setup . --dry-run --plugins
+  <(...)` -> "refused: ... is not empty, and is not a git work tree"). kb-pointers is
+  `repos:.`, the top only. The `--plugins` machinery is proven with the live registry
+  re-rooted at a scratch repo (the proposal held exactly its `registration`). Needs a
+  decision, not built: a settings-only mode for a non-repo folder (only the hooks
+  component, the proposal written, nothing else), or the dispatcher/harness writes
+  the top's proposal from `hooks plugins --json` directly. Hinges on whether setup
+  should ever touch a folder that is not a repo.
+- **`--plugins` has no default.** The workspace run is `./setup . --plugins <(cd
+  tools/hooks && ./hooks plugins --json)` from the top; without the flag the hooks line
+  says "plug-in hooks not checked". A default would name the sibling tool: same
+  dependency decision as above.
 - **td-9 (tools/todo: `devtools/mutate.py` duplicated from here), decided
   2026-10-04: the runner moves to tools/checks, not into a setup component.** A
   component would install one copy per repo, the eight-copies problem again; the

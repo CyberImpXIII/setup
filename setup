@@ -28,6 +28,18 @@
       cli.json declares import and verify and whose store is absent gets
       `<cli> import` then `<cli> verify --json`, with DATA_REPO set to it. Unset,
       the data line is needs-jacob and no store is made.
+      Every hook file that differed from the source gets a line of its own:
+      hooks <action> <file> (<kind>), kind missing, header-only, logic, bytes or
+      mode (`setup components`). A logic, bytes or mode difference is drift, kept.
+  setup <path> --rebuild [--overwrite-uncommitted] [--only hooks] [--dry-run] [...]
+      the same run, but a hook copy whose logic drifted from the source is
+      overwritten from it (in any repo, created by setup or not), and its line says
+      `rewritten`. Only files the hooks listing renders into a folder directly
+      under .claude/ (the hooks and their libraries); never settings.json,
+      .githooks/ or anything setup does not render. Refused (exit 2, nothing written) while one of those copies has
+      changes git does not hold (uncommitted, untracked or ignored), unless
+      --overwrite-uncommitted. Setup never commits here: the owner reviews
+      `git diff` and commits. Per repo: setup <repo> --only hooks --rebuild
   setup <path> --node [--rebuild] [...]
       also set up each child <path>/node.json lists (created as a repo nested in
       this one when absent; a child with its own node.json recurses; never
@@ -74,6 +86,13 @@ def cmd_components(_):
     print("rebuild statuses (--node --rebuild, one line per file):")
     for k, v in spec["rebuild_statuses"].items():
         print(f"  {k:<13} {v}")
+    hr = next(c for c in spec["components"] if c["name"] == "hooks")["rebuild"]
+    print(f"hook files (one line per file that differed; --rebuild without --node overwrites only "
+          f"a file the listing renders into a folder directly under {hr['scope_root']}/):")
+    for part in ("kinds", "actions"):
+        print(f"  {part}:")
+        for k, v in hr[part].items():
+            print(f"    {k:<12} {v}")
     return 0
 
 
@@ -122,6 +141,7 @@ def cmd_setup(argv):
     p.add_argument("--data-repo")
     p.add_argument("--node", action="store_true")
     p.add_argument("--rebuild", action="store_true")
+    p.add_argument("--overwrite-uncommitted", action="store_true")
     p.add_argument("--only")
     p.add_argument("--json", action="store_true")
     try:
@@ -138,12 +158,17 @@ def cmd_setup(argv):
     if a.private and not a.github:
         print("setup: --private only means something with --github", file=sys.stderr)
         return 2
-    if a.rebuild and not a.node:
-        print("setup: --rebuild only means something with --node", file=sys.stderr)
+    hooks_rebuild = a.rebuild and not a.node  # without --node, --rebuild overwrites drifted hook copies
+    if hooks_rebuild and a.only not in (None, "hooks"):
+        print(f"setup: --rebuild without --node overwrites drifted hook copies: --only {a.only} renders none",
+              file=sys.stderr)
+        return 2
+    if a.overwrite_uncommitted and not hooks_rebuild:
+        print("setup: --overwrite-uncommitted only means something with --rebuild, without --node", file=sys.stderr)
         return 2
     rebuild_dry = a.dry_run
-    if a.rebuild:
-        a.dry_run = True  # a rebuild writes only the generated files: the setup lines are a dry run's
+    if a.rebuild and a.node:
+        a.dry_run = True  # a node rebuild writes only the generated files: the setup lines are a dry run's
     cwd = Path.cwd()
     dir_base = cwd / (a.relative_to or ".")
     if not dir_base.is_dir():
@@ -158,8 +183,9 @@ def cmd_setup(argv):
                    github=a.github, private=a.private, owner=a.owner,
                    hooks_from=a.hooks_from, plugins_from=a.plugins, user_scope_from=a.user_scope,
                    dir_base=dir_base, gh=os.environ.get("SETUP_GH", "gh"),
-                   node=a.node, rebuild=a.rebuild, rebuild_dry=rebuild_dry, checks_cli=a.checks,
-                   data_repo=data_repo(a.data_repo, cwd), only=a.only)
+                   node=a.node, rebuild=a.rebuild and a.node, rebuild_dry=rebuild_dry, checks_cli=a.checks,
+                   data_repo=data_repo(a.data_repo, cwd), only=a.only,
+                   hooks_rebuild=hooks_rebuild, overwrite_uncommitted=a.overwrite_uncommitted)
     try:
         results = s.run()
     except core.Refused as e:
@@ -175,7 +201,8 @@ def cmd_setup(argv):
         print_doc(doc, "")
         summary = ", ".join(f"{counts[k]} {k}" for k in core.PRECEDENCE if k in counts)
         how = (" (dry run, nothing written)" if rebuild_dry else
-               " (rebuild: only generated files written)" if a.rebuild else "")
+               " (rebuild: only generated files written)" if a.rebuild and a.node else
+               " (rebuild: drifted hook copies overwritten)" if hooks_rebuild else "")
         print(f"setup {label}{how}: {summary}")
     return 0 if doc["ok"] else 1
 
@@ -194,6 +221,15 @@ def print_doc(doc, pad):
         print(f"{pad}  {r['component']:<8} {r['status']:<13} {r['detail']}")
     for x in doc.get("rebuild", []):
         print(f"{pad}    {x['status']:<12} {x['path']}  {x['detail']}")
+    lines = doc.get("hook_files", [])
+    missing = [x for x in lines if x["kind"] == "missing" and x["action"] == "installed"]
+    if len(missing) > 3:  # a new repo's whole render: one line, not one per file (--json lists each)
+        print(f"{pad}    hooks installed  {len(missing)} files (missing){'; dry run, not written' if missing[0]['detail'] else ''}"
+              " (--json lists each)")
+        lines = [x for x in lines if x not in missing]
+    for x in lines:
+        detail = f": {x['detail']}" if x["detail"] else ""
+        print(f"{pad}    hooks {x['action']:<10} {x['path']}  ({x['kind']}{detail})")
     for kid in doc.get("children", []):
         print(f"{pad}  child {kid['path']}: {'ok' if kid['ok'] else 'FAILED or drifted'}")
         print_doc(kid, pad + "    ")

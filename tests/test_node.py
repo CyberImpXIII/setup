@@ -84,9 +84,11 @@ class Node(NodeCase):
         self.assertEqual((code, res["node"]["status"]), (1, "failed"))
         self.assertIn("no node.json", res["node"]["detail"])
 
-    def test_rebuild_without_node_is_a_usage_error(self):
+    def test_rebuild_without_node_renders_no_generated_file(self):
+        # without --node, --rebuild means the hook copies (tests/test_rebuild.py): with
+        # --only naming another component it renders nothing, a usage error
         git_repo(self.tmp / "r")
-        self.assertEqual(self.run_setup("r", "--rebuild").returncode, 2)
+        self.assertEqual(self.run_setup("r", "--rebuild", "--only", "rules").returncode, 2)
 
     def test_two_level_tree_from_an_empty_folder(self):
         # §7.5's fixture: each level rendered from the same templates with its own data

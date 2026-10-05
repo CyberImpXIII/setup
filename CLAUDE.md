@@ -18,7 +18,8 @@ command, or read the delegation layer.
 | doing this | use |
 |---|---|
 | set a repo up, or see its drift | `./setup <path> [--dry-run]`; run it from the folder the roster's `dir` is relative to, or pass `--relative-to DIR` (the agent line's `dir` is null when `<path>` is not under it) |
-| where the shared hooks come from (PLAN-repo-setup §7.12) | `dependencies.json` names the sibling tools setup installs FROM (tools/hooks, tools/checks): the hooks component runs the hooks dependency's `list --json --source <its source>` and renders every file it names (hooks, their tests, the libraries), compared by that tool's one comparator (`hookslib.copies.meaning`, imported from where the dependency resolved, refused if found elsewhere). Absent: `installed`; equal by meaning: rewritten, "header refreshed"; logic differs: `drift`, byte-unchanged (replacing it, even under `--rebuild`, waits on Jacob). `--hooks-from DIR` overrides the source; without the dependency it is DIR's `hooks/*.sh`, byte for byte. `setup audit deps` gates the file: each dependency a discovered repo, its CLI executable, its source a folder; nothing discovered is UNCHECKED (exit 3). The file is exempt from `audit content` only (`tests/test_deps.py`) |
+| where the shared hooks come from (PLAN-repo-setup §7.12) | `dependencies.json` names the sibling tools setup installs FROM (tools/hooks, tools/checks): the hooks component runs the hooks dependency's `list --json --source <its source>` and renders every file it names (hooks, their tests, the libraries), compared by that tool's one comparator (`hookslib.copies.meaning`, imported from where the dependency resolved, refused if found elsewhere). Absent: `installed`; equal by meaning: rewritten, "header refreshed"; logic differs: `drift`, byte-unchanged unless `--rebuild` (next row). Each file that differed gets a line: `hooks <action> <file> (<kind>)` (`hook_files` in `--json`; vocabulary in `setup components`). `--hooks-from DIR` overrides the source; without the dependency it is DIR's `hooks/*.sh`, byte for byte. `setup audit deps` gates the file: each dependency a discovered repo, its CLI executable, its source a folder; nothing discovered is UNCHECKED (exit 3). The file is exempt from `audit content` only (`tests/test_deps.py`) |
+| replace hook copies whose logic drifted from the source (§7.12, Jacob's yes 2026-10-05) | `./setup <repo> --only hooks --rebuild` (the per-repo line; without `--only` the other components run as usual). In any repo, created by setup or not: a copy the listing renders into a folder directly under `.claude/` (the hooks, `.claude/hooks/`, and their libraries, `.claude/lib/`) is overwritten from the source, its line `rewritten (logic)` (or `bytes` without the dependency, `mode` when only the executable bit differed); nothing else is ever overwritten (components.json `hooks.rebuild.scope_root`; `tests/test_rebuild.py` holds every listed file inside it). **Refused, exit 2, nothing written** while such a copy differs from the source and holds changes git does not (staged, unstaged, untracked or ignored); `--overwrite-uncommitted` lifts that. Setup never commits there: the owner reviews `git diff` and commits. `--dry-run` shows the lines. `tests/test_rebuild.py` |
 | also propose the plug-in hooks that apply | `--plugins FILE`: the JSON tools/hooks' `./hooks plugins --json` prints (a plug-in runs in place from its owner's repo, never copied); one whose registration would run from below the registry's root fails rather than guess |
 | skip the shared hooks user scope already runs | `--user-scope FILE`: the JSON tools/hooks' `./hooks copies <top> --json` prints; only its `user_scope` is read (never the user settings). A hook every `kind: source` row of which is `registered: true` is not copied and not registered per repo in the proposal (it would run twice); the line says `covered by user scope: <files>`. `null`, an `error`, or no user settings file: not covered, behaviour unchanged. The rule is tools/checks' `hooks-installed` rule, mirrored (setup may not import a sibling tool); an existing copy is never deleted |
 | also create the GitHub repo | `--github` (public by default), `--private` on request, `--owner O` |
@@ -38,11 +39,17 @@ command, or read the delegation layer.
 **What setup never does:** write to a path it refused (a non-empty folder that is
 not a repo, a subfolder of a repo, a new repo nested in a work tree unless that
 tree's node.json declares it a child, a missing parent); overwrite something that
-differs (that is `drift`, reported; the one exception is `--rebuild`, which writes
-a generated file's render over a committed copy so `git diff` shows the drift,
-and never writes a record or a generated file with uncommitted changes; the
-other is a hook copy equal to its source by meaning, rewritten as "header
-refreshed", which by construction changes no logic); touch an
+differs (that is `drift`, reported), with three exceptions: `--node --rebuild`
+writes a generated file's render over a committed copy so `git diff` shows the
+drift, and never writes a record or a generated file with uncommitted changes;
+`--rebuild` without `--node` overwrites a hook copy whose logic drifted from the
+source, in any repo, but only a file the hooks listing renders under
+`.claude/hooks/` or `.claude/lib/` (never `settings.json`, never a repo's own
+`.githooks/pre-commit`, never anything setup does not render), and refuses the
+whole run while one of those copies holds changes git does not, unless
+`--overwrite-uncommitted`; and a hook copy equal to its source by meaning is
+rewritten as "header refreshed" in every run, which by construction changes no
+logic. Never touch an
 existing repo's `settings.json` (it writes `settings.proposed.json` and prints the
 copy command), including on a later run in a repo it created; commit in a repo it
 did not create; push into a GitHub repo that already exists.

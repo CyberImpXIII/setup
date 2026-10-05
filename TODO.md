@@ -71,13 +71,24 @@
   Also fixed: `setup <repo> --dry-run` on an old six-file repo said "0 installed, 6
   unchanged of 6" (the income report); it now lists the 22 files the listing names
   (`test_old_six_file_repo_gets_the_rest_installed`). Still open, below.
-- **Replacing a drifted hook copy waits on Jacob (§7.12 end).** A copy whose logic
-  differs from the source is `drift` and byte-unchanged under a plain run and under
-  `--rebuild`; only a copy equal by meaning is rewritten ("header refreshed"). Options:
-  an explicit flag (never default), or `--rebuild` overwriting in a repo setup did not
-  create. Hinges on: whether setup may ever overwrite logic in a repo it did not
-  create. The five DRIFT files in other repos stay until then. Moot for any hook user
-  scope covers (`--user-scope`): its per-repo copy is neither replaced nor read.
+- **Drifted hook copies: `--rebuild` without `--node` built 2026-10-05 (§7.12, Jacob's
+  yes).** Per repo: `./setup <repo> --only hooks --rebuild` from the workspace top, then
+  the owner reviews `git diff` and commits (setup never commits there). Not run on any
+  real repo here (the dispatcher routes it per owner). Choices made, open to Jacob:
+  (1) the uncommitted-work guard refuses the whole run (exit 2, nothing written) rather
+  than keeping the one file, so an owner sees it before anything moves; it counts only
+  files the listing renders in scope that differ from the source (an owner's own hook
+  beside them, or a dirty copy already equal to the source, never blocks); untracked
+  and ignored copies count as uncommitted (git cannot restore them). (2) A dry run with
+  `--rebuild` refuses too (it predicts the real run). (3) A copy differing only in its
+  executable bit is kind `mode`, fixed by `--rebuild` too. (4) Every run now prints a
+  line per hook file that differed (a new repo's whole render collapses to one line in
+  text; `--json` `hook_files` lists each). Moot for any hook user scope covers.
+  (5) The scope is a rule, not a folder list: a file the listing renders into a folder
+  directly under `.claude/` (components.json `scope_root`), because the direction audit
+  forbids setup's code and data to name the delegation layer's library folder by path;
+  `test_every_file_the_listing_renders_is_in_scope` fails if the hooks tool adds a
+  destination outside it.
 - **An active core.hooksPath no longer gets setup's gates while unready** (fixed
   2026-10-05, from emailTools' §7.12 step 2 run: setup at 13c6691 would have written
   commit-msg into its active `.githooks/` with git-stamp unregistered, refusing every
@@ -99,7 +110,8 @@
   tools/checks so a future `checks run .` in the stub can resolve it; nothing in code
   consumes it today (`_used_by` says so). `audit deps` still gates it.
 - **The hook source is the dependency's working tree, not a commit.** Another agent's
-  uncommitted edit in tools/hooks/source is what setup installs. Options: install from
+  uncommitted edit in tools/hooks/source is what setup installs (and, since `--rebuild`
+  without `--node`, what it overwrites a drifted copy with: this matters more now). Options: install from
   `git show HEAD:` in the dependency, or refuse a dirty source. Hinges on whether a
   hooks agent's in-progress edit should ever reach other repos.
 - **`--user-scope` has no default** (built 2026-10-04, decision 19). The workspace run

@@ -225,8 +225,15 @@ class Setup:
                  github: bool = False, private: bool = False, owner=None,
                  hooks_from=None, plugins_from=None, user_scope_from=None, dir_base=None, gh: str = "gh",
                  spec=None, node=False, rebuild=False, rebuild_dry=False, nest_in=None, stands_for=None,
-                 checks_cli=None, data_repo=None, only=None):
+                 checks_cli=None, data_repo=None, only=None, hooks_rebuild=False, overwrite_uncommitted=False):
         self.target = target
+        # --rebuild without --node: a hook copy whose logic drifted from the source is
+        # overwritten (only in the hooks component's rebuild scope); refused up front
+        # when one it renders there has uncommitted changes, unless overwrite_uncommitted
+        self.hooks_rebuild = hooks_rebuild
+        self.overwrite_uncommitted = overwrite_uncommitted
+        self.hook_lines = []  # one per hook file that differed: {path, kind, action, detail}
+        self._listed_memo = None
         self.only = only  # --only: the one component run, on an existing repo; None runs every one
         self.checks_cli = checks_cli  # --checks: the shared checks CLI the gates component runs last
         self.data_repo = data_repo  # the data repo's root (an absolute Path), or None when DATA_REPO is unset
@@ -311,10 +318,13 @@ class Setup:
         """Every file the hook source's listing names, rendered into the repo (PLAN-repo-
         setup §7.12): absent, installed; equal by meaning (the hooks dependency's one
         comparator: comments and blank lines aside) but not byte for byte, rewritten from
-        the source ("header refreshed"); differing in logic, drift, left byte-unchanged.
+        the source ("header refreshed"); differing in logic, drift, left byte-unchanged,
+        unless hooks_rebuild (--rebuild without --node), which overwrites it when it is
+        in the hooks entry's rebuild scope, _in_scope (_rebuild_guard has already refused a copy
+        there with uncommitted changes). Each file that differed: one hook_lines entry.
         Without the dependency (--hooks-from DIR in a workspace lacking it) there is no
         listing and no comparator: DIR's hooks folder, compared byte for byte."""
-        files, how, statuses, notes = self._hook_files()
+        files, how, statuses, notes = self._listed()
         if files is None:
             return Result("hooks", "failed", "; ".join(notes))
         if not files:
@@ -328,7 +338,8 @@ class Setup:
         statuses += us_statuses
         notes += us_notes
         n_new = n_same = 0
-        covered, unknown, refreshed = [], {}, []
+        covered, unknown, refreshed, rewritten = [], {}, [], []
+        scope = self.comp["hooks"]["rebuild"]["scope_root"]
         for f in files:
             rel, src, name = f["rel"], f["src"], Path(f["rel"]).name
             dst = self.target / rel
@@ -345,35 +356,68 @@ class Setup:
                 continue
             body = src.read_bytes()
             mode = 0o755 if f["exec"] else 0o644
+            dry = "dry run, not written" if self.dry_run else ""
             if not dst.exists():
                 self.w.write(rel, body, mode=mode)
                 n_new += 1
                 statuses.append("installed")
-            elif dst.read_bytes() == body:
+                kind = "missing"
+                action = "installed"
+                self._hook_line(rel, kind, action, dry)
+                continue
+            if dst.read_bytes() == body:
                 if f["exec"] and not os.access(dst, os.X_OK):
-                    statuses.append("drift")
-                    notes.append(f"{rel} is not executable")
+                    kind = "mode"
                 else:
                     n_same += 1
                     statuses.append("unchanged")
-            elif meaning is not None and meaning(dst) == meaning(src):
-                try:
-                    self.w.write(rel, body, mode=mode)
-                except OSError as e:
-                    statuses.append("failed")
-                    notes.append(f"{rel}: equal by meaning, but rewriting it failed ({e.__class__.__name__})")
                     continue
-                refreshed.append(rel)
-                statuses.append("installed")
+            elif meaning is not None and meaning(dst) == meaning(src):
+                kind = "header-only"
+            elif meaning is not None:
+                kind = "logic"
             else:
+                kind = "bytes"
+            why = ""
+            if kind == "header-only":
+                action = "refreshed"
+            elif not self.hooks_rebuild:
+                action = "kept"
+                why = "no --rebuild: drift, byte-unchanged"
+            elif not _in_scope(rel, scope):
+                action = "kept"
+                why = f"outside the --rebuild scope (a folder directly under {scope}/): drift, byte-unchanged"
+            else:
+                action = "rewritten"
+            if action == "kept":
                 statuses.append("drift")
-                notes.append(f"{rel}: its logic differs from the source (drift, not overwritten; replacing a "
-                             "drifted copy waits on Jacob, PLAN-repo-setup §7.12)" if meaning is not None else
-                             f"{rel} differs from the source byte for byte (drift, not overwritten; no comparator "
-                             "by meaning without the hooks dependency)")
+                notes.append({"mode": f"{rel} is not executable",
+                              "logic": f"{rel}: its logic differs from the source (drift, not overwritten: "
+                                       "`--rebuild` overwrites it)",
+                              "bytes": f"{rel} differs from the source byte for byte (drift, not overwritten; no "
+                                       "comparator by meaning without the hooks dependency: `--rebuild` "
+                                       "overwrites it)"}[kind]
+                             + (f" ({why})" if self.hooks_rebuild else ""))
+                self._hook_line(rel, kind, action, why)
+                continue
+            try:
+                self.w.write(rel, body, mode=mode)
+            except OSError as e:
+                statuses.append("failed")
+                notes.append(f"{rel}: {kind}, but rewriting it failed ({e.__class__.__name__})")
+                action = "failed"
+                self._hook_line(rel, kind, action, e.__class__.__name__)
+                continue
+            (refreshed if kind == "header-only" else rewritten).append(rel)
+            statuses.append("installed")
+            self._hook_line(rel, kind, action, dry)
         if refreshed:
             did = "would refresh" if self.dry_run else "refreshed"
             notes.append(f"header {did} (equal by meaning, rewritten from the source): {', '.join(refreshed)}")
+        if rewritten:
+            did = "would rewrite" if self.dry_run else "rewrote"
+            notes.append(f"--rebuild {did} from the source (the copy differed in logic or mode): "
+                         f"{', '.join(rewritten)}")
         if covered:
             notes.append(f"covered by user scope: {', '.join(covered)} (not copied; a copy already here is kept)")
         elif self.user_scope_from is not None and not statuses.count("failed"):
@@ -390,6 +434,52 @@ class Setup:
         head = (f"{n_new} installed, {len(refreshed)} header refreshed, {n_same} unchanged of {len(files)}, "
                 f"against {self.hooks_from} ({how}; compared {by})")
         return Result("hooks", worst(statuses), "; ".join([head, *notes]))
+
+    def _hook_line(self, rel, kind, action, detail=""):
+        """One per-file line of the hooks component (the hooks entry's `rebuild` kinds
+        and actions in components.json): which file, how it differed, what was done."""
+        self.hook_lines.append({"path": rel, "kind": kind, "action": action, "detail": detail})
+
+    def _listed(self):
+        """_hook_files, read once per run (the --rebuild guard reads it before any
+        component runs, c_hooks after); each caller gets its own lists."""
+        if self._listed_memo is None:
+            self._listed_memo = self._hook_files()
+        files, how, statuses, notes = self._listed_memo
+        return (None if files is None else list(files)), how, list(statuses), list(notes)
+
+    def _rebuild_guard(self):
+        """--rebuild without --node, before anything is written: refuse when a file the
+        hooks component would render into the rebuild scope is on disk, differs from the
+        source, and holds changes git does not (staged, unstaged, untracked or ignored),
+        since overwriting it would lose them (a byte-equal copy loses nothing). overwrite_uncommitted (--overwrite-uncommitted) lifts it. A file setup
+        does not render (an owner's own hook beside the copies), or one user scope
+        covers, is never written, so it never blocks. No listing: nothing to guard (the
+        hooks line fails and overwrites nothing)."""
+        if not self.hooks_rebuild or self.overwrite_uncommitted or self.is_new:
+            return
+        files = self._listed()[0]
+        if not files:
+            return
+        scope = self.comp["hooks"]["rebuild"]["scope_root"]
+        cover = self._user_scope()[0]
+        rels = [f["rel"] for f in files if _in_scope(f["rel"], scope) and (self.target / f["rel"]).is_file()
+                and cover(f["rel"])[0] is not True
+                and (self.target / f["rel"]).read_bytes() != f["src"].read_bytes()]  # equal: nothing to lose
+        if not rels:
+            return
+        r = _git(["status", "--porcelain=v1", "-z", "--no-renames", "--ignored", "--untracked-files=all",
+                  "--", *rels], self.target)
+        if r.returncode != 0:
+            raise Refused(f"--rebuild could not read git status of the hook copies "
+                          f"({(r.stderr.strip() or 'git status failed')[-200:]}), so it cannot tell whether "
+                          "overwriting one loses uncommitted work")
+        dirty = sorted({e[3:] for e in r.stdout.split("\0") if len(e) > 3})
+        if dirty:
+            more = f" and {len(dirty) - 10} more" if len(dirty) > 10 else ""
+            raise Refused(f"--rebuild would overwrite hook copies holding changes git does not have "
+                          f"(uncommitted, untracked or ignored): {', '.join(dirty[:10])}{more}; commit or "
+                          "discard them first, or pass --overwrite-uncommitted to overwrite them anyway")
 
     def _hook_comparator(self):
         """(meaning(path) -> hash, how it compares). The hooks dependency's own function
@@ -1139,6 +1229,7 @@ class Setup:
         if self.only and self.is_new:
             raise Refused(f"--only {self.only} runs one component on an existing repo, and "
                           f"{self.label} is not one yet (a full run creates it)")
+        self._rebuild_guard()
         results = []
         for c in self.spec["components"]:
             if self.only and c["name"] != self.only:
@@ -1244,7 +1335,17 @@ def tree_doc(label, results, s):
         doc["children"] = s.children
     if s.rebuild_lines is not None:
         doc["rebuild"] = [x.__dict__ for x in s.rebuild_lines]
+    doc["hook_files"] = list(s.hook_lines)
     return doc
+
+
+def _in_scope(rel, root):
+    """A rendered file --rebuild may overwrite: one whose destination is a folder directly
+    under `root` (the hooks entry's rebuild scope_root), i.e. <root>/<folder>/<file>, as
+    the listing's hooks and libraries are. A file in root itself (settings.json), deeper,
+    or anywhere else is kept, whatever it holds."""
+    parts = Path(rel).parts
+    return len(parts) == 3 and parts[0] == root
 
 
 def _script(command: str):

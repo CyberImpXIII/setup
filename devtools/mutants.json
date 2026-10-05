@@ -351,6 +351,9 @@
      "run": ["python3", "-m", "unittest", "tests.test_data.Data.test_a_dry_run_runs_nothing"]},
     {"id": "data-no-verify-verb-runs", "gate": "data: an import nothing can verify is not run",
      "file": "setuplib/core.py", "old": "        if c[\"verify\"] not in verbs:", "new": "        if False:",
-     "run": ["python3", "-m", "unittest", "tests.test_data.Data.test_import_without_verify_is_never_run"]}
+     "run": ["python3", "-m", "unittest", "tests.test_data.Data.test_import_without_verify_is_never_run"]},
+    {"id": "ignore-drops-hook-state", "gate": "ignore: the shared hooks' .claude/state/ is in the baseline",
+     "file": "components.json", "old": ",\n       {\"line\": \".claude/state/\", \"probe\": \".claude/state/writes.tsv\"}", "new": "",
+     "run": ["python3", "-m", "unittest", "tests.test_ignore.Ignore.test_the_shared_hooks_state_folder_is_ignored"]}
   ]
 }

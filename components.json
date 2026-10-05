@@ -14,14 +14,15 @@
     {"name": "params", "installs": "checks.json, if absent: the baseline, no parameter set, so every shared check runs at its defaults where it says it applies. An existing one is the owner's", "file": "checks.json",
      "baseline": {"_comment": "Parameters for the shared checks: {\"<check>\": {\"<param>\": value}}. None set: every check at its defaults. Keys starting with _ are comments."}},
     {"name": "ignore", "installs": ".gitignore with the baseline entries if absent; in an existing one, only the entries git does not already ignore, appended (nothing rewritten or reordered); a negation of one is drift, as is an append that would re-ignore what a root negation keeps (git decides, in a scratch repo; a negation with a pattern in it cannot be tested and blocks the append); a committed file a baseline line covers is drift, never untracked", "file": ".gitignore",
-     "header": "# Baseline from the setup tool: its settings proposal, local env files, backups. Add your own lines anywhere; setup only appends what is missing.",
+     "header": "# Baseline from the setup tool: its settings proposal, local env files, backups, the shared hooks' run state. Add your own lines anywhere; setup only appends what is missing.",
      "_entries": "line: what is written; probe: a path that line must make git ignore. Present means git ignores the probe through the repo's own ignore files (by meaning, not bytes).",
      "entries": [
        {"line": ".claude/settings.proposed.json", "probe": ".claude/settings.proposed.json"},
        {"line": ".env", "probe": ".env"},
        {"line": "*.env", "probe": "local.env"},
        {"line": "*.bak", "probe": "notes.bak"},
-       {"line": "registry.proposed.json", "probe": "registry.proposed.json"}
+       {"line": "registry.proposed.json", "probe": "registry.proposed.json"},
+       {"line": ".claude/state/", "probe": ".claude/state/writes.tsv"}
      ]},
     {"name": "commit","installs": "in a repo setup just created only: one commit of exactly the files it wrote, .claude/settings.json among them (never add -A, never the settings proposal)"},
     {"name": "remote", "installs": "with --github only: a GitHub repo (public by default, --private on request), origin, and a push of the current branch; verified by the pushed sha and the visibility"},

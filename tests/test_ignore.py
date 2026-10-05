@@ -55,6 +55,19 @@ class Ignore(Case):
         self.assertEqual(res["ignore"]["status"], "unchanged", res["ignore"])
         self.assertEqual(snapshot(repo), before)
 
+    def test_the_shared_hooks_state_folder_is_ignored(self):
+        # the shared hooks write per-repo run state under .claude/state/ (the write
+        # ledger, writes.tsv; the check-pass stamp): any file there, any depth
+        repo = git_repo(self.tmp / "r")
+        for rel in [".claude/state/writes.tsv", ".claude/state/check-pass", ".claude/state/x/y.json"]:
+            (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+            (repo / rel).write_text("x\n")
+        code, res = self.run_json("r")
+        self.assertEqual(res["ignore"]["status"], "installed", res["ignore"])
+        self.assertNotIn(".claude/state", git(["status", "--porcelain", "--untracked-files=all"], repo).stdout)
+        _, res = self.run_json("r")
+        self.assertEqual(res["ignore"]["status"], "unchanged", res["ignore"])
+
     def test_missing_final_newline_is_completed_not_merged(self):
         repo = git_repo(self.tmp / "old")
         (repo / ".gitignore").write_text("dist")

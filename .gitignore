@@ -9,3 +9,4 @@ __pycache__/
 *.env
 *.bak
 registry.proposed.json
+.claude/state/

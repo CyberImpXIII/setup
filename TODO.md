@@ -138,11 +138,36 @@
   override (the negation's last match is the folder, not the file). Hinges on
   whether an owner ever means "keep everything in here" by a folder negation.
 
+- **`check --json` validated by subprocess, not by a vendored schema** (2026-10-05).
+  The stub's `--json` and this repo's own (`devtools/checkjson.py`) are held to
+  reviewed fixtures in `tests/fixtures/` anywhere, and to the real `check-json`
+  validator (the shared checks CLI, run on scratch repos) in the workspace, with the
+  old `{"ok","error"}` shape as the counterfactual. No copy of the schema or its
+  validator lives here (a copy would need a second validator: duplicated procedure).
+  Cost: in a lone clone only the fixtures hold; a schema change upstream is caught
+  only in the workspace. `devtools/checkjson.py` is a second emitter beside checks'
+  `checkslib/devjson.py` (setup may not import a sibling tool): agreement by meaning
+  is gated by the live validator test, not by a shared helper. Revisit with the
+  dependency decision above.
+- **Repos set up before 2026-10-05 keep the old stub's `{"ok": false, "error"}`**:
+  setup never overwrites `dev.sh` (an existing stub is `needs-owner`). Probe run
+  2026-10-05, `grep -l SETUP-STUB */dev.sh */*/dev.sh` from the workspace top: none
+  carry the stub today, so nothing to migrate.
+
 ## Unconfirmed suspicions
 
 (none open)
 
 ## Reported to other owners
+
+- 2026-10-05, via the dispatcher, to checks: `checks one check-json tools/setup`
+  took 242.7 s against check-json's 280 s limit (an earlier run, 228.5 s): this
+  suite (123 tests + 67 mutants) is near the cap and will cross it as mutants
+  grow. PLAN-agent-groups §4.4 already says raise the limit; this is the evidence.
+  Also: check-json proves shape only. This repo's `--json` once printed a valid
+  report with every gate after `hooks` reading `fail` and no finding, from a bash
+  variable leak (fixed here, gate runs in a subshell, mutant `own-json-gate-clobbers`);
+  check-json passed it. Not a bug in checks, a reason for each repo's own wiring test.
 
 - 2026-10-04, via the dispatcher, to knowledge-base: its TODO observation that
   this CLAUDE.md's "Keeping these rules in sync" names only `../../CLAUDE.md` is

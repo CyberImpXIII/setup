@@ -1,0 +1,16 @@
+{"ok": false, "checks": [
+ {"name": "test", "status": "fail", "counts": {"failed": 2}, "failures": [
+  {"message": "FAIL: test_check_stub_fails_by_name (tests.test_fixture.Fixture.test_check_stub_fails_by_name)", "file": "tests/test_fixture.py", "line": null, "role": "code"},
+  {"message": "ERROR: test_gone (tests.test_nowhere.Gone.test_gone)", "file": null, "line": null, "role": "code"}]},
+ {"name": "hooks", "status": "ok", "counts": {"failed": 0}, "failures": []},
+ {"name": "files", "status": "fail", "counts": {"failed": 1}, "failures": [
+  {"message": "./dev.sh files failed (exit 1) with no finding line; run it for the output", "file": null, "line": null, "role": "code"}]},
+ {"name": "audit", "status": "fail", "counts": {"failed": 3}, "failures": [
+  {"message": "setuplib/core.py:12: repo name x", "file": "setuplib/core.py", "line": 12, "role": "audit"},
+  {"message": "/elsewhere/y.py:3: repo name x", "file": null, "line": null, "role": "audit"},
+  {"message": "UNCHECKED no sibling git repos within 2 folders", "file": null, "line": null, "role": "audit"}]},
+ {"name": "self", "status": "ok", "counts": {"failed": 0}, "failures": []},
+ {"name": "mutants", "status": "fail", "counts": {"failed": 2}, "failures": [
+  {"message": "SURVIVED some-id: a gate stayed green", "file": null, "line": null, "role": "tests"},
+  {"message": "BASELINE-RED python3 -m x exits 1 unmutated: a", "file": null, "line": null, "role": "tests"}]}
+]}

@@ -13,6 +13,16 @@ SETUP = ROOT / "setup"
 FAKE_GH = ROOT / "tests" / "fake_gh.py"
 
 
+def workspace_cli(tool):
+    """(workspace top, CLI) for the sibling tool `tools/<tool>/<tool>` in the workspace
+    around this one, or (None, None) in a lone clone. Run as a subprocess, never imported."""
+    for top in ROOT.parents:
+        cli = top / "tools" / tool / tool
+        if os.access(cli, os.X_OK):
+            return top, cli
+    return None, None
+
+
 def git(args, cwd):
     return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
 

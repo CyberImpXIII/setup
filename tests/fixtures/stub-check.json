@@ -1,0 +1,1 @@
+{"ok": false, "checks": [{"name": "stub-unfilled", "status": "fail", "counts": {"failed": 1}, "failures": [{"message": "not implemented: fill in the contract (./dev.sh is still the setup stub; replace it with the real gates of this repo)", "file": "dev.sh", "line": 2, "role": "code"}]}]}

@@ -16,7 +16,7 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from tests.helpers import ROOT, Case, git_repo
+from tests.helpers import ROOT, Case, git_repo, workspace_cli
 
 SRC = ROOT / ".claude/hooks"
 HOOKS = sorted(p.name for p in SRC.glob("*.sh") if not p.name.startswith("test-"))
@@ -215,16 +215,7 @@ class UserScope(Case):
         self.assertIn(f"covered by user scope: {BLOBS}", res["hooks"]["detail"])
 
 
-def workspace_hooks_cli():
-    """The shared hooks source's CLI in the workspace around this tool, or None (a lone clone)."""
-    for top in ROOT.parents:
-        cli = top / "tools" / "hooks" / "hooks"
-        if os.access(cli, os.X_OK):
-            return top, cli
-    return None, None
-
-
-TOP, HOOKS_CLI = workspace_hooks_cli()
+TOP, HOOKS_CLI = workspace_cli("hooks")
 
 
 @unittest.skipIf(HOOKS_CLI is None, "no shared hooks CLI in a workspace around this tool (a lone clone)")

@@ -24,6 +24,7 @@ command, or read the delegation layer.
 | what each component does, and the statuses | `./setup components` |
 | check a folder of plans | `./setup plans <dir>` |
 | before committing | `./dev.sh check` (tests, hooks, files, audits, self, mutants) |
+| the check as JSON | `./dev.sh check --json`: the one schema every repo prints (tools/checks holds it), one check per gate, each finding line a failure (`devtools/checkjson.py`); the stub setup installs prints its red report. Proven by fixtures here and, in the workspace, by the real validator (`tests/test_checkjson.py`); no copy of the schema lives here |
 | what is open | `TODO.md` |
 
 **What setup never does:** write to a path it refused (a non-empty folder that is

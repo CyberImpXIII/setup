@@ -186,6 +186,21 @@
      "run": ["./dev.sh", "files"]},
     {"id": "self-gate", "gate": "./dev.sh self: this repo's own rules block drifted",
      "file": "templates/shared-rules.md", "old": "## Keep an active TODO", "new": "## Keep a TODO",
-     "run": ["./dev.sh", "self"]}
+     "run": ["./dev.sh", "self"]},
+    {"id": "stub-json-shape", "gate": "check-json: the stub's --json is the one schema's red report, not {ok, error}",
+     "file": "templates/dev.sh", "old": "printf '%s\\n' '{\"ok\": false, \"checks\": [", "new": "printf '%s\\n' '{\"ok\": false, \"error\": \"not implemented: fill in the contract\"}' # '{\"ok\": false, \"checks\": [",
+     "run": ["python3", "-m", "unittest", "tests.test_checkjson.Stub"]},
+    {"id": "own-json-miscounted", "gate": "check-json: this repo's counts.failed is the number of failures",
+     "file": "devtools/checkjson.py", "old": "\"counts\": {\"failed\": len(failures)}", "new": "\"counts\": {\"failed\": 1}",
+     "run": ["python3", "-m", "unittest", "tests.test_checkjson.Own.test_red_report_is_the_fixture", "tests.test_checkjson.Own.test_green_report_is_the_fixture"]},
+    {"id": "own-json-uncaptured", "gate": "check-json: dev.sh captures each gate's output so its findings become failures",
+     "file": "dev.sh", "old": "      ( \"cmd_$g\" ) >\"$dest\" 2>&1; code=$?", "new": "      ( \"cmd_$g\" ) >/dev/null 2>&1; code=$?",
+     "run": ["python3", "-m", "unittest", "tests.test_checkjson.Own.test_dev_sh_wires_each_gate_through_the_helper"]},
+    {"id": "own-json-gate-clobbers", "gate": "check-json: a gate runs in a subshell, so it cannot reset the loop's capture dir or rows",
+     "file": "dev.sh", "old": "      ( \"cmd_$g\" ) >\"$dest\" 2>&1; code=$?", "new": "      \"cmd_$g\" >\"$dest\" 2>&1; code=$?",
+     "run": ["python3", "-m", "unittest", "tests.test_checkjson.Own.test_dev_sh_wires_each_gate_through_the_helper"]},
+    {"id": "own-json-exit-green", "gate": "check-json: dev.sh check --json exits 0 iff ok",
+     "file": "dev.sh", "old": "python3 devtools/checkjson.py \"${rows[@]}\"; code=$?", "new": "python3 devtools/checkjson.py \"${rows[@]}\"; code=0",
+     "run": ["python3", "-m", "unittest", "tests.test_checkjson.Own.test_dev_sh_wires_each_gate_through_the_helper"]}
   ]
 }

@@ -7,7 +7,7 @@ usage() {
   cat <<'EOF'
 ./dev.sh <command>
 
-  check      every gate below, in order; non-zero if any fails (--json: {"ok": bool, "gates": {...}})
+  check      every gate below, in order; non-zero if any fails (--json: the one schema, via devtools/checkjson.py)
   test       the unit tests (tests/), trimmed to the result unless something fails
   hooks      the shared hook copies: present, executable, parse, registered, their own tests pass
   files      the files the tool needs: present, executable where they must be, data parses
@@ -26,7 +26,7 @@ cmd_test() {
 }
 
 cmd_hooks() {
-  local fails=0 h name t
+  local fails=0 h name t out
   [ -f .claude/settings.json ] && jq -e . .claude/settings.json >/dev/null 2>&1 \
     || { echo "  FAIL  .claude/settings.json missing or does not parse"; return 1; }
   for h in .claude/hooks/*.sh; do
@@ -48,10 +48,10 @@ cmd_hooks() {
 
 cmd_files() {
   local fails=0 f
-  for f in setup dev.sh templates/dev.sh tests/fake_gh.py devtools/mutate.py; do
+  for f in setup dev.sh templates/dev.sh tests/fake_gh.py devtools/mutate.py devtools/checkjson.py; do
     [ -x "$f" ] || { echo "  FAIL  $f missing or not executable"; fails=$((fails+1)); }
   done
-  for f in components.json audit-terms.json devtools/mutants.json checks.json; do
+  for f in components.json audit-terms.json devtools/mutants.json checks.json tests/fixtures/*.json; do
     jq -e . "$f" >/dev/null 2>&1 || { echo "  FAIL  $f missing or does not parse"; fails=$((fails+1)); }
   done
   for f in CLAUDE.md TODO.md .gitignore $(jq -r '.components[] | (.template, .head) // empty' components.json 2>/dev/null); do
@@ -88,20 +88,30 @@ cmd_plans() {
 
 GATES=(test hooks files audit self mutants)
 
+# The role each gate's failure belongs to, in --json (code, tests, audit, docs):
+# a surviving mutant is a missing test; the audits are audit's; the rest is code.
+gate_role() { case "$1" in audit) echo audit ;; mutants) echo tests ;; *) echo code ;; esac; }
+
+# --json: stdout is exactly one document (devtools/checkjson.py), each gate's
+# output captured to a scratch file so its finding lines become the failures.
 cmd_check() {
-  local json=0 g code fails=0 results=""
+  local json=0 g code fails=0 capdir="" dest rows=()
   [ "${1:-}" = "--json" ] && json=1
+  [ $json -eq 1 ] && capdir=$(mktemp -d 2>/dev/null)
   for g in "${GATES[@]}"; do
-    if [ $json -eq 1 ]; then "cmd_$g" >/dev/null 2>&1; code=$?
-    else echo "== $g"; "cmd_$g"; code=$?; fi
+    if [ $json -eq 1 ]; then
+      dest=/dev/null; [ -n "$capdir" ] && dest="$capdir/$g"
+      ( "cmd_$g" ) >"$dest" 2>&1; code=$?  # a subshell: a gate cannot touch this loop's variables
+      rows+=("$g:$(gate_role "$g"):$code:$dest")
+    else echo "== $g"; ( "cmd_$g" ); code=$?; fi
     [ $code -ne 0 ] && fails=$((fails+1))
-    results="$results\"$g\": $([ $code -eq 0 ] && echo true || echo false), "
   done
   if [ $json -eq 1 ]; then
-    printf '{"ok": %s, "gates": {%s}}\n' "$([ $fails -eq 0 ] && echo true || echo false)" "${results%, }"
-  else
-    [ $fails -eq 0 ] && echo "check: all ${#GATES[@]} gates green" || echo "check: $fails of ${#GATES[@]} gates FAILED"
+    python3 devtools/checkjson.py "${rows[@]}"; code=$?
+    [ -n "$capdir" ] && rm -rf "$capdir"
+    return $code
   fi
+  [ $fails -eq 0 ] && echo "check: all ${#GATES[@]} gates green" || echo "check: $fails of ${#GATES[@]} gates FAILED"
   return $((fails > 0))
 }
 

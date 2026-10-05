@@ -1,0 +1,4 @@
+{"ok": true, "checks": [
+ {"name": "test", "status": "ok", "counts": {"failed": 0}, "failures": []},
+ {"name": "files", "status": "ok", "counts": {"failed": 0}, "failures": []}
+]}

@@ -79,6 +79,13 @@
 
 ## Reported to other owners
 
+- 2026-10-04, via the dispatcher, to knowledge-base: its TODO observation that
+  this CLAUDE.md's "Keeping these rules in sync" names only `../../CLAUDE.md` is
+  stale (it names all nine hand-synced copies; `tests/test_sync_list.py`'s live
+  comparison passes). The section's prose was reworded (commit "CLAUDE.md: sync
+  section"): it now says why the block-carrying tool folders stay out of the list.
+  Their item can be closed.
+
 - 2026-10-04, via the dispatcher, to checks: take the mutant runner as `checks
   mutants [PATH]` (td-9 decision above; start from tools/todo's copy, which has
   the `edits` list). And to todo: td-9 is decided that way, so it waits on checks.

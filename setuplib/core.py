@@ -116,6 +116,32 @@ def _json_file(p: Path):
 
 
 CHECKS_TIMEOUT = 1800  # seconds for one call of the shared checks CLI; past it the gates line fails
+VERIFY = {"same", "differs", "missing", "unavailable"}  # a verify report's item statuses (the shared verify.schema.json)
+
+
+def _inside(rel):
+    """A relative path inside the repo: not absolute, no `..` segment."""
+    return isinstance(rel, str) and rel != "" and not Path(rel).is_absolute() and ".." not in Path(rel).parts
+
+
+def _cli_shape(doc):
+    """None when cli.json is {store, cli, verbs} with every path inside the repo, else
+    why not. Only what the data component needs before it runs anything; the shared
+    accessor gates the rest (the schema, the help, an executable cli)."""
+    if not isinstance(doc, dict):
+        return "is not an object"
+    store = doc.get("store")
+    stores = [store] if isinstance(store, str) else store
+    if not isinstance(stores, list) or not stores or not all(isinstance(s, str) and s for s in stores):
+        return "has no `store` (a path, or a list of paths or globs)"
+    if not isinstance(doc.get("cli"), str) or not doc["cli"]:
+        return "has no `cli` (the store's executable)"
+    if not isinstance(doc.get("verbs"), list) or not all(isinstance(v, str) for v in doc["verbs"]):
+        return "has no `verbs` list"
+    outside = [p for p in [doc["cli"], *stores] if not _inside(p)]
+    if outside:
+        return f"names {', '.join(outside)}: not a relative path inside the repo"
+    return None
 
 
 def _names(doc):
@@ -156,9 +182,10 @@ class Setup:
                  github: bool = False, private: bool = False, owner=None,
                  hooks_from=None, plugins_from=None, user_scope_from=None, dir_base=None, gh: str = "gh",
                  spec=None, node=False, rebuild=False, rebuild_dry=False, nest_in=None, stands_for=None,
-                 checks_cli=None):
+                 checks_cli=None, data_repo=None):
         self.target = target
         self.checks_cli = checks_cli  # --checks: the shared checks CLI the gates component runs last
+        self.data_repo = data_repo  # the data repo's root (an absolute Path), or None when DATA_REPO is unset
         self.node = node  # False, True (--node: node.json required) or "auto" (a child: a node if it has one)
         self.node_cfg = None  # node.json, once c_node has read it without a finding
         self.rebuild = rebuild  # with it the setup pass is a dry run (dry_run=True) and only the rebuild writes,
@@ -443,6 +470,92 @@ class Setup:
             return Result("cli", "unchanged", f"{c['file']} present: the owner's (the shared accessor gates it)")
         return Result("cli", "none", f"no {c['file']}, and none written: no skeleton passes its schema; "
                                      "a repo with a store adds {store, cli, verbs}")
+
+    def c_data(self):
+        """PLAN-repo-setup.md §7.11: an absent store, generated from its export in the
+        data repo by the repo's own CLI, then proved by its own `verify`. Nothing here
+        reads the store or the data repo: the CLI is the only way in."""
+        c = self.comp["data"]
+        f, key = c["file"], c["key"]
+        if not (self.target / f).exists():
+            return Result("data", "none", f"no {f}: no store is declared here")
+        doc, why = _json_file(self.target / f)
+        why = why or _cli_shape(doc)
+        if why:
+            return Result("data", "drift", f"{f} {why}: nothing run (the shared accessor gates its shape)")
+        cli, verbs = doc["cli"], doc["verbs"]
+        if c["import"] not in verbs:
+            return Result("data", "none", f"{f} declares no `{c['import']}` verb: the store is not generated here")
+        stores = [doc["store"]] if isinstance(doc["store"], str) else doc["store"]
+        absent = [s for s in stores if not self._on_disk(s)]
+        if not absent:
+            return Result("data", "unchanged", f"the store is on disk ({', '.join(stores)}): never dropped, "
+                                               "never imported over")
+        if len(absent) < len(stores):
+            return Result("data", "needs-owner", f"{', '.join(absent)} absent while the rest of the store is on disk: "
+                                                 f"setup never imports over a store (`{cli} {c['import']}` is the owner's call)")
+        if c["verify"] not in verbs:
+            return Result("data", "needs-owner", f"{f} declares `{c['import']}` but no `{c['verify']}`: an import "
+                                                 "nothing can prove is not run")
+        if self.data_repo is None:
+            return Result("data", "needs-" + c["needs"], f"the store is absent and {key} is not set (--data-repo, or "
+                                                         "the environment): clone the data repo, set it, run setup again")
+        if not self.data_repo.is_dir():
+            return Result("data", "needs-" + c["needs"], f"the store is absent and {key} is set but is not a folder: "
+                                                         "clone the data repo there, run setup again")
+        if self.dry_run:
+            return Result("data", "installed", f"would run `{cli} {c['import']}`, then `{cli} {c['verify']} --json`, "
+                                               f"with {key}")
+        env = dict(os.environ, **{key: str(self.data_repo)})
+        code, tail, err = self.w.run_repo_cli([str(self.target / cli), c["import"]], env, c["timeout"])
+        if err or code != 0:
+            return Result("data", "failed", f"`{cli} {c['import']}` " + (f"could not run ({err})" if err else
+                                                                           f"exited {code}: {tail or '(no output)'}"))
+        absent = [s for s in stores if not self._on_disk(s)]
+        if absent:
+            return Result("data", "failed", f"`{cli} {c['import']}` exited 0 but no store is on disk at "
+                                            f"{', '.join(absent)}")
+        return self._verify(cli, env, c)
+
+    def _on_disk(self, store):
+        """A store path or glob (relative, inside: _cli_shape held it) matches a file or folder."""
+        return any(True for _ in self.target.glob(store))
+
+    def _verify(self, cli, env, c):
+        """The data line from `<cli> verify --json` (verify.schema.json's shape), read
+        from its report; its exit code only counts against a report that is all `same`."""
+        cmd = f"`{cli} {c['verify']} --json`"
+        try:
+            r = subprocess.run([str(self.target / cli), c["verify"], "--json"], cwd=self.target, env=env,
+                               capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=c["timeout"])
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return Result("data", "failed", f"the store was imported; {cmd} could not run ({e.__class__.__name__})")
+        try:
+            items = json.loads(r.stdout).get("items")
+        except (ValueError, AttributeError):
+            items = None
+        if (not isinstance(items, list) or not items
+                or not all(isinstance(i, dict) and isinstance(i.get("item"), str) and i.get("status") in VERIFY
+                           for i in items)
+                or len({i["item"] for i in items}) != len(items)):
+            return Result("data", "failed", f"the store was imported; {cmd} printed no report of shape "
+                                            "{items: [{item, status}]}, one or more, each item once "
+                                            f"(exit {r.returncode})")
+        red = [f"{i['item']}: {i['status']}" + (f" ({i['detail']})" if i.get("detail") else "")
+               for i in items if i["status"] in ("differs", "missing")]
+        away = [i["item"] for i in items if i["status"] == "unavailable"]
+        if red:
+            return Result("data", "failed", f"imported, but {cmd} reports {len(red)} item(s) not same: "
+                                            + "; ".join(red[:5]))
+        if away:
+            return Result("data", "needs-" + c["needs"], f"imported; {len(away)} item(s) unavailable, could not be "
+                                                         f"compared here (unchecked, never a pass): {', '.join(away[:5])}; "
+                                                         f"run {cmd} where they can be")
+        if r.returncode != 0:
+            return Result("data", "failed", f"imported, but {cmd} exited {r.returncode} though every item is "
+                                            "`same`: a verify that failed is not a pass")
+        return Result("data", "installed", f"`{cli} {c['import']}` from {c['key']}, then {cmd}: "
+                                           f"{len(items)} item(s) same; not committed")
 
     def c_params(self):
         c = self.comp["params"]
@@ -753,7 +866,7 @@ class Setup:
                     hooks_from=self.hooks_from, plugins_from=self.plugins_from,
                     user_scope_from=self.user_scope_from, dir_base=self.dir_base, gh=self.gh,
                     spec=self.spec, node="auto", rebuild=self.rebuild, rebuild_dry=self.rebuild_dry,
-                    nest_in=self.target, checks_cli=self.checks_cli)
+                    nest_in=self.target, checks_cli=self.checks_cli, data_repo=self.data_repo)
         try:
             results = kid.run()
         except Refused as e:

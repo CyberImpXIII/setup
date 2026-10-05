@@ -1,7 +1,8 @@
 """The ONLY module in setuplib that changes anything on disk or on a remote.
 
-Every file write, chmod, folder creation, `git init`, commit and `gh repo create`
-goes through a Writer, so `--dry-run` is enforced in one place: a dry Writer
+Every file write, chmod, folder creation, `git init`, commit, `gh repo create` and
+the repo CLI's own write setup asks for (the data component's `import`) goes
+through a Writer, so `--dry-run` is enforced in one place: a dry Writer
 records what it would have done and touches nothing. tests/test_vocab.py
 (OneWriter) audits that no other module in setuplib writes, and
 tests/test_dryrun.py that a dry run leaves the target byte-identical. The two
@@ -99,6 +100,19 @@ class Writer:
         r = subprocess.run(["git", "commit", "-q", "-m", message], cwd=self.root,
                            capture_output=True, text=True)
         return None if r.returncode == 0 else (r.stderr.strip() or r.stdout.strip() or "git commit failed")
+
+    def run_repo_cli(self, argv, env, timeout):
+        """A write the repo's own CLI does (the data component's `import`), run in the
+        repo. (exit code, stderr+stdout tail, None) or (None, "", why it could not run);
+        a dry run runs nothing: (0, "", None). The caller checks what it wrote, not the code."""
+        if self.dry_run:
+            return 0, "", None
+        try:
+            r = subprocess.run(argv, cwd=self.root, env=env, capture_output=True, text=True,
+                               stdin=subprocess.DEVNULL, timeout=timeout)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return None, "", f"{e.__class__.__name__}: {e}"
+        return r.returncode, (r.stderr.strip() or r.stdout.strip())[-200:], None
 
     def create_github(self, gh: str, slug: str, private: bool):
         """`gh repo create` with origin and a push. The caller verifies the result."""

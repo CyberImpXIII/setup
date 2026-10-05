@@ -13,7 +13,7 @@ class Fixture(Case):
         self.assertEqual(self.statuses(res), {
             "repo": "installed", "rules": "installed", "hooks": "installed",
             "todo": "installed", "check": "installed", "services": "installed", "cli": "none",
-            "params": "installed", "ignore": "installed", "commit": "installed",
+            "data": "none", "params": "installed", "ignore": "installed", "commit": "installed",
             "remote": "none", "agent": "needs-harness", "server": "needs-harness",
             "node": "none", "registry": "none", "gates": "none"})
         repo = self.tmp / "fresh"

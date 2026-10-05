@@ -18,6 +18,19 @@
 
 ## Open decisions
 
+- **§7.11 data component, built 2026-10-05; three parts of §7.11 not built here.**
+  (1) The `--node --rebuild` store row (`emerged`, `same`, `drift`, `state`): the
+  rebuild renders into a scratch copy and has no store to compare; it needs `verify`
+  on an existing store, which setup leaves to the shared `stores-exported`. Open:
+  build it as "run verify on each child's store in a rebuild", or drop it for the
+  gate. (2) Data-repo commits "scoped to the exporting tool's folder" belong to the
+  export (the `write` service, §14.6), not to setup's import: no setup code commits
+  in the data repo. (3) `DATA_REPO` arrives by `--data-repo` or the environment;
+  the `.claude/local.env` loader (PLAN-portable-env §3.1) does not exist yet, so
+  nothing exports it today. Also open: a tool with a store and no export yet (its
+  folder absent from the data repo): its `import` decides (exit non-zero: setup's
+  line is failed). And the plan says cli.json "declares `stores`"; the shared
+  schema's field is `store` (string or list): setup follows the schema.
 - **The check component installing `checks run .` (planner: yes, PLAN-tools-folder
   §8) collides with the content audit.** Not built, 2026-10-04. The stub would
   have to name the runner's path (`tools/checks/checks`), and `./dev.sh audit

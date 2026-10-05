@@ -2,7 +2,7 @@
 """setup: bring a git repo (or a new folder) to the shared baseline.
 
   setup <path> [--dry-run] [--github [--private] [--owner O]] [--name N] [--hooks-from DIR]
-               [--plugins FILE] [--user-scope FILE] [--relative-to DIR] [--checks CLI] [--json]
+               [--plugins FILE] [--user-scope FILE] [--relative-to DIR] [--checks CLI] [--data-repo DIR] [--json]
       install every component in components.json; one line each, then a result line.
       A repo setup creates gets .claude/settings.json (the render a proposal would
       hold), committed; an existing repo only ever gets settings.proposed.json.
@@ -19,6 +19,10 @@
       (`CLI run <path>`, then each contract gate it left out by name, in
       sequence; never in a dry run): their result is the gates line, and a
       contract gate the CLI lacks fails it. Without it, the gates line is none.
+      --data-repo DIR: the data repo's root (default: $DATA_REPO): a repo whose
+      cli.json declares import and verify and whose store is absent gets
+      `<cli> import` then `<cli> verify --json`, with DATA_REPO set to it. Unset,
+      the data line is needs-jacob and no store is made.
   setup <path> --node [--rebuild] [...]
       also set up each child <path>/node.json lists (created as a repo nested in
       this one when absent; a child with its own node.json recurses; never
@@ -108,6 +112,7 @@ def cmd_setup(argv):
     p.add_argument("--user-scope")
     p.add_argument("--relative-to")
     p.add_argument("--checks")
+    p.add_argument("--data-repo")
     p.add_argument("--node", action="store_true")
     p.add_argument("--rebuild", action="store_true")
     p.add_argument("--json", action="store_true")
@@ -138,7 +143,8 @@ def cmd_setup(argv):
                    github=a.github, private=a.private, owner=a.owner,
                    hooks_from=a.hooks_from, plugins_from=a.plugins, user_scope_from=a.user_scope,
                    dir_base=dir_base, gh=os.environ.get("SETUP_GH", "gh"),
-                   node=a.node, rebuild=a.rebuild, rebuild_dry=rebuild_dry, checks_cli=a.checks)
+                   node=a.node, rebuild=a.rebuild, rebuild_dry=rebuild_dry, checks_cli=a.checks,
+                   data_repo=data_repo(a.data_repo, cwd))
     try:
         results = s.run()
     except core.Refused as e:
@@ -157,6 +163,15 @@ def cmd_setup(argv):
                " (rebuild: only generated files written)" if a.rebuild else "")
         print(f"setup {label}{how}: {summary}")
     return 0 if doc["ok"] else 1
+
+
+def data_repo(flag, cwd):
+    """The data repo's root: --data-repo, else $DATA_REPO (the instance's loader
+    exports it; setup reads no instance file), resolved against the working folder.
+    None when neither is set (an empty value is unset)."""
+    key = next(c["key"] for c in core.load_spec()["components"] if c["name"] == "data")
+    value = flag or os.environ.get(key) or None
+    return (cwd / value).resolve() if value else None
 
 
 def print_doc(doc, pad):

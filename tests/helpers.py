@@ -58,6 +58,7 @@ class Case(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp(prefix="setup-test-")).resolve()
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.env = dict(os.environ)
+        self.env.pop("DATA_REPO", None)  # the data component reads it: a test sets its own or none
         self.env["SETUP_GH"] = str(FAKE_GH)
         self.env["FAKE_GH_ROOT"] = str(self.tmp / "_github")
         # A commit needs an identity; never borrow the user's for test commits.

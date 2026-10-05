@@ -2,8 +2,13 @@
 """setup: bring a git repo (or a new folder) to the shared baseline.
 
   setup <path> [--dry-run] [--github [--private] [--owner O]] [--name N] [--hooks-from DIR]
-               [--plugins FILE] [--user-scope FILE] [--relative-to DIR] [--checks CLI] [--data-repo DIR] [--json]
+               [--plugins FILE] [--user-scope FILE] [--relative-to DIR] [--checks CLI] [--data-repo DIR]
+               [--only COMPONENT] [--json]
       install every component in components.json; one line each, then a result line.
+      --only COMPONENT: run that one component alone (a name `setup components`
+      lists), on an existing repo only (a new folder is refused: nothing else
+      would create the repo), never with --node; e.g. --only hooks installs the
+      hook copies and libraries and touches nothing else.
       A repo setup creates gets .claude/settings.json (the render a proposal would
       hold), committed; an existing repo only ever gets settings.proposed.json.
       The roster line's dir is <path> relative to DIR (default: the working
@@ -62,6 +67,7 @@ def cmd_components(_):
     spec = core.load_spec()
     for c in spec["components"]:
         print(f"  {c['name']:<8} {c['installs']}")
+    print("one alone, on an existing repo: setup <path> --only <component>")
     print("statuses:")
     for k, v in spec["statuses"].items():
         print(f"  {k:<13} {v}")
@@ -116,10 +122,18 @@ def cmd_setup(argv):
     p.add_argument("--data-repo")
     p.add_argument("--node", action="store_true")
     p.add_argument("--rebuild", action="store_true")
+    p.add_argument("--only")
     p.add_argument("--json", action="store_true")
     try:
         a = p.parse_args(argv)
     except SystemExit:
+        return 2
+    names = [c["name"] for c in core.load_spec()["components"]]
+    if a.only is not None and a.only not in names:
+        print(f"setup: --only {a.only}: not a component (one of: {', '.join(names)})", file=sys.stderr)
+        return 2
+    if a.only and a.node:
+        print("setup: --only runs one component of one repo: not with --node", file=sys.stderr)
         return 2
     if a.private and not a.github:
         print("setup: --private only means something with --github", file=sys.stderr)
@@ -145,7 +159,7 @@ def cmd_setup(argv):
                    hooks_from=a.hooks_from, plugins_from=a.plugins, user_scope_from=a.user_scope,
                    dir_base=dir_base, gh=os.environ.get("SETUP_GH", "gh"),
                    node=a.node, rebuild=a.rebuild, rebuild_dry=rebuild_dry, checks_cli=a.checks,
-                   data_repo=data_repo(a.data_repo, cwd))
+                   data_repo=data_repo(a.data_repo, cwd), only=a.only)
     try:
         results = s.run()
     except core.Refused as e:

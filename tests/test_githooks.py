@@ -211,6 +211,63 @@ class Install(Base):
         self.assertEqual((code, res["githooks"]["status"]), (1, "drift"), res["githooks"])
         self.assertIn("every commit is refused", res["githooks"]["detail"])
 
+    def active_unwired(self, own_pre_commit=None):
+        """A repo whose core.hooksPath already names the folder (set by its owner, not by
+        setup) while the stamp hook is unregistered: seen in a real repo, §7.12 step 2."""
+        repo, src = self.ready_repo(wired=False)
+        (repo / DIR).mkdir()
+        if own_pre_commit is not None:
+            (repo / DIR / "pre-commit").write_text(own_pre_commit)
+            os.chmod(repo / DIR / "pre-commit", 0o755)
+        git(["config", "core.hooksPath", DIR], repo)
+        git(["add", "-A"], repo)
+        git(["commit", "-q", "--no-verify", "-m", "base"], repo)
+        return repo, src
+
+    def session_commit(self, repo):
+        """What the repo's agent does next: commit setup's output, unstamped (no stamp
+        hook runs to add the Agent: trailer)."""
+        git(["add", "-A"], repo)
+        env = dict(self.env, CLAUDECODE="1")
+        return subprocess.run(["git", "commit", "-q", "-m", "setup output"], cwd=repo, env=env,
+                              capture_output=True, text=True)
+
+    def test_an_active_hooks_path_never_gets_a_gate_while_the_stamp_is_unregistered(self):
+        repo, src = self.active_unwired()
+        code, res = self.setup("r", src)
+        line = res["githooks"]
+        self.assertEqual(line["status"], "needs-jacob", line)
+        self.assertIn("withheld " + ", ".join(SPEC["runs"]), line["detail"])
+        self.assertIn("git-stamp.sh is not registered", line["detail"])
+        for f in SPEC["runs"]:
+            self.assertFalse((repo / DIR / f).exists(), f"{f} written into an active core.hooksPath")
+        # everything else is installed: the recorder, and the session hooks themselves
+        rest = [f for f in SPEC["files"] if f not in SPEC["runs"]]
+        self.assertTrue(rest and all((repo / DIR / f).exists() for f in rest), rest)
+        self.assertTrue((repo / ".claude/hooks/git-stamp.sh").exists(), res["hooks"])
+        # and setup's output can be committed by the repo's own agent, as it is
+        r = self.session_commit(repo)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        # once the stamp is wired the gates go in, and the folder stays active
+        (repo / ".claude/settings.json").write_text((src / "settings.json").read_text())
+        _, res = self.setup("r", src)
+        self.assertEqual(res["githooks"]["status"], "installed", res["githooks"])
+        for f in SPEC["runs"]:
+            self.assertTrue((repo / DIR / f).exists(), f)
+        self.assertEqual(self.hooks_path(repo), DIR)
+
+    def test_an_active_hooks_path_with_its_own_hook_keeps_it_and_claims_no_refusal(self):
+        own = "#!/bin/sh\n./dev.sh check\n"
+        repo, src = self.active_unwired(own_pre_commit=own)
+        code, res = self.setup("r", src)
+        line = res["githooks"]
+        self.assertEqual((code, line["status"]), (1, "drift"), line)  # its pre-commit is not setup's
+        self.assertEqual((repo / DIR / "pre-commit").read_text(), own)
+        self.assertFalse((repo / DIR / "commit-msg").exists())
+        self.assertIn("withheld commit-msg", line["detail"])
+        self.assertNotIn("every commit is refused until that is fixed", line["detail"])
+        self.assertIn("none of setup's gates there run yet", line["detail"])
+
 
 class Hooks(Base):
     """The hooks themselves, in an activated fixture repo."""

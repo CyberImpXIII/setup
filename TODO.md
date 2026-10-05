@@ -78,6 +78,16 @@
   create. Hinges on: whether setup may ever overwrite logic in a repo it did not
   create. The five DRIFT files in other repos stay until then. Moot for any hook user
   scope covers (`--user-scope`): its per-repo copy is neither replaced nor read.
+- **An active core.hooksPath no longer gets setup's gates while unready** (fixed
+  2026-10-05, from emailTools' §7.12 step 2 run: setup at 13c6691 would have written
+  commit-msg into its active `.githooks/` with git-stamp unregistered, refusing every
+  session commit, setup's own output first). Now withheld (`runs` in components.json,
+  tests `test_an_active_hooks_path_*`). Probe the same day, `git config core.hooksPath`
+  in the 16 locations `hooks copies ../..` names: only emailTools has it set (its own
+  `.githooks/pre-commit`); 12 others hold an inert `.githooks/commit-msg` from earlier
+  runs (hooksPath unset). emailTools' githooks line stays `drift`: its own pre-commit is
+  not the template, and merging the two is its owner's call. Open: a repo's own hook in
+  `runs` is never wrapped or chained; whether setup should ever chain is undecided.
 - **Other repos owe a reinstall (§7.12 step 2, dispatched per owner).** `hooks copies
   <top> --gate <loc>` showed ~18-21 non-ok files per location before this change;
   `setup <repo>` now installs the MISSING ones. Not run here (the brief: step 2).

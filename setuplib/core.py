@@ -225,8 +225,9 @@ class Setup:
                  github: bool = False, private: bool = False, owner=None,
                  hooks_from=None, plugins_from=None, user_scope_from=None, dir_base=None, gh: str = "gh",
                  spec=None, node=False, rebuild=False, rebuild_dry=False, nest_in=None, stands_for=None,
-                 checks_cli=None, data_repo=None):
+                 checks_cli=None, data_repo=None, only=None):
         self.target = target
+        self.only = only  # --only: the one component run, on an existing repo; None runs every one
         self.checks_cli = checks_cli  # --checks: the shared checks CLI the gates component runs last
         self.data_repo = data_repo  # the data repo's root (an absolute Path), or None when DATA_REPO is unset
         self.node = node  # False, True (--node: node.json required) or "auto" (a child: a node if it has one)
@@ -899,15 +900,25 @@ class Setup:
         changed one drift. core.hooksPath is set only when nothing would be refused for
         want of wiring (_unready); until then it is left unset and the line says what is
         missing, so a repo is never left unable to commit. Never set in a repo setup is
-        creating, and never over another core.hooksPath."""
+        creating, and never over another core.hooksPath. When core.hooksPath already
+        points at the folder, a hook git runs (`runs`) is not written there while
+        anything is unready: written, it would refuse every commit, setup's own output
+        among them. It is withheld, and the line is needs-jacob (the stamp unregistered)
+        or needs-owner, with the reasons."""
         c = self.comp["githooks"]
         statuses, notes = [], []
         n_new = 0
+        unwired = self._unwired(c["hooks"])
+        active = not self.is_new and self._config("core.hooksPath", local=True) == c["dir"]
+        hold = self._unready(c, unwired, active=True) if active else []
+        withheld = []
         for name in c["files"]:
             rel = f"{c['dir']}/{name}"
             body = (TOOL_ROOT / c["templates"] / name).read_bytes()
             dst = self.target / rel
-            if not dst.exists():
+            if not dst.exists() and hold and name in c["runs"]:
+                withheld.append(name)
+            elif not dst.exists():
                 self.w.write(rel, body, mode=0o755)
                 n_new += 1
                 statuses.append("installed")
@@ -918,12 +929,17 @@ class Setup:
                 statuses.append("drift")
                 notes.append(f"{rel} is not executable")
         did = "would install" if self.dry_run else "installed"
-        notes.insert(0, f"{did} {n_new} of {len(c['files'])} in {c['dir']}/" if n_new
+        notes.insert(0, f"{did} {n_new} of {len(c['files'])} in {c['dir']}/" if n_new or withheld
                      else f"{c['dir']}/ holds the {len(c['files'])} hooks")
+        if withheld:
+            statuses.append("needs-" + c["needs"] if c["stamp"] in unwired else "needs-owner")
+            notes.append(f"withheld {', '.join(withheld)}: core.hooksPath = {c['dir']} is already active, so git "
+                         "would run each at once and refuse every commit (setup's own output among them) "
+                         "until this is fixed: "
+                         + "; ".join(hold))
         st, note = self._checks_config(c)
         statuses.append(st)
         notes.append(note)
-        unwired = self._unwired(c["hooks"])
         if unwired:
             statuses.append("needs-" + c["needs"])
             notes.append("settings do not run " + "; ".join(f"{n} ({why})" for n, why in unwired.items())
@@ -958,9 +974,14 @@ class Setup:
         origin, value = self._config_origin("core.hooksPath")
         unready = self._unready(c, unwired, active=local == c["dir"])
         if local == c["dir"]:
-            if unready:
-                return "drift", ("core.hooksPath is active but " + "; ".join(unready)
+            # only setup's own hooks there are known to refuse; the repo's own run as they are
+            live = [n for n in c["runs"] if _read(self.target / c["dir"] / n)
+                    == (TOOL_ROOT / c["templates"] / n).read_text()]
+            if unready and live:
+                return "drift", (f"core.hooksPath is active, {', '.join(live)} there, but " + "; ".join(unready)
                                  + ": every commit is refused until that is fixed")
+            if unready:
+                return "unchanged", f"core.hooksPath = {c['dir']} (active): none of setup's gates there run yet"
             return "unchanged", f"core.hooksPath = {c['dir']} (active)"
         if value is not None and value != c["dir"]:
             return "drift", f"core.hooksPath is {value} ({origin}): setup never overrides it, the gates are off"
@@ -1112,10 +1133,16 @@ class Setup:
     # ---- runner -----------------------------------------------------------
 
     def run(self):
-        """Run every declared component in order. Raises Refused before any write."""
+        """Run every declared component in order (only `only`, when given). Raises
+        Refused before any write."""
         self.is_new, self._existed_empty = preflight(self.target, self.nest_in)
+        if self.only and self.is_new:
+            raise Refused(f"--only {self.only} runs one component on an existing repo, and "
+                          f"{self.label} is not one yet (a full run creates it)")
         results = []
         for c in self.spec["components"]:
+            if self.only and c["name"] != self.only:
+                continue
             res = getattr(self, "c_" + c["name"])()
             results.append(res)
             if c["name"] == "repo" and res.status == "failed":

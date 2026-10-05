@@ -19,6 +19,7 @@ command, or read the delegation layer.
 |---|---|
 | set a repo up, or see its drift | `./setup <path> [--dry-run]`; run it from the folder the roster's `dir` is relative to, or pass `--relative-to DIR` (the agent line's `dir` is null when `<path>` is not under it) |
 | also propose the plug-in hooks that apply | `--plugins FILE`: the JSON tools/hooks' `./hooks plugins --json` prints (a plug-in runs in place from its owner's repo, never copied); one whose registration would run from below the registry's root fails rather than guess |
+| skip the shared hooks user scope already runs | `--user-scope FILE`: the JSON tools/hooks' `./hooks copies <top> --json` prints; only its `user_scope` is read (never the user settings). A hook every `kind: source` row of which is `registered: true` is not copied and not registered per repo in the proposal (it would run twice); the line says `covered by user scope: <files>`. `null`, an `error`, or no user settings file: not covered, behaviour unchanged. The rule is tools/checks' `hooks-installed` rule, mirrored (setup may not import a sibling tool); an existing copy is never deleted |
 | also create the GitHub repo | `--github` (public by default), `--private` on request, `--owner O` |
 | what each component does, and the statuses | `./setup components` |
 | check a folder of plans | `./setup plans <dir>` |

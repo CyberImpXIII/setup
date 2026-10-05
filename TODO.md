@@ -55,7 +55,33 @@
   the source, or §9 (1)'s "header refreshed" path, which replaces only copies equal by
   meaning and still leaves a logic change (today's case) to a hand copy. Hinges on:
   whether setup may ever overwrite a file in a repo it did not create (CLAUDE.md
-  "What setup never does" says no today).
+  "What setup never does" says no today). Waits on Jacob (planner decisions 33-35);
+  not built. **Moot for the applies_to=all hooks once user scope is on** (2026-10-04,
+  `--user-scope`): a covered hook runs from its one source, so its per-repo copy is
+  neither replaced nor read (a drifted copy of a covered hook is no longer drift).
+  It stays live for any hook user scope does not cover (a `repos:` hook, or before
+  Jacob applies the user-scope proposal).
+- **`--user-scope` has no default** (built 2026-10-04, decision 19). The workspace run
+  is `./setup <path> --user-scope <(cd tools/hooks && ./hooks copies .. --json)`; without
+  it the hooks line says "user scope not checked" and behaviour is as before. A default
+  would name the sibling tool: same dependency decision as above.
+- **The coverage rule is a second copy of tools/checks' `hooks-installed` rule**
+  (`_coverage` and `_user_scope_shape` in setuplib/core.py), not a shared helper:
+  setup may not import a sibling tool (content/direction audits; the dependency
+  decision above), and checks' rule lives in a check script that runs on import.
+  Gated: the rule's cases are tests here with mutants (tests/test_userscope.py), and
+  the shape by a live test that runs the real `hooks copies --json` against scratch
+  user settings (`hooks userscope --out` into a temp folder, HOME pointed there too).
+  NOT gated: that the two copies agree by meaning if checks' rule changes. Settle
+  when the dependency decision lands (then both read one helper), or checks exposes
+  the rule in checkslib and a workspace test here calls both on one fixture.
+- **After Jacob applies user scope, every repo still registering the shared hooks per
+  repo runs them twice** until its settings.json drops them. Setup's proposal does
+  that only when run with `--user-scope` on each repo (the proposal is still his to
+  apply). This repo too: its own `./dev.sh hooks` REQUIRES each copy registered in
+  `.claude/settings.json`, so applying the drop here turns that gate red. Needs a
+  decision once user scope is on: `dev.sh hooks` accepts user-scope coverage (read
+  from the same report) or keeps per-repo registration here deliberately.
 - **Plug-ins whose registration runs from below the registry's root fail** (built
   2026-10-04, `--plugins`): tools/hooks gives one `registration`, with a command
   relative to the workspace top, so it is correct only for applies_to `repos:.`. A

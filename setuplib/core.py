@@ -108,7 +108,8 @@ def worst(statuses):
 class Setup:
     def __init__(self, target: Path, *, label: str, name: str, dry_run: bool,
                  github: bool = False, private: bool = False, owner=None,
-                 hooks_from=None, plugins_from=None, dir_base=None, gh: str = "gh", spec=None):
+                 hooks_from=None, plugins_from=None, user_scope_from=None, dir_base=None, gh: str = "gh",
+                 spec=None):
         self.target = target
         self.dir_base = Path(dir_base) if dir_base is not None else Path.cwd()
         self.label = label
@@ -123,7 +124,8 @@ class Setup:
         hf = self.comp["hooks"]["source"]
         self.hooks_from = Path(hooks_from) if hooks_from else TOOL_ROOT / hf
         self.plugins_from = Path(plugins_from) if plugins_from else None
-        self.w = Writer(target, dry_run)
+        self.user_scope_from = Path(user_scope_from) if user_scope_from else None
+        self.w =Writer(target, dry_run)
         self.is_new = False
         self.repo_slug = None
 
@@ -174,12 +176,23 @@ class Setup:
         srcs = sorted(src_dir.glob("*.sh")) if src_dir.is_dir() else []
         if not srcs:
             return Result("hooks", "failed", f"no hooks found in {src_dir}")
-        statuses, notes = [], []
+        cover, statuses, notes = self._user_scope()
         n_new = n_same = 0
+        covered, unknown = [], {}
         for s in srcs:
             rel = f".claude/hooks/{s.name}"
             dst = self.target / rel
-            if not dst.exists():
+            state, why = cover(rel)
+            if state is None:
+                unknown.setdefault(why, []).append(s.name)
+            if state is True:  # user scope runs it from its source: no copy, an existing one kept
+                covered.append(s.name)
+                if dst.exists() and not os.access(dst, os.X_OK):
+                    statuses.append("drift")
+                    notes.append(f"{s.name} is not executable (a broken copy, whatever user scope runs)")
+                else:
+                    statuses.append("unchanged")
+            elif not dst.exists():
                 self.w.write(rel, s.read_bytes(), mode=0o755)
                 n_new += 1
                 statuses.append("installed")
@@ -192,14 +205,43 @@ class Setup:
             else:
                 n_same += 1
                 statuses.append("unchanged")
+        if covered:
+            notes.append(f"covered by user scope: {', '.join(covered)} (not copied; a copy already here is kept)")
+        elif self.user_scope_from is not None and not statuses.count("failed"):
+            notes.append("user scope covers none of these hooks")
+        for why, names in unknown.items():
+            notes.append(f"user scope could not tell ({why}): treated as not covered for {', '.join(names)}")
         extra, p_statuses, p_notes = self._plugin_wants()
-        st, note = self._settings([s.name for s in srcs], extra)
+        st, note = self._settings([s.name for s in srcs if s.name not in covered], extra, drop=covered)
         statuses += [st, *p_statuses]
         if note:
             notes.append(note)
         notes += p_notes
         head = f"{n_new} installed, {n_same} unchanged of {len(srcs)}, against {src_dir}"
         return Result("hooks", worst(statuses), "; ".join([head, *notes]))
+
+    def _user_scope(self):
+        """(cover, statuses, notes) from the report given with --user-scope: the JSON
+        the shared hooks source prints for its copies, of which only `user_scope` is
+        read, never the user settings themselves. cover(rel) is (True | False | None,
+        why) for the copy at rel, by the rule the shared checks read from the same
+        report (_coverage). Without the report nothing is covered, and the line says so;
+        a report not in that shape fails, and nothing is covered."""
+        nothing = (lambda rel: (False, None))
+        if self.user_scope_from is None:
+            return nothing, [], ["user scope not checked (no --user-scope report given)"]
+        try:
+            rep = json.loads(self.user_scope_from.read_text())
+        except (OSError, ValueError) as e:
+            return nothing, ["failed"], [f"user-scope report {self.user_scope_from} unreadable "
+                                         f"({e.__class__.__name__}); nothing treated as covered"]
+        us, why = _user_scope_shape(rep)
+        if why:
+            return nothing, ["failed"], [f"user-scope report not in the shape read here ({why}); "
+                                         "nothing treated as covered"]
+        notes = [] if us["exists"] else [f"user scope: no user settings file ({us.get('settings')}), "
+                                         "so nothing is covered"]
+        return (lambda rel: _coverage(us, rel)), [], notes
 
     def _plugin_wants(self):
         """(wanted, statuses, notes) from the plug-in registry given with --plugins: the
@@ -253,9 +295,11 @@ class Setup:
         notes.append(f"plug-in hooks that apply here: {', '.join(applied) or 'none'}")
         return wanted, statuses, notes
 
-    def _settings(self, names, extra=()):
+    def _settings(self, names, extra=(), drop=()):
         """Registrations the source settings.json makes for these hooks, plus `extra`
-        (event, matcher, hook) wanted besides, against the target's."""
+        (event, matcher, hook) wanted besides, against the target's. A shared hook in
+        `drop` runs at user scope: a per-repo registration of it would run it twice, so
+        the proposal leaves it out (settings.json itself is never touched)."""
         try:
             src = json.loads((self.hooks_from / "settings.json").read_text())
         except (FileNotFoundError, json.JSONDecodeError) as e:
@@ -275,15 +319,21 @@ class Setup:
                         wanted.append((event, g.get("matcher"), h))
         wanted += list(extra)
         missing = [w for w in wanted if not _registered(tgt, *w)]
-        if not missing:
+        kept, twice = _without(tgt, {("hook", n) for n in drop})
+        if not missing and not twice:
             return "unchanged", None
-        prop = _merge(tgt, missing)
+        prop = _merge(kept, missing)
         rel = ".claude/settings.proposed.json"
         body = json.dumps(prop, indent=2) + "\n"
         if _read(self.target / rel) != body:
             self.w.write(rel, body, commit=False)
-        return "needs-jacob", (f"settings.json lacks {len(missing)} registration(s); "
-                               f"apply with: cp {rel} .claude/settings.json")
+        why = []
+        if missing:
+            why.append(f"settings.json lacks {len(missing)} registration(s)")
+        if twice:
+            why.append(f"settings.json registers {', '.join(twice)} per repo, which user scope also runs, so "
+                       "it runs twice: the proposal leaves that registration out")
+        return "needs-jacob", "; ".join(why) + f"; apply with: cp {rel} .claude/settings.json"
 
     def c_todo(self):
         c = self.comp["todo"]
@@ -568,6 +618,83 @@ def _registered(tgt, event, matcher, hook):
         if any(_key(h.get("command", "")) == key for h in g.get("hooks", [])):
             return True
     return False
+
+
+def _tristate(v):
+    return v is True or v is False or v is None
+
+
+def _user_scope_shape(rep):
+    """(user_scope, None) when the report carries one in the shape read here, else
+    (None, why). The same fields the shared checks require of it, so a report one
+    trusts the other does too."""
+    us = rep.get("user_scope") if isinstance(rep, dict) else None
+    if not isinstance(us, dict):
+        return None, "no `user_scope` object"
+    for key in ("exists", "error", "hooks"):
+        if key not in us:
+            return None, f"`user_scope` has no `{key}`"
+    if not isinstance(us["exists"], bool):
+        return None, "`user_scope.exists` is not true/false"
+    if us["error"] is not None and not isinstance(us["error"], str):
+        return None, "`user_scope.error` is neither null nor text"
+    if not isinstance(us["hooks"], list):
+        return None, "`user_scope.hooks` is not a list"
+    for h in us["hooks"]:
+        if not (isinstance(h, dict) and isinstance(h.get("file"), str) and isinstance(h.get("kind"), str)
+                and "registered" in h and _tristate(h["registered"])
+                and isinstance(h.get("test"), (str, type(None)))):
+            return None, "a `user_scope.hooks` row is not {file, kind, test?, registered: true|false|null}"
+    return us, None
+
+
+def _coverage(us, rel):
+    """(True | False | None, why): do the user settings run the shared hook the copy
+    at rel stands for (rel is the hook, or the test of one)? The shared checks'
+    rule, read from the same report: covered only when every `kind: source` row
+    naming it is `registered: true`; any false is not covered; otherwise (null, or a
+    `user_scope.error`) unknown, which is never covered. No user settings file: not
+    covered, never an error."""
+    if not us["exists"]:
+        return False, "no user settings file"
+    if us["error"] is not None:
+        return None, us["error"]
+    rows = [h for h in us["hooks"] if h["kind"] == "source" and rel in (h["file"], h.get("test"))]
+    if not rows:
+        return False, "no shared hook of that name there"
+    regs = [h["registered"] for h in rows]
+    if all(r is True for r in regs):
+        return True, ""
+    if any(r is False for r in regs):
+        return False, "not registered there"
+    return None, "registered: null"
+
+
+def _without(tgt, keys):
+    """(tgt minus every registration whose command runs one of `keys` (by _key), the
+    names of what was left out). An emptied group or event goes too."""
+    out = copy.deepcopy(tgt)
+    gone = []
+    hooks = out.get("hooks")
+    if not keys or not isinstance(hooks, dict):
+        return out, gone
+    for event in list(hooks):
+        groups = []
+        for g in hooks[event]:
+            keep = []
+            for h in g.get("hooks", []):
+                k = _key(h.get("command", ""))
+                if k in keys:
+                    gone.append(k[1])
+                else:
+                    keep.append(h)
+            if keep or not g.get("hooks"):
+                groups.append({**g, "hooks": keep} if "hooks" in g else g)
+        if groups:
+            hooks[event] = groups
+        else:
+            del hooks[event]
+    return out, list(dict.fromkeys(gone))
 
 
 def _merge(tgt, missing):

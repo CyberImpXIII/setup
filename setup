@@ -2,13 +2,17 @@
 """setup: bring a git repo (or a new folder) to the shared baseline.
 
   setup <path> [--dry-run] [--github [--private] [--owner O]] [--name N] [--hooks-from DIR]
-               [--plugins FILE] [--relative-to DIR] [--json]
+               [--plugins FILE] [--user-scope FILE] [--relative-to DIR] [--json]
       install every component in components.json; one line each, then a result line.
       The roster line's dir is <path> relative to DIR (default: the working
       folder), normalised; null when <path> is not under DIR. --plugins: a
       plug-in hook registry (JSON: root, ok, plugins[name, applies_to, faults,
       registration]); the registrations that apply to <path> join the settings
-      proposal. Without it, no plug-in is proposed, and the hooks line says so
+      proposal. Without it, no plug-in is proposed, and the hooks line says so.
+      --user-scope: the hook copies report (JSON with user_scope{exists, error,
+      hooks[file, kind, test, registered]}); a shared hook the user settings
+      already run is not copied, and the proposal does not register it per
+      repo ("covered by user scope: <files>"). Without it, nothing is covered
   setup components            what each component installs, and the status vocabulary
   setup plans <dir>           every PLAN-*.md there that is not done has a "Setup component" heading
   setup audit content         setup names no repo, repo path or repo command
@@ -81,6 +85,7 @@ def cmd_setup(argv):
     p.add_argument("--name")
     p.add_argument("--hooks-from")
     p.add_argument("--plugins")
+    p.add_argument("--user-scope")
     p.add_argument("--relative-to")
     p.add_argument("--json", action="store_true")
     try:
@@ -102,7 +107,8 @@ def cmd_setup(argv):
         label = str(target)
     s = core.Setup(target, label=label, name=a.name or target.name, dry_run=a.dry_run,
                    github=a.github, private=a.private, owner=a.owner,
-                   hooks_from=a.hooks_from, plugins_from=a.plugins, dir_base=dir_base, gh=os.environ.get("SETUP_GH", "gh"))
+                   hooks_from=a.hooks_from, plugins_from=a.plugins, user_scope_from=a.user_scope,
+                   dir_base=dir_base, gh=os.environ.get("SETUP_GH", "gh"))
     try:
         results = s.run()
     except core.Refused as e:

@@ -122,9 +122,10 @@
   uncommitted edit in tools/hooks/source is what setup installs (and, since `--rebuild`
   without `--node`, what it overwrites a drifted copy with: this matters more now). Options: install from
   `git show HEAD:` in the dependency, or refuse a dirty source. Hinges on whether a
-  hooks agent's in-progress edit should ever reach other repos. Live 2026-10-08: a
-  dirty prefer-recipes.sh in the source turns every repo's hooks line (this one's
-  `./dev.sh self` included) to drift while the hooks agent works.
+  hooks agent's in-progress edit should ever reach other repos. Was live 2026-10-08
+  (a dirty prefer-recipes.sh in the source turned every repo's hooks line to drift);
+  that edit landed (tools/hooks 978e6cb..05a5ae4) and this repo's four copies were
+  re-rendered with `--only hooks --rebuild` the same day. The decision stays open.
 - **`--user-scope` has no default** (built 2026-10-04, decision 19). The workspace run
   is `./setup <path> --user-scope <(cd tools/hooks && ./hooks copies .. --json)`; without
   it the hooks line says "user scope not checked" and behaviour is as before. A default
@@ -279,12 +280,12 @@
   `./setup . --checks`, which could set core.hooksPath here: githooks decision (5),
   Jacob's): ask-first.sh is no longer missing; `rules-gated` (new since) was red, no
   row for "Keeping these rules in sync", fixed by this repo's own `gates.json` (two
-  gate rows; `./dev.sh files` parses it); `hooks-installed` is red on
-  prefer-recipes.sh and its test, drift against tools/hooks' UNCOMMITTED working-tree
-  edit of both (`git status` there: ` M source/hooks/prefer-recipes.sh`), so
-  `./dev.sh self` is red too until that lands: the dirty-source decision below, live.
-  Not overwritten (no `--rebuild`: drift is reported, not overwritten, and the source
-  is mid-edit).
+  gate rows; `./dev.sh files` parses it); `hooks-installed` was red on
+  prefer-recipes.sh and its test (drift against tools/hooks' then-uncommitted edit).
+  Since landed (978e6cb..05a5ae4, tree clean) and re-rendered here 2026-10-08 with
+  `./setup . --only hooks --rebuild` (Jacob's yes for drifted repos, same day): four
+  files rewritten (logic), no-inline-blobs.sh, prefer-recipes.sh and their tests.
+  Not re-run under `checks run .` since.
 
 ## Unconfirmed suspicions
 

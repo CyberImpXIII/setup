@@ -67,13 +67,16 @@
   test-no-inline-blobs.sh, another agent's, now differs from the source). `./dev.sh check`
   here is red only from the hooks fault (store-guard.sh unregistered in tools/hooks
   source/settings.json, so the proposal omits it): `hooks` gate, two test_userscope
-  tests, and their BASELINE-RED mutants. NOT done: tools/checks (refused, exit 2: untracked
-  store-guard.sh/test-store-guard.sh there are byte-equal to hooks b393ccd, i.e. an old
-  render; the `--overwrite-uncommitted` run was denied by the permission classifier),
-  tools/hooks, hub, todo, usage (batch denied by the classifier), context-hygiene,
-  transcripts, wizard (stamp gate; not attempted after the denials), top level (not a
-  git repo, and its .claude/ is harness's: skipped). Each owner or Jacob runs
-  `tools/setup/setup <repo> --only hooks --rebuild` from the workspace top.
+  tests, and their BASELINE-RED mutants. Second pass at hooks eb09868: tools/hooks, hub,
+  todo, usage rendered and committed; transcripts rendered, left uncommitted (stamp gate).
+  `hooks copies` then: 14 of 19 pass. Still differing, each a Jacob/owner step:
+  tools/checks (untracked store-guard.sh/test-store-guard.sh byte-equal to hooks b393ccd,
+  an old render; needs `--overwrite-uncommitted`, which the classifier denied and the
+  dispatcher reserved for Jacob); data-bridge, context-hygiene, wizard (refused, exit 2:
+  an uncommitted test-no-inline-blobs.sh byte-equal to hooks 05a5ae4, an Oct 8 render
+  nobody committed; its owner commits or discards it, then `--rebuild`); top level (not
+  a git repo, and its .claude/ is harness's: skipped). The hub commit 03f33d2's message
+  names dd23d32 (a tools/hooks .claude commit) instead of source eb09868; content correct.
 - **mutate.py leaves runs behind when killed.** 5 `.mutants/run-*` folders from Oct 4-5
   (515M; no unwritable dirs, so not a permission failure: most likely killed before its
   `finally`) were removed 2026-10-09. `shutil.rmtree(tmp, ignore_errors=True)` would also

@@ -13,19 +13,28 @@
   `test_the_cli_exits_non_zero_when_it_could_not_run` and its mutant. Nothing
   left here to fix unless tools/hooks changes how its test finds its sibling.
   Since §7.12 (2026-10-05) `audit deps` is UNCHECKED there too, and the hooks
-  component fails without `--hooks-from`. unverified: which other test modules go
-  red in a lone clone because their fixtures use the default hook source (the
-  LoneClone classes in test_hooks and test_deps are the only ones proven) --
-  settle: copy this folder outside the workspace, `git init`, `./dev.sh test`.
+  component fails without `--hooks-from`. Settled 2026-10-08 (this folder rsynced
+  to the scratchpad, `git init`, `./dev.sh test`): 318 tests, 88 failures, 11
+  errors, 43 skipped. By module: test_node 38, test_userscope 15, test_plugins 10,
+  test_data 8, test_settings_new 7, test_contract 7, test_remote 3, test_ignore 3,
+  test_idempotent 2, test_fixture 2, test_dryrun 2, test_refuse 1, test_deps 1;
+  nearly all `1 != 0` / `(1, status)`: setup exits 1 on the hooks line's `failed`
+  (no dependency). So a lone clone's `test` gate is red too (CLAUDE.md now says so).
+  Open, not decided: give those fixtures a planted hook source (`--hooks-from`, as
+  test_hooks' LoneClone does) so only the LoneClone classes depend on the
+  workspace; ~100 call sites, worth it only if a lone clone's check is ever meant
+  to be green.
+- **A fresh clone's `./dev.sh hooks` FAILs 7 hooks as registered nowhere**
+  (probe 2026-10-08, `git clone` to the scratchpad): `settings.proposed.json` is
+  gitignored, so a clone has only Jacob's settings.json (3 registrations). True (they
+  run nowhere there) and the line says `run ./setup .`; it clears once Jacob applies
+  the proposal here (Open decisions, "7 hooks here run only once..."). The same probe
+  found the income agent's report true: a hook test's exit 3 (UNCHECKED: no
+  site-scrapers above) read as FAIL. Fixed 2026-10-08: UNCHECKED with its reason,
+  gate exit 3 (`tests/test_hooks_gate.py`, three mutants).
 - **The agent line's `"repo"` reads "none yet" in a dry run on a new folder**,
   though the real run would make a local repo and print "local, no remote yet".
   Deliberate: it reports the target as it is now (dispatcher's brief, 2026-10-04).
-
-- **Setup's own `record_pass` in dev.sh has no test or mutant** (2026-10-05):
-  recording only on a green check is proven for the stub contract only by reading.
-  Running `./dev.sh check` from a test recurses into the whole suite. Settle: a test
-  that runs `cmd_check` with GATES overridden to one stub gate (dev.sh would need a
-  `GATES` env override, which is itself a seam to guard).
 
 ## Open decisions
 
@@ -113,7 +122,9 @@
   uncommitted edit in tools/hooks/source is what setup installs (and, since `--rebuild`
   without `--node`, what it overwrites a drifted copy with: this matters more now). Options: install from
   `git show HEAD:` in the dependency, or refuse a dirty source. Hinges on whether a
-  hooks agent's in-progress edit should ever reach other repos.
+  hooks agent's in-progress edit should ever reach other repos. Live 2026-10-08: a
+  dirty prefer-recipes.sh in the source turns every repo's hooks line (this one's
+  `./dev.sh self` included) to drift while the hooks agent works.
 - **`--user-scope` has no default** (built 2026-10-04, decision 19). The workspace run
   is `./setup <path> --user-scope <(cd tools/hooks && ./hooks copies .. --json)`; without
   it the hooks line says "user scope not checked" and behaviour is as before. A default
@@ -176,15 +187,19 @@
   names that are not also repo names are exactly the seven listed (harness,
   deep-work, dispatcher, planner, email-tools, job-import-scripts,
   cron-scheduler); the rest are repo names the content audit discovers. Not stale
-  today. Retire it when a caller runs tools/checks' `no-roster` here with the
+  today; re-probed 2026-10-08 (`agents.sh list`, 21 agents, against the 16 repos
+  `audit content` discovers): still exactly those seven. Retire it when a caller runs tools/checks' `no-roster` here with the
   names (`checks all --names`, reported to harness by checks); `checks.json`
   already makes that run green (checked 2026-10-04 with the roster's names).
   Until then, re-run the probe on each roster change.
 - **A root `.gitignore` negation with a pattern in it (`!keep*.txt`) still blocks
   the append as drift** (2026-10-04): literal negations are now tested by git in a
   scratch repo (as a file and as a folder), but a pattern names no single path, and
-  a representative path would be a guess. No workspace `.gitignore` holds any
-  negation today (probe: `grep -n '^!'` over them, 2026-10-04). Revisit if one does.
+  a representative path would be a guess. No workspace `.gitignore` holds a
+  pattern negation (probe: `grep -n '^!'` over them, 2026-10-08): addon-bench and
+  site-scrapers hold literal ones (`!.env.example`, `.sample`, `.template`), which
+  do not block (`setup <repo> --dry-run --only ignore`: unchanged / installed).
+  Revisit if a pattern negation appears.
 - **The negation test covers the negated path itself, not files inside a kept
   folder** (decided 2026-10-04): after `build/*` and `!build/keep/`, an appended
   `*.bak` ignores `build/keep/x.bak`, which is the baseline doing its job, not an
@@ -205,7 +220,7 @@
 - **Repos set up before 2026-10-05 keep the old stub's `{"ok": false, "error"}`**:
   setup never overwrites `dev.sh` (an existing stub is `needs-owner`). Probe run
   2026-10-05, `grep -l SETUP-STUB */dev.sh */*/dev.sh` from the workspace top: none
-  carry the stub today, so nothing to migrate.
+  carry the stub today, so nothing to migrate (re-run 2026-10-08: still none).
 
 - **A created repo whose render is empty gets no settings.json** (§7.9, built
   2026-10-05). With `--user-scope` covering every shared hook and no plug-in applying,
@@ -260,7 +275,16 @@
 - **Setup's own run under `--checks` is red** (2026-10-05, before this commit):
   `hooks-installed` fails, `.claude/hooks/ask-first.sh` missing here (the shared source
   has a hook this repo's copies lack), and `check-json` errored (exit 1) while this
-  suite was mid-change. Re-check after the commit: `./setup . --checks ../checks/checks`.
+  suite was mid-change. Re-checked 2026-10-08 with `../checks/checks run .` (not
+  `./setup . --checks`, which could set core.hooksPath here: githooks decision (5),
+  Jacob's): ask-first.sh is no longer missing; `rules-gated` (new since) was red, no
+  row for "Keeping these rules in sync", fixed by this repo's own `gates.json` (two
+  gate rows; `./dev.sh files` parses it); `hooks-installed` is red on
+  prefer-recipes.sh and its test, drift against tools/hooks' UNCOMMITTED working-tree
+  edit of both (`git status` there: ` M source/hooks/prefer-recipes.sh`), so
+  `./dev.sh self` is red too until that lands: the dirty-source decision below, live.
+  Not overwritten (no `--rebuild`: drift is reported, not overwritten, and the source
+  is mid-edit).
 
 ## Unconfirmed suspicions
 

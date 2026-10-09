@@ -73,7 +73,9 @@ folder: `hooks` (the shared troubleshooting hook's own test fails when it cannot
 find its sibling, because the hook then enforces nothing; that test belongs to
 the hooks source), `audit content` and `audit deps` (no sibling repos to compare
 against: `UNCHECKED`, exit 3). The hooks component fails too unless
-`--hooks-from DIR` is passed (no dependency to install from). None reads as a pass. `checks.json` holds this repo's
+`--hooks-from DIR` is passed (no dependency to install from), so `test` is red as
+well: every test whose fixture runs setup with the default hook source (99 of 318
+on 2026-10-08, in 13 modules; TODO.md). None reads as a pass. `checks.json` holds this repo's
 parameters for the shared checks runner (`no-roster`: the audit data files
 excluded, as they are from this repo's own audits; `hooks`, `todo` and
 `harness` allowed, being component names and the lane owner `needs harness`

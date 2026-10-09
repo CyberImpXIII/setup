@@ -59,6 +59,36 @@
   below. `.claude/settings.json` here is also modified and not by this session; left
   unstaged.
 
+- **Hook-copy re-render 2026-10-09 (dispatched, Jacob's "Yes I approve all"), partial.**
+  `--only hooks --rebuild` run and committed+pushed (rendered paths only) in addon-bench,
+  applications, emailTools, income, knowledge-base, chronjobScheduler, data-bridge,
+  scripts, site-scrapers, tools/setup; hooks moved to e2242bc mid-task (test-no-inline-blobs),
+  re-rendered again in all of those but data-bridge (refused, exit 2: its own uncommitted
+  test-no-inline-blobs.sh, another agent's, now differs from the source). `./dev.sh check`
+  here is red only from the hooks fault (store-guard.sh unregistered in tools/hooks
+  source/settings.json, so the proposal omits it): `hooks` gate, two test_userscope
+  tests, and their BASELINE-RED mutants. NOT done: tools/checks (refused, exit 2: untracked
+  store-guard.sh/test-store-guard.sh there are byte-equal to hooks b393ccd, i.e. an old
+  render; the `--overwrite-uncommitted` run was denied by the permission classifier),
+  tools/hooks, hub, todo, usage (batch denied by the classifier), context-hygiene,
+  transcripts, wizard (stamp gate; not attempted after the denials), top level (not a
+  git repo, and its .claude/ is harness's: skipped). Each owner or Jacob runs
+  `tools/setup/setup <repo> --only hooks --rebuild` from the workspace top.
+- **mutate.py leaves runs behind when killed.** 5 `.mutants/run-*` folders from Oct 4-5
+  (515M; no unwritable dirs, so not a permission failure: most likely killed before its
+  `finally`) were removed 2026-10-09. `shutil.rmtree(tmp, ignore_errors=True)` would also
+  hide a real failure. Open: sweep stale `run-*` at the start of a run (none running),
+  and report a cleanup that left files rather than ignoring it.
+- **check-partial in `gates.contract` (asked by checks, 2026-10-09; open).** checks'
+  TODO asks setup's contract list (components.json, today `check-json, accessor,
+  services-valid, registry-matches, rendered-matches`) to name `check-partial`. Not added:
+  no repo meets its contract yet, so every `--checks` run would read it UNCHECKED; hinges
+  on whether an UNCHECKED contract gate should fail setup's checks line (PLAN-small-tasks §6).
+- **hooks source test files lack +x.** `source/hooks/test-no-secrets.sh`,
+  `test-primary-guard.sh`, `test-push-gate.sh` are 100644 in tools/hooks; setup renders
+  copies +x, so tools/hooks' own `.claude/` copies read `mode` on every `--rebuild`.
+  Reported to hooks in the 2026-10-09 hand-back.
+
 - **githooks (PLAN-hard-gates §7 phase 2), built 2026-10-05; decisions for Jacob.**
   (1) *Strict match*: pre-commit accepts only a staged tree equal to the working
   tree the check passed on, so a partial commit (staging some changes, leaving

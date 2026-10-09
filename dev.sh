@@ -72,7 +72,7 @@ cmd_files() {
   for f in setup dev.sh templates/dev.sh tests/fake_gh.py tests/fake_checks.py devtools/mutate.py devtools/checkjson.py; do
     [ -x "$f" ] || { echo "  FAIL  $f missing or not executable"; fails=$((fails+1)); }
   done
-  for f in components.json dependencies.json audit-terms.json devtools/mutants.json checks.json tests/fixtures/*.json; do
+  for f in components.json dependencies.json audit-terms.json devtools/mutants.json checks.json gates.json tests/fixtures/*.json; do
     jq -e . "$f" >/dev/null 2>&1 || { echo "  FAIL  $f missing or does not parse"; fails=$((fails+1)); }
   done
   for f in CLAUDE.md TODO.md .gitignore $(jq -r '.components[] | (.template, .head) // empty' components.json 2>/dev/null); do

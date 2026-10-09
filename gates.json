@@ -1,0 +1,25 @@
+{
+  "_comment": "This repo's own CLAUDE.md sections (outside the shared block), each classified for the shared checks' rules-gated (tools/checks, its gates.json holds the vocabulary and the shared block's rows). Paths are from the workspace top. Held by `checks one rules-gated .` from the workspace.",
+  "rules": [
+    {
+      "id": "setup-sync-list",
+      "section": "Keeping these rules in sync",
+      "rule": "the hand-synced copies, the same list every one of them carries",
+      "kind": "gate",
+      "how": "check",
+      "gate": "tools/setup/dev.sh",
+      "test": "tools/setup/tests/test_sync_list.py",
+      "note": "the list is compared both ways with the top level's by tests/test_sync_list.py, which ./dev.sh test runs (skipped, saying so, in a lone clone)"
+    },
+    {
+      "id": "setup-block-from-template",
+      "section": "Keeping these rules in sync",
+      "rule": "a block edited in place is reported as drift",
+      "kind": "gate",
+      "how": "check",
+      "gate": "tools/setup/setup",
+      "test": "tools/setup/tests/test_rules.py",
+      "note": "setup reports an edited block as drift and never overwrites it (test_locally_edited_block_is_drift_and_untouched, mutant rules-overwrite-edit); ./dev.sh self runs it on this repo"
+    }
+  ]
+}

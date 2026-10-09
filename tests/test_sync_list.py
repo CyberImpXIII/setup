@@ -8,7 +8,9 @@ The live comparison is workspace only: a lone clone (or a mutant copy under
 SKIPPED with the reason, never passed silently. The comparison itself is the
 pure function `list_problems`, proven both ways on planted texts that run
 anywhere, so its mutant goes red in a copy too. The top level is found by its
-CLAUDE.md carrying the section, not by anything of the layer's."""
+CLAUDE.md carrying the section, not by anything of the layer's. Run by
+`./dev.sh test` (part of `./dev.sh check`): the gate gates.json's
+`setup-sync-list` row names."""
 import re
 import unittest
 

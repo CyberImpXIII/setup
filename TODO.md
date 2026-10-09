@@ -38,6 +38,27 @@
 
 ## Open decisions
 
+- **`setup plans show|list|edit` and section status, built 2026-10-09** (PLAN-todo-tool
+  §9 step 6, PLAN-services §3 step 2). Choices made here, open to the plan owners:
+  (a) the status marker is `<!-- status: open|approved|done -->` on the first line
+  under a numbered heading. PLAN-todo-tool §9 step 6 fixes the values ("a `status:`
+  per section (open, approved, done)") but not the form; an HTML comment keeps it out
+  of the rendered plan. 0 of the 308 numbered sections in the top-level plans carry
+  one today, so `setup plans list` shows them all as unstated until planners add them. (b) `show` puts `digest <sha256>` on stderr so stdout stays the section;
+  a caller that merges the streams gets it as a last line. (c) An edit into a CRLF plan
+  keeps every byte outside the section but writes the replacement's own lines with LF
+  (except its last line end). (d) The digest is re-checked just before the write by the
+  same `stale()` the first check uses; no test isolates that second call (the window
+  between the gate and the write cannot be opened from a test without a hook in the
+  code). (e) An edit cannot add a section (a replacement with a new heading at its
+  level is refused) and cannot touch an unnumbered heading such as `## Setup component`.
+- **`./dev.sh check` red on 2026-10-09 from tools/hooks' uncommitted work** (reported
+  in the dispatch report, not fixed): `source/hooks/store-guard.sh` (untracked there)
+  made the hooks dependency's `list --json` exit 1, so `self` and `mutants` were
+  BASELINE-RED here. Same root as "The hook source is the dependency's working tree"
+  below. `.claude/settings.json` here is also modified and not by this session; left
+  unstaged.
+
 - **githooks (PLAN-hard-gates §7 phase 2), built 2026-10-05; decisions for Jacob.**
   (1) *Strict match*: pre-commit accepts only a staged tree equal to the working
   tree the check passed on, so a partial commit (staging some changes, leaving

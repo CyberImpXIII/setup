@@ -52,7 +52,29 @@
       the progress to make (the checks' `regenerate` is the gate). Run it on a
       copy: --dry-run writes nothing.
   setup components            what each component installs, and the status vocabulary
-  setup plans <dir>           every PLAN-*.md there that is not done has a "Setup component" heading
+  setup plans <dir>           every PLAN-*.md there that is not done has a "Setup component" heading,
+      and in every plan each section status marker is valid and placed, and no section
+      number is carried twice; the last line is `ok ... N sections: a open, b approved,
+      c done, d unstated` (the sections of the plans not done), or the FAIL lines.
+      A section is a numbered heading (`## 3. Title`, `### 7.12 Title`, `## 2a. Title`)
+      through the line before the next heading of its level or above, trailing blank
+      lines dropped. Its status is a marker on the first non-blank line under it:
+      <!-- status: open|approved|done -->
+      none is unstated.
+  setup plans show <file> §<n>
+      prints that section, exactly, on stdout; on stderr `digest <sha256 hex>` of the
+      file's bytes (what edit's --digest takes). A missing file, a missing or
+      ambiguous section: exit 1, `plans show: <why>` on stderr, nothing on stdout.
+  setup plans list <dir> [--all]
+      one line per section: `<file> §<n> <status>  <title>`; without --all, a done
+      plan, a done section and the sections inside one are left out.
+  setup plans edit <file> §<n> --from <src> --digest <sha256> [--dry-run]
+      replaces exactly that section of a PLAN-*.md with <src> (which starts with the
+      same numbered heading at the same level and adds no section); every other byte
+      is kept. Refused, exit 1, nothing written, when the file's digest is not
+      <sha256> (it changed since it was shown), when `setup plans <its dir>` is red
+      before or would be red after. Prints `plans edit: <file> §<n> replaced (lines
+      A-B now A-C); digest <new sha256>`.
   setup audit content         setup names no repo, repo path or repo command
   setup audit direction       setup reads nothing of the delegation layer
   setup audit deps            each tool dependencies.json names (installed FROM) is a discovered repo
@@ -70,7 +92,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from setuplib import audit, core  # noqa: E402
+from setuplib import audit, core, fsw, plans  # noqa: E402
 
 SUBCOMMANDS = ["components", "plans", "audit"]
 
@@ -96,16 +118,131 @@ def cmd_components(_):
     return 0
 
 
+PLANS_USAGE = {
+    "": "setup plans <dir>",
+    "show": "setup plans show <file> §<n>",
+    "list": "setup plans list <dir> [--all]",
+    "edit": "setup plans edit <file> §<n> --from <src> --digest <sha256> [--dry-run]",
+}
+
+
 def cmd_plans(args):
+    action = args[0] if args and args[0] in PLANS_USAGE else ""
+    rest = args[1:] if action else args
+    return {"": plans_gate, "show": plans_show, "list": plans_list, "edit": plans_edit}[action](rest)
+
+
+def plans_gate(args):
     if len(args) != 1:
-        print("usage: setup plans <dir>", file=sys.stderr)
+        print(f"usage: {PLANS_USAGE['']}", file=sys.stderr)
         return 2
     findings, note = audit.audit_plans(Path(args[0]))
     for f in findings:
         print(f"  FAIL  {f}")
-    if not findings:
+    if not findings:  # the ok line stays last: a caller reads the last line
         print(f"  ok    {note}: every plan not done has a Setup component heading")
     return 1 if findings else 0
+
+
+def _read_plan(path):
+    """(bytes, text, None) or (None, None, why): text is the bytes decoded, line ends
+    kept as they are (read_text would turn CRLF into LF, and an edit must keep every
+    byte outside its section)."""
+    try:
+        raw = Path(path).read_bytes()
+        return raw, raw.decode("utf-8"), None
+    except (OSError, UnicodeDecodeError) as e:
+        return None, None, f"{path}: cannot be read ({getattr(e, 'strerror', None) or e})"
+
+
+def plans_show(args):
+    if len(args) != 2:
+        print(f"usage: {PLANS_USAGE['show']}", file=sys.stderr)
+        return 2
+    raw, text, why = _read_plan(args[0])
+    if not why:
+        out, why = plans.section_text(Path(args[0]).name, text, args[1])
+    if why:
+        print(f"plans show: {why}", file=sys.stderr)
+        return 1
+    print(out)  # stdout: the section, exactly
+    print(f"digest {plans.digest(raw)}", file=sys.stderr)  # what `plans edit --digest` takes
+    return 0
+
+
+def plans_list(args):
+    every = "--all" in args
+    rest = [a for a in args if a != "--all"]
+    if len(rest) != 1 or not Path(rest[0]).is_dir():
+        print(f"usage: {PLANS_USAGE['list']}", file=sys.stderr)
+        return 2
+    for p in sorted(Path(rest[0]).glob("PLAN-*.md")):
+        _, is_done, secs = audit.plan_findings(p.name, p.read_text())
+        if is_done and not every:
+            continue
+        for s in plans.live(secs, every):
+            print(f"{p.name} §{s['number']} {s['status'] or 'unstated'}  {s['title']}")
+    return 0
+
+
+def plans_edit(args):
+    p = argparse.ArgumentParser(prog="setup plans edit", add_help=False)
+    p.add_argument("file")
+    p.add_argument("ref")
+    p.add_argument("--from", dest="src", required=True)
+    p.add_argument("--digest", required=True)
+    p.add_argument("--dry-run", action="store_true")
+    try:
+        a = p.parse_args(args)
+    except SystemExit:
+        print(f"usage: {PLANS_USAGE['edit']}", file=sys.stderr)
+        return 2
+    plan = Path(a.file)
+    name, folder = plan.name, plan.parent
+
+    def refuse(why):
+        print(f"plans edit: refused, nothing written: {why}", file=sys.stderr)
+        return 1
+
+    if not (name.startswith("PLAN-") and name.endswith(".md")):
+        return refuse(f"{name} is not a plan (PLAN-*.md): the gate it runs is `setup plans <dir>`")
+    def stale():
+        """Why the file is not the one the caller read (its digest), or None. Run at
+        the start and again just before the write, as the gate takes a while."""
+        raw_now, _, why = _read_plan(plan)
+        if why:
+            return why
+        now = plans.digest(raw_now)
+        return None if now == a.digest else (
+            f"{name} changed since digest {a.digest[:12]}... (now {now[:12]}...): "
+            "show the section again and redo the edit on what is there now")
+
+    raw, text, why = _read_plan(plan)
+    why = why or stale()
+    if why:
+        return refuse(why)
+    try:
+        new = Path(a.src).read_text()
+    except (OSError, UnicodeDecodeError) as e:
+        return refuse(f"{a.src}: cannot be read ({getattr(e, 'strerror', None) or e})")
+    before, _ = audit.audit_plans(folder)
+    if before:
+        return refuse(f"`setup plans {folder}` is already red ({len(before)} finding(s)), first: {before[0]}")
+    done, why = plans.replace(name, text, a.ref, new)
+    if why:
+        return refuse(why)
+    out, (first, old_last, new_last) = done
+    after, _ = audit.audit_plans(folder, {name: out})
+    if after:
+        return refuse(f"the edit would turn `setup plans {folder}` red, first: {after[0]}")
+    why = stale()
+    if why:
+        return refuse(why)
+    fsw.Writer(folder, a.dry_run).write(name, out)
+    verb = "would be replaced" if a.dry_run else "replaced"
+    print(f"plans edit: {name} §{a.ref.lstrip('§')} {verb} (lines {first}-{old_last} now {first}-{new_last}); "
+          f"digest {plans.digest(out.encode()) if not a.dry_run else a.digest}")
+    return 0
 
 
 def cmd_audit(args):

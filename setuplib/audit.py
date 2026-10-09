@@ -9,14 +9,16 @@ deps       each sibling dependencies.json names (the tools setup installs FROM,
            exempt from `content` for that reason) resolves to a discovered repo,
            with its CLI executable and its source a folder (setuplib/deps.py).
 plans      every PLAN-*.md in a folder whose status is not done has a
-           "Setup component" heading.
+           "Setup component" heading; in every plan, each section status marker
+           is placed and valued as setuplib/plans.py reads it, and no section
+           number is carried twice.
 """
 import json
 import os
 import re
 from pathlib import Path
 
-from . import deps
+from . import deps, plans
 from .core import TOOL_ROOT
 
 # What is setup's own code, data and templates: the scope of both audits. Prose
@@ -146,18 +148,36 @@ STATUS_RX = re.compile(r"\*\*Status:\s*([A-Za-z-]+)")
 HEADING_RX = re.compile(r"^#{2,4}\s+(?:\d+[a-z]?\.?\s+)?Setup component\b", re.M)
 
 
-def audit_plans(folder: Path):
-    """(findings, note): each not-done PLAN-*.md must carry a Setup component heading."""
-    plans = sorted(folder.glob("PLAN-*.md"))
-    if not plans:
+def plan_findings(name, text):
+    """(findings, done, sections) for one plan. Every plan's section markers and
+    numbers are checked (a pointer into a done plan must still resolve); a plan
+    whose own status is done skips the Setup component rule."""
+    secs = plans.sections(text)
+    findings = plans.marker_findings(name, text) + plans.duplicate_findings(name, secs)
+    m = STATUS_RX.search("\n".join(text.splitlines()[:25]))
+    done = bool(m and m.group(1).lower() == "done")
+    if not done and not HEADING_RX.search(text):
+        findings.append(f"{name}: status {m.group(1) if m else 'unstated'}, no 'Setup component' heading")
+    return findings, done, secs
+
+
+def audit_plans(folder: Path, instead=None):
+    """(findings, note): plan_findings over each PLAN-*.md; the note counts the
+    sections of the plans not done by their status. `instead` ({file name: text})
+    checks those files as if they held that text: `setup plans edit` runs the gate
+    on the folder as it would be after its write, before writing."""
+    instead = instead or {}
+    files = sorted(folder.glob("PLAN-*.md"))
+    if not files:
         return [f"no PLAN-*.md in {folder}"], ""
-    findings, done = [], 0
-    for p in plans:
-        text = p.read_text()
-        m = STATUS_RX.search("\n".join(text.splitlines()[:25]))
-        if m and m.group(1).lower() == "done":
+    findings, done, counts = [], 0, {k: 0 for k in (*plans.STATUSES, "unstated")}
+    for p in files:
+        f, is_done, secs = plan_findings(p.name, instead[p.name] if p.name in instead else p.read_text())
+        findings += f
+        if is_done:
             done += 1
             continue
-        if not HEADING_RX.search(text):
-            findings.append(f"{p.name}: status {m.group(1) if m else 'unstated'}, no 'Setup component' heading")
-    return findings, f"{len(plans)} plans, {done} done (skipped)"
+        for s in secs:
+            counts[s["status"] if s["status"] in plans.STATUSES else "unstated"] += 1
+    by = ", ".join(f"{n} {k}" for k, n in counts.items())
+    return findings, f"{len(files)} plans, {done} done (skipped), {sum(counts.values())} sections: {by}"

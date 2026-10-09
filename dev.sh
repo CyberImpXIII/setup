@@ -9,7 +9,7 @@ usage() {
 
   check      every gate below, in order; non-zero if any fails (--json: the one schema, via devtools/checkjson.py)
   test       the unit tests (tests/), trimmed to the result unless something fails
-  hooks      the shared hook copies: present, executable, parse, their own tests pass, registered (PENDING: only in the proposal, for Jacob)
+  hooks      the shared hook copies: present, executable, parse, their own tests pass (exit 3 there: UNCHECKED, gate exit 3), registered (PENDING: only in the proposal, for Jacob)
   files      the files the tool needs: present, executable where they must be, data parses
   audit      setup audit content, direction and deps (content and deps are UNCHECKED, so red, in a lone clone)
   self       ./setup --dry-run on this repo: nothing would be written, nothing drifted
@@ -30,7 +30,7 @@ registers() {  # registers SETTINGS_FILE NAME: does that settings file run .clau
 }
 
 cmd_hooks() {
-  local fails=0 pending=0 h name t out
+  local fails=0 pending=0 unchecked=0 h name t out code why
   [ -f .claude/settings.json ] && jq -e . .claude/settings.json >/dev/null 2>&1 \
     || { echo "  FAIL  .claude/settings.json missing or does not parse"; return 1; }
   for h in .claude/hooks/*.sh; do
@@ -51,12 +51,20 @@ cmd_hooks() {
     fi
     t=".claude/hooks/test-$name"
     if [ ! -f "$t" ]; then echo "  FAIL  $name has no test-$name"; fails=$((fails+1)); continue; fi
-    if ! out=$(bash "$t" 2>&1); then
-      echo "  FAIL  test-$name:"; printf '%s\n' "$out" | grep -E 'FAIL' | sed 's/^/        /'; fails=$((fails+1))
+    # a hook's own test answers like a gate: 0 pass, 3 UNCHECKED (it could not run
+    # here, e.g. no sibling repo above a lone clone), anything else FAIL
+    out=$(bash "$t" </dev/null 2>&1); code=$?
+    if [ $code -eq 3 ]; then
+      why=$(printf '%s\n' "$out" | grep -m1 -E '^[[:space:]]*UNCHECKED' | sed -E 's/^[[:space:]]*UNCHECKED:?[[:space:]]*//')
+      echo "  UNCHECKED  test-$name: ${why:-exit 3 without saying why}"; unchecked=$((unchecked+1))
+    elif [ $code -ne 0 ]; then
+      echo "  FAIL  test-$name: exit $code"; printf '%s\n' "$out" | grep -E 'FAIL' | sed 's/^/        /'; fails=$((fails+1))
     fi
   done
-  [ $fails -eq 0 ] && echo "  ok    hooks: $(ls .claude/hooks/*.sh | grep -vc /test-) hooks, each executable, passing its own test and registered ($pending of them only in the proposal, PENDING Jacob)"
-  return $((fails > 0))
+  [ $fails -gt 0 ] && return 1
+  # UNCHECKED is never a pass and never a FAIL: the gate exits 3 (check counts it red)
+  if [ $unchecked -gt 0 ]; then echo "  note  hooks: $unchecked hook test(s) UNCHECKED: they did not run here, not a pass"; return 3; fi
+  echo "  ok    hooks: $(ls .claude/hooks/*.sh | grep -vc /test-) hooks, each executable, passing its own test and registered ($pending of them only in the proposal, PENDING Jacob)"
 }
 
 cmd_files() {

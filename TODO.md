@@ -341,11 +341,47 @@
   files rewritten (logic), no-inline-blobs.sh, prefer-recipes.sh and their tests.
   Not re-run under `checks run .` since.
 
+- **The `parts` component, built 2026-10-10** (top TODO Q6, PLAN-small-tasks §7
+  step 2). Choices made here, open to Jacob and the checks owner:
+  (a) destination `devtools/parts.py`: devtools/ exists in 15 repos, no `parts.py`
+  anywhere yet; components.json `parts.file` is the one place to change it.
+  (b) compared by meaning with this repo's own `setuplib/pymeaning.py` (AST dump,
+  docstrings included), not a comparator from checks: checks has none. Better
+  owned there (`checkslib` exposing `meaning()`, named as the checks dependency's
+  `comparator`), as hooks owns hookslib.copies; then pymeaning goes.
+  (c) in the node `render` list: a new folder's scaffold commits the copy, so
+  `--node --rebuild` must regenerate it byte for byte (test_node's SCAFFOLD). A
+  node.json written before 2026-10-10 does not list `devtools/parts.py` among its
+  generated files, so its rebuild ignores the copy until the owner adds it.
+  (d) a lone clone: parts is `failed` (no source), like hooks without --hooks-from.
+  (e) the stub dev.sh (templates/) does not call the runner yet, nor does this
+  repo's: the copy is installed, nothing runs it. That wiring is §7's next step.
+  (f) no `parts-installed` gate in checks; the agreement is gated here only for
+  this repo (`ThisRepo`, mutant `runner-copy-stale`). A checks gate would cover
+  every repo: suggest it to checks.
+  Copies rendered so far: this repo only. Other repos get it on their next `./setup`.
+
 ## Unconfirmed suspicions
 
 (none open)
 
 ## Reported to other owners
+
+- 2026-10-10, via the dispatcher (top TODO Q6 (b)): `./setup <repo> --only hooks
+  --rebuild` re-rendered the drifted hook copies in 14 repos (addon-bench,
+  applications, emailTools, income, knowledge-base, scriptingTools/chronjobScheduler,
+  scriptingTools/data-bridge, scripts, site-scrapers, tools/hooks, tools/hub,
+  tools/setup, tools/todo, tools/usage); each now clean in `hooks copies` and
+  `checks one hooks-installed` ok. Committed here only (a066d36); the other 13 hold
+  the uncommitted render (store-guard.sh, test-no-inline-blobs.sh,
+  test-store-guard.sh, lib/extra-stores.sh) for their owners to commit. Skipped,
+  someone's uncommitted work in `.claude/`: tools/checks (untracked store-guard.sh,
+  test-store-guard.sh), tools/context-hygiene (modified hooks), tools/transcripts
+  (modified and untracked), tools/wizard (staged hooks); the workspace top (not a
+  repo, harness-owned). To hooks and Jacob: this repo's `hooks` gate, two
+  test_userscope tests and 3 mutants' baselines are red because store-guard.sh is
+  not registered in tools/hooks `source/settings.json` (already in hooks/TODO.md);
+  that file needs Jacob's yes.
 
 - 2026-10-05, via the dispatcher, to checks: PLAN-hard-gates §3 row 6 says the
   pre-commit runs no-secrets on the *staged diff*; `checks one no-secrets <repo>`

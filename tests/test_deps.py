@@ -14,9 +14,14 @@ from tests.helpers import ROOT, Case, git_repo, workspace_cli
 DOC = json.loads((ROOT / deps.DEPS_FILE).read_text())
 
 
-def plant(top: Path, name, cli=True, source=True, executable=True):
-    """A sibling repo at top/tools/<name> with its CLI and source folder (or not)."""
+def plant(top: Path, name, cli=True, source=True, executable=True, runner=True):
+    """A sibling repo at top/tools/<name> with its CLI, source folder and (when
+    dependencies.json declares one for it) its runner file (or not)."""
     repo = git_repo(top / "tools" / name, commit=False)
+    declared = DOC["dependencies"].get(name, {}).get("runner")
+    if runner and declared:
+        (repo / declared).parent.mkdir(parents=True, exist_ok=True)
+        (repo / declared).write_text("x = 1\n")
     if cli:
         (repo / name).write_text("#!/bin/sh\nexit 0\n")
         (repo / name).chmod(0o755 if executable else 0o644)
@@ -100,6 +105,15 @@ class Audit(Case):
         self.assertEqual(len(findings), 2, findings)
         self.assertTrue(any("not a folder" in f for f in findings))
         self.assertTrue(any("not an executable file" in f for f in findings))
+
+    def test_a_missing_runner_is_a_finding(self):
+        top = self.tmp / "ws"
+        tool = self.tool_in(top)
+        plant(top, "hooks")
+        plant(top, "checks", source=False, runner=False)
+        findings, _ = self.run_audit(tool)
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("is not a file", findings[0])
 
     def test_nothing_discovered_is_unchecked_and_exits_3(self):
         lone = self.tmp / "lone" / "setup"

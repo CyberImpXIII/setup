@@ -12,7 +12,7 @@ from pathlib import Path
 
 TOOL_ROOT = Path(__file__).resolve().parent.parent
 DEPS_FILE = "dependencies.json"
-KEYS = {"path", "cli", "source", "comparator"}  # every non-comment key an entry may carry
+KEYS = {"path", "cli", "source", "comparator", "runner"}  # every non-comment key an entry may carry
 
 
 def load(tool_root: Path = TOOL_ROOT):
@@ -36,11 +36,32 @@ def load(tool_root: Path = TOOL_ROOT):
                 return None, f"{DEPS_FILE}: {name}.{k} is not a relative path"
         if "source" in d and (not isinstance(d["source"], str) or ".." in Path(d["source"]).parts):
             return None, f"{DEPS_FILE}: {name}.source is not a relative path"
+        if "runner" in d and not _inside_rel(d["runner"]):
+            return None, f"{DEPS_FILE}: {name}.runner is not a relative path"
         c = d.get("comparator")
         if c is not None and not (isinstance(c, dict) and all(isinstance(c.get(k), str) and c[k]
                                                                for k in ("module", "function"))):
             return None, f"{DEPS_FILE}: {name}.comparator is not {{module, function}}"
     return deps, None
+
+
+def _inside_rel(p):
+    """A non-empty relative path with no `..` segment."""
+    return isinstance(p, str) and p != "" and not Path(p).is_absolute() and ".." not in Path(p).parts
+
+
+def runner(name, where: Path, deps):
+    """(the dependency's runner file, None), or (None, why): `runner` declared, and a
+    file inside the dependency's folder (a symlink out of it is refused)."""
+    r = deps[name].get("runner")
+    if r is None:
+        return None, f"{DEPS_FILE} `{name}` declares no runner"
+    p = (where / deps[name]["runner"]).resolve()
+    if where.resolve() not in p.parents:
+        return None, f"{DEPS_FILE} `{name}`.runner resolves to {p}, outside {where}: refused"
+    if not p.is_file():
+        return None, f"{DEPS_FILE} `{name}`: {where / r} is not a file"
+    return p, None
 
 
 def resolve(name, tool_root: Path = TOOL_ROOT, deps=None):
@@ -127,4 +148,8 @@ def audit(tool_root: Path = TOOL_ROOT, discovered=None):
             findings.append(f"{DEPS_FILE} `{name}`: {where / d['cli']} is not an executable file")
         if "source" in d and not (where / d["source"]).is_dir():
             findings.append(f"{DEPS_FILE} `{name}`: {where / d['source']} is not a folder")
+        if "runner" in d:
+            why = runner(name, where, deps)[1]
+            if why:
+                findings.append(why)
     return findings, f"{len(deps)} dependencies against {len(found)} discovered repos"

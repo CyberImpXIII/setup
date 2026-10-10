@@ -31,15 +31,17 @@
       Every hook file that differed from the source gets a line of its own:
       hooks <action> <file> (<kind>), kind missing, header-only, logic, bytes or
       mode (`setup components`). A logic, bytes or mode difference is drift, kept.
-  setup <path> --rebuild [--overwrite-uncommitted] [--only hooks] [--dry-run] [...]
+  setup <path> --rebuild [--overwrite-uncommitted] [--only hooks|parts] [--dry-run] [...]
       the same run, but a hook copy whose logic drifted from the source is
       overwritten from it (in any repo, created by setup or not), and its line says
       `rewritten`. Only files the hooks listing renders into a folder directly
-      under .claude/ (the hooks and their libraries); never settings.json,
+      under .claude/ (the hooks and their libraries), and the parts component's
+      runner copy (devtools/parts.py: "--rebuild rewrote"); never settings.json,
       .githooks/ or anything setup does not render. Refused (exit 2, nothing written) while one of those copies has
       changes git does not hold (uncommitted, untracked or ignored), unless
       --overwrite-uncommitted. Setup never commits here: the owner reviews
       `git diff` and commits. Per repo: setup <repo> --only hooks --rebuild
+      (or --only parts --rebuild for the runner alone)
   setup <path> --node [--rebuild] [...]
       also set up each child <path>/node.json lists (created as a repo nested in
       this one when absent; a child with its own node.json recurses; never
@@ -295,10 +297,10 @@ def cmd_setup(argv):
     if a.private and not a.github:
         print("setup: --private only means something with --github", file=sys.stderr)
         return 2
-    hooks_rebuild = a.rebuild and not a.node  # without --node, --rebuild overwrites drifted hook copies
-    if hooks_rebuild and a.only not in (None, "hooks"):
-        print(f"setup: --rebuild without --node overwrites drifted hook copies: --only {a.only} renders none",
-              file=sys.stderr)
+    hooks_rebuild = a.rebuild and not a.node  # without --node, --rebuild overwrites drifted hook and runner copies
+    if hooks_rebuild and a.only not in (None, "hooks", "parts"):
+        print(f"setup: --rebuild without --node overwrites drifted hook and runner copies: --only {a.only} "
+              "renders none", file=sys.stderr)
         return 2
     if a.overwrite_uncommitted and not hooks_rebuild:
         print("setup: --overwrite-uncommitted only means something with --rebuild, without --node", file=sys.stderr)
@@ -339,7 +341,7 @@ def cmd_setup(argv):
         summary = ", ".join(f"{counts[k]} {k}" for k in core.PRECEDENCE if k in counts)
         how = (" (dry run, nothing written)" if rebuild_dry else
                " (rebuild: only generated files written)" if a.rebuild and a.node else
-               " (rebuild: drifted hook copies overwritten)" if hooks_rebuild else "")
+               " (rebuild: drifted copies overwritten)" if hooks_rebuild else "")
         print(f"setup {label}{how}: {summary}")
     return 0 if doc["ok"] else 1
 

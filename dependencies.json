@@ -1,5 +1,5 @@
 {
-  "_comment": "The sibling tools setup installs FROM: dependencies, never targets (PLAN-repo-setup.md §7.12). Each `path` is relative to the workspace top, found by walking up from this tool until <top>/<path> is a git work tree (setuplib/deps.py). The one data file exempt from the content audit, which would otherwise forbid naming them; the direction audit still reads it. `setup audit deps` (in ./dev.sh audit): each one resolves to a discovered repo with its `cli` executable and its `source` a folder, else FAIL; nothing discovered is UNCHECKED. Keys starting with _ are comments; every other key is read by setuplib/deps.py (tests/test_deps.py holds both directions).",
+  "_comment": "The sibling tools setup installs FROM: dependencies, never targets (PLAN-repo-setup.md §7.12). Each `path` is relative to the workspace top, found by walking up from this tool until <top>/<path> is a git work tree (setuplib/deps.py). The one data file exempt from the content audit, which would otherwise forbid naming them; the direction audit still reads it. `setup audit deps` (in ./dev.sh audit): each one resolves to a discovered repo with its `cli` executable, its `source` a folder and its `runner` a file, else FAIL; nothing discovered is UNCHECKED. Keys starting with _ are comments; every other key is read by setuplib/deps.py (tests/test_deps.py holds both directions).",
   "dependencies": {
     "hooks": {
       "_used_by": "the hooks component: the default hook source (<path>/<source>), the listing (`<cli> list --json --source <source>`: name, path, dest, test), and the one comparator by meaning (<comparator.module>.<comparator.function>, imported from <path>). --hooks-from DIR overrides the source; without this dependency it is the only source, compared byte for byte",
@@ -9,9 +9,10 @@
       "comparator": {"module": "hookslib.copies", "function": "meaning"}
     },
     "checks": {
-      "_used_by": "nothing yet in code: --checks CLI has no default (a run of the shared checks costs minutes); named so its location is gated and the check component can resolve the runner from here (TODO.md)",
+      "_used_by": "the parts component: the shared suite runner (<path>/<runner>), rendered byte for byte into each repo (components.json `parts`). --checks CLI still has no default (a run of the shared checks costs minutes)",
       "path": "tools/checks",
-      "cli": "checks"
+      "cli": "checks",
+      "runner": "checkslib/parts.py"
     }
   }
 }

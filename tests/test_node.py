@@ -18,7 +18,7 @@ from tests.helpers import ROOT, SETUP, Case, git, git_repo, hook_listing, snapsh
 
 HOOK_FILES = sorted(rel for rel, _ in hook_listing() or [])  # what the hooks dependency lists
 GITHOOKS = next(c for c in core.load_spec()["components"] if c["name"] == "githooks")
-SCAFFOLD = ["CLAUDE.md", "TODO.md", "dev.sh", "services.json", "checks.json", ".gitignore",
+SCAFFOLD = ["CLAUDE.md", "TODO.md", "dev.sh", "services.json", "checks.json", ".gitignore", "devtools/parts.py",
             ".claude/settings.json", *HOOK_FILES, *(f"{GITHOOKS['dir']}/{f}" for f in GITHOOKS["files"])]
 CHECKS_CLI = workspace_cli("checks")[1]
 REBUILD = [str(SETUP), ".", "--node", "--rebuild"]

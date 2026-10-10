@@ -17,6 +17,7 @@ from pathlib import Path
 
 from . import deps
 from . import node as nodefile
+from . import pymeaning
 from .fsw import Writer, ignore_verdicts
 
 TOOL_ROOT = Path(__file__).resolve().parent.parent
@@ -450,36 +451,56 @@ class Setup:
 
     def _rebuild_guard(self):
         """--rebuild without --node, before anything is written: refuse when a file the
-        hooks component would render into the rebuild scope is on disk, differs from the
-        source, and holds changes git does not (staged, unstaged, untracked or ignored),
+        hooks component would render into the rebuild scope, or the parts component's
+        runner copy, is on disk, differs from the source, and holds changes git does
+        not (staged, unstaged, untracked or ignored); only the components this run
+        runs (--only) are read,
         since overwriting it would lose them (a byte-equal copy loses nothing). overwrite_uncommitted (--overwrite-uncommitted) lifts it. A file setup
         does not render (an owner's own hook beside the copies), or one user scope
         covers, is never written, so it never blocks. No listing: nothing to guard (the
         hooks line fails and overwrites nothing)."""
         if not self.hooks_rebuild or self.overwrite_uncommitted or self.is_new:
             return
-        files = self._listed()[0]
-        if not files:
-            return
-        scope = self.comp["hooks"]["rebuild"]["scope_root"]
-        cover = self._user_scope()[0]
-        rels = [f["rel"] for f in files if _in_scope(f["rel"], scope) and (self.target / f["rel"]).is_file()
-                and cover(f["rel"])[0] is not True
-                and (self.target / f["rel"]).read_bytes() != f["src"].read_bytes()]  # equal: nothing to lose
+        # only what this run renders: --only hooks never reads the runner's copy, --only parts never the hooks'
+        rels = (self._hook_rebuild_rels() if self.only in (None, "hooks") else []) + \
+            (self._parts_rebuild_rels() if self.only in (None, "parts") else [])
         if not rels:
             return
         r = _git(["status", "--porcelain=v1", "-z", "--no-renames", "--ignored", "--untracked-files=all",
                   "--", *rels], self.target)
         if r.returncode != 0:
-            raise Refused(f"--rebuild could not read git status of the hook copies "
+            raise Refused(f"--rebuild could not read git status of the rendered copies "
                           f"({(r.stderr.strip() or 'git status failed')[-200:]}), so it cannot tell whether "
                           "overwriting one loses uncommitted work")
         dirty = sorted({e[3:] for e in r.stdout.split("\0") if len(e) > 3})
         if dirty:
             more = f" and {len(dirty) - 10} more" if len(dirty) > 10 else ""
-            raise Refused(f"--rebuild would overwrite hook copies holding changes git does not have "
+            raise Refused(f"--rebuild would overwrite rendered copies holding changes git does not have "
                           f"(uncommitted, untracked or ignored): {', '.join(dirty[:10])}{more}; commit or "
                           "discard them first, or pass --overwrite-uncommitted to overwrite them anyway")
+
+    def _hook_rebuild_rels(self):
+        """The hook copies --rebuild would overwrite that differ from the source: in the
+        rebuild scope, on disk, not covered by user scope."""
+        files = self._listed()[0]
+        if not files:
+            return []
+        scope = self.comp["hooks"]["rebuild"]["scope_root"]
+        cover = self._user_scope()[0]
+        return [f["rel"] for f in files if _in_scope(f["rel"], scope) and (self.target / f["rel"]).is_file()
+                and cover(f["rel"])[0] is not True
+                and (self.target / f["rel"]).read_bytes() != f["src"].read_bytes()]  # equal: nothing to lose
+
+    def _parts_rebuild_rels(self):
+        """[the runner copy] when it is on disk and differs from the source byte for
+        byte (c_parts would write it), else []. No source: [] (c_parts fails, writing
+        nothing); the source's own repo gets no copy."""
+        src, where, _ = self._parts_source()
+        rel = self.comp["parts"]["file"]
+        dst = self.target / rel
+        if src is None or self.target.resolve() == where or not dst.is_file():
+            return []
+        return [rel] if dst.read_bytes() != src.read_bytes() else []
 
     def _hook_comparator(self):
         """(meaning(path) -> hash, how it compares). The hooks dependency's own function
@@ -696,6 +717,65 @@ class Setup:
         if subprocess.run(["bash", "-n", str(f)], capture_output=True).returncode != 0:
             return Result("check", "drift", f"./{c['file']} does not parse")
         return Result("check", "unchanged", f"./{c['file']} present, executable, parses")
+
+    def _parts_source(self):
+        """(the runner source file, its dependency's folder, None), or (None, None, why):
+        the parts entry's dependency (dependencies.json), resolved by walking up from
+        this tool, and its `runner` inside it. No dependency (a lone clone): why."""
+        name = self.comp["parts"]["dependency"]
+        if self.deps is None:
+            return None, None, self.dep_why
+        where, why = deps.resolve(name, deps=self.deps)
+        if where is None:
+            return None, None, why
+        src, why = deps.runner(name, where, self.deps)
+        return src, where, why
+
+    def c_parts(self):
+        """The shared suite runner as a rendered copy (PLAN-small-tasks §7 step 2), at
+        the entry's `file`: absent, installed; byte-equal, unchanged; equal by meaning
+        (pymeaning: the syntax tree, docstrings included), rewritten from the source,
+        "header refreshed"; meaning differs, drift, byte-unchanged unless hooks_rebuild
+        (--rebuild without --node: _rebuild_guard has already refused a differing copy
+        with changes git does not hold). In the dependency's own repo, none: it runs
+        the source. The copy is never imported or run here."""
+        rel = self.comp["parts"]["file"]
+        src, where, why = self._parts_source()
+        if src is None:
+            return Result("parts", "failed", f"no runner to render ({why}); nothing compared, nothing written")
+        if self.stands_for.resolve() == where:  # a rebuild's render stands for the real path
+            return Result("parts", "none", f"this repo is the runner's source ({src.relative_to(where)}): "
+                                           "it runs that, no copy")
+        body = src.read_bytes()
+        want = pymeaning.meaning(src)
+        if want is None:
+            return Result("parts", "failed", f"the source {src} does not parse; nothing compared, nothing written")
+        tag = f"{rel} (runner {pymeaning.version(src) or 'version unread'}, from {src})"
+        mode = 0o755 if os.access(src, os.X_OK) else 0o644
+        dst = self.target / rel
+        dry = " (dry run, not written)" if self.dry_run else ""
+        if not dst.exists():
+            return self._parts_write(rel, body, mode, "installed", f"installed {tag}{dry}")
+        if not dst.is_file():
+            return Result("parts", "drift", f"{rel} is not a file; not overwritten")
+        if dst.read_bytes() == body:
+            return Result("parts", "unchanged", tag)
+        if pymeaning.meaning(dst) == want:
+            return self._parts_write(rel, body, mode, "installed",
+                                     f"header refreshed (equal by meaning, rewritten from the source): {tag}{dry}")
+        had = pymeaning.version(dst) or "version unread"
+        if not self.hooks_rebuild:
+            return Result("parts", "drift", f"{rel}: its meaning differs from the source (copy {had}; source: "
+                                            f"{tag}): drift, not overwritten: `--rebuild` overwrites it")
+        return self._parts_write(rel, body, mode, "installed",
+                                 f"--rebuild rewrote {tag} (the copy, {had}, differed in meaning){dry}")
+
+    def _parts_write(self, rel, body, mode, status, detail):
+        try:
+            self.w.write(rel, body, mode=mode)
+        except OSError as e:
+            return Result("parts", "failed", f"{rel}: writing it failed ({e.__class__.__name__})")
+        return Result("parts", status, detail)
 
     # ---- the contract files (PLAN-routing-tree.md §14.8) ----------------------
 

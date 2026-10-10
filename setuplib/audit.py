@@ -19,11 +19,11 @@ import re
 from pathlib import Path
 
 from . import deps, plans
-from .core import TOOL_ROOT
+from .core import TOOL_ROOT, load_spec
 
 # What is setup's own code, data and templates: the scope of both audits. Prose
-# about this repo (CLAUDE.md, TODO.md) and the hook copies (.claude/, owned by
-# their canonical repo) are out of scope by design.
+# about this repo (CLAUDE.md, TODO.md), the hook copies (.claude/, owned by
+# their canonical repo) and the runner copy (rendered_copies) are out of scope by design.
 CODE_GLOBS = ["setup", "dev.sh", "components.json", "dependencies.json", "setuplib/*.py", "templates/*",
               "devtools/*"]
 TERMS_FILE = "audit-terms.json"
@@ -40,11 +40,25 @@ CONTRACT_NAMES = {"dev.sh"}
 CONTRACT_DIRS = [".claude"]
 
 
+def rendered_copies(root: Path):
+    """The files setup renders into itself from a sibling's source, as into any repo,
+    that sit inside CODE_GLOBS: the parts component's runner copy. Like the hook copies,
+    their canonical repo owns their content (tests/test_parts_component.py holds the
+    copy equal to its source), so neither audit reads them. No readable components.json
+    under root: none, so every file is read (stricter, never laxer)."""
+    try:
+        spec = load_spec(root / "components.json")
+    except (OSError, ValueError):
+        return set()
+    return {root / c["file"] for c in spec["components"] if c["name"] == "parts"}
+
+
 def code_files(root: Path, extra_globs=(), exempt=EXEMPT):
     out = []
     for g in [*CODE_GLOBS, *extra_globs]:
         out += [p for p in sorted(root.glob(g)) if p.is_file() and "__pycache__" not in p.parts]
-    return [p for p in dict.fromkeys(out) if p.name not in exempt]
+    copies = rendered_copies(root)
+    return [p for p in dict.fromkeys(out) if p.name not in exempt and p not in copies]
 
 
 def discover_repos(tool_root: Path, levels: int = 2, depth: int = 3):

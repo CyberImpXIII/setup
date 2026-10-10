@@ -111,7 +111,7 @@ class Fixture(Case):
         self.assertRegex(r.stdout, r"(?m)^    hooks rewritten\s+" + re.escape(self.logic) + r"  \(logic\)$")
         self.assertRegex(r.stdout, r"(?m)^    hooks refreshed\s+" + re.escape(self.header) + r"  \(header-only\)$")
         self.assertRegex(r.stdout, r"(?m)^    hooks installed\s+" + re.escape(self.missing) + r"  \(missing\)$")
-        self.assertIn("(rebuild: drifted hook copies overwritten)", r.stdout)
+        self.assertIn("(rebuild: drifted copies overwritten)", r.stdout)
 
     def test_uncommitted_changes_refuse_and_nothing_is_written(self):
         (self.repo / self.logic).write_bytes(self.drifted + b"echo the owner's uncommitted work\n")

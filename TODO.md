@@ -374,11 +374,18 @@
   tools/setup, tools/todo, tools/usage); each now clean in `hooks copies` and
   `checks one hooks-installed` ok. Committed here only (a066d36); the other 13 hold
   the uncommitted render (store-guard.sh, test-no-inline-blobs.sh,
-  test-store-guard.sh, lib/extra-stores.sh) for their owners to commit. Skipped,
-  someone's uncommitted work in `.claude/`: tools/checks (untracked store-guard.sh,
-  test-store-guard.sh), tools/context-hygiene (modified hooks), tools/transcripts
-  (modified and untracked), tools/wizard (staged hooks); the workspace top (not a
-  repo, harness-owned). To hooks and Jacob: this repo's `hooks` gate, two
+  test-store-guard.sh, lib/extra-stores.sh) for their owners to commit. The four
+  skipped then (tools/checks, tools/context-hygiene, tools/transcripts, tools/wizard)
+  were re-rendered later that day once their owners were idle: every uncommitted
+  `.claude/hooks`/`.claude/lib` file there equalled, byte for byte, some committed
+  version of its source file in tools/hooks (stale renders, no hand work), so
+  `--rebuild --overwrite-uncommitted` ran; each now `checks one hooks-installed` ok,
+  nothing outside `.claude/hooks` and `.claude/lib` changed, nothing committed there
+  (wizard's index still holds its older staged test-no-inline-blobs.sh: its owner
+  stages the render). `hooks copies` now differs only at the workspace top (not a
+  repo, harness-owned). Possible feature, not built: the refusal could treat an
+  uncommitted copy equal to a committed source version as safe to overwrite, which
+  is what was checked by hand here. To hooks and Jacob: this repo's `hooks` gate, two
   test_userscope tests and 3 mutants' baselines are red because store-guard.sh is
   not registered in tools/hooks `source/settings.json` (already in hooks/TODO.md);
   that file needs Jacob's yes.

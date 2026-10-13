@@ -56,6 +56,37 @@
 
 ## Open decisions
 
+- **Suspicion, unproven: the dry-run probe's `--only` filter has no mutant.** The
+  `only-runs-everything` mutant now breaks the run loop's filter (`not in (self.only,
+  "commit")`, core.py); the probe loop's `if self.only and c["name"] != self.only`
+  (the old target, it survived there 2026-10-13) is gated by nothing known. Probe:
+  delete those two lines and run `tests.test_only` and `tests.test_nocommit`.
+- **The --rebuild guard is mostly shadowed by S2's clean-tree rule**: a dirty copy is
+  refused by both, so its mutants are held by ignored copies (and --no-commit), the
+  one case the clean-tree rule lets through (2026-10-13: three mutants retargeted).
+
+- **The docs component (built 2026-10-13, d07bff9) writes the declaration only.**
+  The index's owner asked for its refresh as a step in each repo's `dev.sh check`
+  too: not done. dev.sh is the owner's once it exists, and the check template
+  cannot name the index's command (content audit); it would need a dependency-fed
+  template slot. Also: a declaration naming TODO.md makes a deleted TODO.md the
+  docs line's drift (honest, but a second red for one cause). Open for Jacob.
+- **`--no-commit` (built 2026-10-13, e5da70a), used once.** Rendered, not
+  committed, into tools/wizard and tools/transcripts (8 hook files each: commit.sh,
+  git-funnel.sh and its test, prefer-recipes.sh and its test, test-store-guard.sh,
+  lib/ledger.sh, lib/write-targets.sh); `checks one hooks-installed` green in both
+  after. Their owners commit them with their own work. Unverified: that their full
+  checks are then green (other parts may be red for other reasons).
+- **The pass's render commits in 11 other repos are local, not pushed** (applications,
+  emailTools, income, chronjobScheduler, data-bridge, hub, usage, hooks, research,
+  addon-bench, checks): each owner pushes. After them: applications' check is red
+  on its own dev.sh hook list (lists fewer hooks than `.claude/hooks` now holds),
+  income's on `test.parts` (3 tests against the old runner's output, parts 1.3.0
+  now); both reported to their owners.
+- **The workspace top's `.claude` repo is dirty** (` M settings.json`,
+  `?? settings.json.bak`): `--only hooks` there (c4f052e) is refused until its
+  owner commits or cleans it. `--no-commit` would render there now.
+
 - **Plan steps (PLAN-services §4 step 6.1, §3 G1/G5), built 2026-10-13**
   (`setuplib/steps.py`, `setup plans steps`, `setup plans <dir> --steps`,
   `tests/test_steps.py`). Choices made here, open to the plan owners: (1) a steps

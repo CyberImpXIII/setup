@@ -165,6 +165,17 @@ class Live(Case):
         r = self.run_setup("r", "--only", "parts", "--rebuild")
         self.assertEqual(r.returncode, 2, r.stdout)
 
+    def test_an_ignored_copy_counts_as_uncommitted(self):
+        # the tree is clean to git (the clean-tree rule lets it through): only --rebuild's guard sees it
+        f = self.plant(self.body + b"\nDRIFTED = 1\n", commit=False)
+        (self.repo / ".gitignore").write_text(REL + "\n")
+        commit_all(self.repo, "ignore the copy")
+        r = self.run_setup("r", "--only", "parts", "--rebuild")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn(f"--rebuild would overwrite rendered copies holding changes git does not", r.stderr)
+        self.assertIn(REL, r.stderr)
+        self.assertEqual(f.read_bytes(), self.body + b"\nDRIFTED = 1\n")
+
     def test_a_folder_in_its_place_is_drift_and_kept(self):
         (self.repo / REL).mkdir(parents=True)
         code, res = self.parts()
@@ -215,6 +226,15 @@ class OnlyAndTheGuard(Case):
         (self.repo / REL).write_bytes(BODY + b"\nDRIFTED = 1\n")
         r = self.run_setup("r", "--only", "parts", "--rebuild")
         self.assertEqual(r.returncode, 2, r.stdout)
+        r = self.run_setup("r", "--only", "hooks", "--rebuild")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_an_uncommitted_copy_equal_to_the_source_does_not_block(self):
+        # rewriting a copy that already equals the source loses nothing: never refused
+        src = dict(hook_listing())[self.hook]
+        (self.repo / self.hook).write_text("#!/bin/sh\necho stale\n")
+        commit_all(self.repo, "a stale copy, committed")
+        (self.repo / self.hook).write_bytes(src.read_bytes())
         r = self.run_setup("r", "--only", "hooks", "--rebuild")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 

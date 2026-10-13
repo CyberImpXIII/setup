@@ -639,6 +639,18 @@
      "run": ["python3", "-m", "unittest", "tests.test_parts_component.Committed.test_an_uncommitted_source_edit_is_named_and_not_rendered"]},
     {"id": "parts-uncommitted-runner-read", "gate": "parts: a runner its repo never committed is no source",
      "file": "setuplib/deps.py", "old": "    if t.returncode != 0 or not t.stdout.strip():\n", "new": "    if False:\n",
-     "run": ["python3", "-m", "unittest", "tests.test_parts_component.Committed.test_a_runner_never_committed_fails_and_writes_nothing"]}
+     "run": ["python3", "-m", "unittest", "tests.test_parts_component.Committed.test_a_runner_never_committed_fails_and_writes_nothing"]},
+    {"id": "subrepo-commit-at-root", "gate": "workspace top: the render is committed in its .claude/ repo, paths relative to it",
+     "file": "setuplib/fsw.py", "old": "        if not self.git_sub:\n            return self.root, list(paths)\n", "new": "        if True:\n            return self.root, list(paths)\n",
+     "run": ["python3", "-m", "unittest", "tests.test_subrepo.SubRepo.test_only_hooks_renders_and_commits_in_the_claude_repo"]},
+    {"id": "subrepo-status-unread", "gate": "workspace top: the clean-tree rule reads the .claude/ repo",
+     "file": "setuplib/core.py", "old": "        if self.git_sub:\n            return self.target / self.git_sub, self.git_sub + \"/\"\n", "new": "        if False:\n            return self.target / self.git_sub, self.git_sub + \"/\"\n",
+     "run": ["python3", "-m", "unittest", "tests.test_subrepo.SubRepo.test_a_dirty_claude_repo_is_refused_and_nothing_written"]},
+    {"id": "subrepo-guard-unprefixed", "gate": "workspace top: --rebuild's guard names the copy as the target sees it",
+     "file": "setuplib/core.py", "old": "        dirty = sorted({pre + e[3:] for e in r.stdout.split(\"\\0\") if len(e) > 3})\n", "new": "        dirty = sorted({e[3:] for e in r.stdout.split(\"\\0\") if len(e) > 3})\n",
+     "run": ["python3", "-m", "unittest", "tests.test_subrepo.SubRepo.test_rebuild_guard_reads_the_claude_repo"]},
+    {"id": "subrepo-any-component", "gate": "workspace top: only --only hooks renders there; every other run is refused",
+     "file": "setuplib/core.py", "old": "        if self.only == \"hooks\" and sub_repo(self.target, sub):\n", "new": "        if sub_repo(self.target, sub):\n",
+     "run": ["python3", "-m", "unittest", "tests.test_subrepo.SubRepo.test_any_other_run_is_refused_and_names_the_way"]}
   ]
 }

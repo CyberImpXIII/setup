@@ -58,6 +58,13 @@ def _toplevel(p: Path):
     return Path(r.stdout.strip()).resolve() if r.returncode == 0 else None
 
 
+def sub_repo(target: Path, sub: str):
+    """True when target is a folder in no git work tree whose `sub` folder is the
+    top of its own (the workspace top, whose .claude/ is a local repo)."""
+    return (target.is_dir() and _toplevel(target) is None and (target / sub).is_dir()
+            and _toplevel(target / sub) == (target / sub).resolve())
+
+
 def preflight(target: Path, nest_in=None):
     """Decide what the path is, or refuse. Returns (is_new, existed_empty). Writes nothing.
     nest_in: the top of the node that declares target as a child (node.json); a new
@@ -74,8 +81,11 @@ def preflight(target: Path, nest_in=None):
         if top == target:
             return False, False
         if any(target.iterdir()):
+            sub = ".claude" if sub_repo(target, ".claude") else None
             raise Refused(f"{target} exists, is not empty, and is not a git work tree; "
-                          "setup will not turn someone's folder into a repo")
+                          "setup will not turn someone's folder into a repo"
+                          + (f" (its {sub}/ is its own repo: `--only hooks` renders and commits there)"
+                             if sub else ""))
         return True, True
     parent = target.parent
     if not parent.is_dir():
@@ -272,6 +282,7 @@ class Setup:
         self.w =Writer(target, dry_run)
         self.is_new = False
         self.repo_slug = None
+        self.git_sub = ""  # run(): the hooks folder's parent, when only it is a repo (sub_repo)
 
     # ---- components: one method per name in components.json -----------------
 
@@ -466,13 +477,14 @@ class Setup:
             (self._parts_rebuild_rels() if self.only in (None, "parts") else [])
         if not rels:
             return
+        here, pre = self._git_where()
         r = _git(["status", "--porcelain=v1", "-z", "--no-renames", "--ignored", "--untracked-files=all",
-                  "--", *rels], self.target)
+                  "--", *[rel[len(pre):] for rel in rels]], here)
         if r.returncode != 0:
             raise Refused(f"--rebuild could not read git status of the rendered copies "
                           f"({(r.stderr.strip() or 'git status failed')[-200:]}), so it cannot tell whether "
                           "overwriting one loses uncommitted work")
-        dirty = sorted({e[3:] for e in r.stdout.split("\0") if len(e) > 3})
+        dirty = sorted({pre + e[3:] for e in r.stdout.split("\0") if len(e) > 3})
         if dirty:
             more = f" and {len(dirty) - 10} more" if len(dirty) > 10 else ""
             raise Refused(f"--rebuild would overwrite rendered copies holding changes git does not have "
@@ -1323,7 +1335,13 @@ class Setup:
     def run(self):
         """Run every declared component in order (only `only`, when given). Raises
         Refused before any write."""
-        self.is_new, self._existed_empty = preflight(self.target, self.nest_in)
+        # the workspace top: not a repo, its hooks folder's parent is (`--only hooks` only)
+        sub = self.comp["hooks"]["rebuild"]["scope_root"]
+        if self.only == "hooks" and sub_repo(self.target, sub):
+            self.git_sub = self.w.git_sub = sub
+            self.is_new, self._existed_empty = False, False
+        else:
+            self.is_new, self._existed_empty = preflight(self.target, self.nest_in)
         if self.only and self.is_new:
             raise Refused(f"--only {self.only} runs one component on an existing repo, and "
                           f"{self.label} is not one yet (a full run creates it)")
@@ -1354,13 +1372,21 @@ class Setup:
         """The paths git status reports as changed (staged, unstaged, untracked; not
         ignored), sorted. Refused when git status cannot run: a dirty tree would be
         guessed clean."""
-        r = _git(["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all"], self.target)
+        here, pre = self._git_where()
+        r = _git(["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all"], here)
         if r.returncode != 0:
             raise Refused(f"could not read git status ({(r.stderr.strip() or 'git status failed')[-200:]}), so "
                           "it cannot tell whether the tree is clean (setup commits what it renders)")
         # setup's own proposals (never committed; the baseline .gitignore ignores them) are not a change
         mine = {self.PROPOSAL, self.comp["registry"]["file"]}
-        return sorted({e[3:] for e in r.stdout.split("\0") if len(e) > 3} - mine)
+        return sorted({pre + e[3:] for e in r.stdout.split("\0") if len(e) > 3} - mine)
+
+    def _git_where(self):
+        """(the folder git runs in, the prefix of its paths as seen from the target):
+        (target, "") for a repo; (target/<sub>, "<sub>/") for a folder whose sub is."""
+        if self.git_sub:
+            return self.target / self.git_sub, self.git_sub + "/"
+        return self.target, ""
 
     def _settings_rides(self, dirty):
         """True when settings.json is among the dirty paths and is byte for byte its
@@ -1470,8 +1496,8 @@ class Setup:
                           + (", ..." if len(rendered) > 5 else "") + ")"
                           + (f"; a git config write failed: {err}" if err else ""))
         err = self.w.apply_config()
-        sha = _git(["rev-parse", "--short", "HEAD"], self.target).stdout.strip()
-        did = f"{sha} with exactly the {len(rendered)} file(s) it rendered" + (
+        sha = _git(["rev-parse", "--short", "HEAD"], self._git_where()[0]).stdout.strip()
+        did = (f"in its {self.git_sub}/ repo, " if self.git_sub else "") + f"{sha} with exactly the {len(rendered)} file(s) it rendered" + (
             f" and {', '.join(p for p in paths if p not in rendered)}" if len(paths) > len(rendered) else "")
         if err:
             return Result("commit", "failed", f"{did}; then a git config write failed: {err}")

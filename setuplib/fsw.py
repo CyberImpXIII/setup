@@ -69,6 +69,21 @@ class Writer:
         # core.hooksPath set first would gate setup's own commit), apply_config sets it
         self.defer_config = False
         self.pending_config = []
+        # "" : root is the repo. A subfolder name: root is not a repo, that folder of
+        # it is (the workspace top, whose .claude/ is its own repo): paths are given
+        # from root, and git runs in the subfolder on the part after it
+        self.git_sub = ""
+
+    def _in_repo(self, paths):
+        """(the folder git runs in, paths relative to it). A path outside git_sub is
+        a ValueError: it would be committed nowhere."""
+        if not self.git_sub:
+            return self.root, list(paths)
+        pre = self.git_sub + "/"
+        out = [p[len(pre):] for p in paths if p.startswith(pre)]
+        if len(out) != len(paths):
+            raise ValueError(f"outside {pre}: " + ", ".join(p for p in paths if not p.startswith(pre)))
+        return self.root / self.git_sub, out
 
     def create_repo(self, existed_empty: bool):
         """mkdir (unless an empty folder is already there) and `git init`."""
@@ -114,17 +129,21 @@ class Writer:
         or (why, None or why the unstaging failed)."""
         if self.dry_run or not paths:
             return None, None
-        r = subprocess.run(["git", "add", "--", *paths], cwd=self.root, capture_output=True, text=True)
+        try:
+            cwd, paths = self._in_repo(paths)
+        except ValueError as e:
+            return f"nothing committed: rendered {e}, which is no repo", None
+        r = subprocess.run(["git", "add", "--", *paths], cwd=cwd, capture_output=True, text=True)
         if r.returncode == 0:
-            r = subprocess.run(["git", "commit", "-q", "-m", message, "--only", "--", *paths], cwd=self.root,
+            r = subprocess.run(["git", "commit", "-q", "-m", message, "--only", "--", *paths], cwd=cwd,
                                capture_output=True, text=True)
             if r.returncode == 0:
                 return None, None
         why = (r.stderr.strip() or r.stdout.strip() or "git commit failed")[-300:]
-        u = subprocess.run(["git", "reset", "-q", "--", *paths], cwd=self.root, capture_output=True, text=True)
+        u = subprocess.run(["git", "reset", "-q", "--", *paths], cwd=cwd, capture_output=True, text=True)
         if u.returncode != 0:  # no HEAD yet: unstage by removing from the index only
             u = subprocess.run(["git", "rm", "-q", "--cached", "--ignore-unmatch", "--", *paths],
-                               cwd=self.root, capture_output=True, text=True)
+                               cwd=cwd, capture_output=True, text=True)
         return why, None if u.returncode == 0 else (u.stderr.strip() or "git reset failed")[-120:]
 
     def apply_config(self):

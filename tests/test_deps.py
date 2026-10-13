@@ -14,17 +14,24 @@ from tests.helpers import ROOT, Case, commit_all, git_repo, workspace_cli
 DOC = json.loads((ROOT / deps.DEPS_FILE).read_text())
 
 
-def plant(top: Path, name, cli=True, source=True, executable=True, runner=True):
-    """A sibling repo at top/tools/<name> with its CLI, source folder and (when
-    dependencies.json declares one for it) its runner file (or not)."""
-    repo = git_repo(top / "tools" / name, commit=False)
-    declared = DOC["dependencies"].get(name, {}).get("runner")
+def plant(top: Path, name, cli=True, source=True, executable=True, runner=True, reader=True):
+    """A sibling repo at its declared path (top/tools/<name> when undeclared) with its
+    CLI, source folder and (when dependencies.json declares one for it) its runner
+    file and its reader module (or not)."""
+    d = DOC["dependencies"].get(name, {})
+    repo = git_repo(top / d.get("path", f"tools/{name}"), commit=False)
+    declared = d.get("runner")
     if runner and declared:
         (repo / declared).parent.mkdir(parents=True, exist_ok=True)
         (repo / declared).write_text("x = 1\n")
+    if reader and d.get("reader"):
+        mod = repo / (d["reader"]["module"].replace(".", "/") + ".py")
+        mod.parent.mkdir(parents=True, exist_ok=True)
+        mod.write_text("x = 1\n")
     if cli:
-        (repo / name).write_text("#!/bin/sh\nexit 0\n")
-        (repo / name).chmod(0o755 if executable else 0o644)
+        exe = repo / d.get("cli", name)
+        exe.write_text("#!/bin/sh\nexit 0\n")
+        exe.chmod(0o755 if executable else 0o644)
     if source:
         (repo / "source").mkdir()
     return repo
@@ -57,6 +64,9 @@ class Vocabulary(Case):
                     {"x": {"path": "/abs", "cli": "a"}},
                     {"x": {"path": "../up", "cli": "a"}},
                     {"x": {"path": "a", "cli": "a", "comparator": {"module": "m"}}},
+                    {"x": {"path": "a", "cli": "a", "reader": {"module": "m", "parse": "p"}}},
+                    {"x": {"path": "a", "cli": "a", "reader": {"module": "m", "declaration": "D", "parse": "p",
+                                                               "resolve": "r", "extra": "e"}}},
                     {}):
             tool = self.tmp / "t"
             tool.mkdir(exist_ok=True)
@@ -83,14 +93,16 @@ class Audit(Case):
         tool = self.tool_in(top)
         plant(top, "hooks")
         plant(top, "checks", source=False)
+        plant(top, "docs", source=False)
         findings, note = self.run_audit(tool)
         self.assertEqual(findings, [])
-        self.assertIn("2 dependencies against", note)
+        self.assertIn("3 dependencies against", note)
 
     def test_a_missing_dependency_is_a_finding(self):
         top = self.tmp / "ws"
         tool = self.tool_in(top)
         plant(top, "hooks")
+        plant(top, "docs", source=False)
         plant(top, "other")  # something discovered, so the audit runs
         findings, _ = self.run_audit(tool)
         self.assertEqual(len(findings), 1, findings)
@@ -101,6 +113,7 @@ class Audit(Case):
         tool = self.tool_in(top)
         plant(top, "hooks", source=False)
         plant(top, "checks", executable=False)
+        plant(top, "docs", source=False)
         findings, _ = self.run_audit(tool)
         self.assertEqual(len(findings), 2, findings)
         self.assertTrue(any("not a folder" in f for f in findings))
@@ -111,9 +124,20 @@ class Audit(Case):
         tool = self.tool_in(top)
         plant(top, "hooks")
         plant(top, "checks", source=False, runner=False)
+        plant(top, "docs", source=False)
         findings, _ = self.run_audit(tool)
         self.assertEqual(len(findings), 1, findings)
         self.assertIn("is not a file", findings[0])
+
+    def test_a_missing_reader_is_a_finding(self):
+        top = self.tmp / "ws"
+        tool = self.tool_in(top)
+        plant(top, "hooks")
+        plant(top, "checks", source=False)
+        plant(top, "docs", source=False, reader=False)
+        findings, _ = self.run_audit(tool)
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("(its reader) is not a file", findings[0])
 
     def test_nothing_discovered_is_unchecked_and_exits_3(self):
         lone = self.tmp / "lone" / "setup"

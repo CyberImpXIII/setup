@@ -1,5 +1,5 @@
 """The sibling tools setup installs FROM, as data (dependencies.json): where each
-one is, its CLI, and for the hook source the one comparator by meaning.
+one is, its CLI, and for the hook source the one comparator by meaning, and for the docs declaration its one reader.
 
 A dependency is resolved by walking up from this tool: the first ancestor <top>
 for which <top>/<path> is a git work tree. None when there is none (a lone
@@ -13,7 +13,8 @@ from pathlib import Path
 
 TOOL_ROOT = Path(__file__).resolve().parent.parent
 DEPS_FILE = "dependencies.json"
-KEYS = {"path", "cli", "source", "comparator", "runner"}  # every non-comment key an entry may carry
+KEYS = {"path", "cli", "source", "comparator", "runner", "reader"}  # every non-comment key an entry may carry
+READER_ATTRS = ("declaration", "parse", "resolve")  # what a reader names in its module
 
 
 def load(tool_root: Path = TOOL_ROOT):
@@ -43,6 +44,10 @@ def load(tool_root: Path = TOOL_ROOT):
         if c is not None and not (isinstance(c, dict) and all(isinstance(c.get(k), str) and c[k]
                                                                for k in ("module", "function"))):
             return None, f"{DEPS_FILE}: {name}.comparator is not {{module, function}}"
+        r = d.get("reader")
+        if r is not None and not (isinstance(r, dict) and set(r) == {"module", *READER_ATTRS}
+                                  and all(isinstance(v, str) and v for v in r.values())):
+            return None, f"{DEPS_FILE}: {name}.reader is not {{module, {', '.join(READER_ATTRS)}}}"
     return deps, None
 
 
@@ -128,6 +133,39 @@ def cli(name, where: Path, deps):
     return p if p.is_file() and os.access(p, os.X_OK) else None
 
 
+def _module(where: Path, module):
+    """(the module imported from where, None), or (None, why). A module of that
+    name found elsewhere first (shadowing) is refused, never used."""
+    if str(where) not in sys.path:
+        sys.path.append(str(where))
+    try:
+        mod = importlib.import_module(module)
+    except Exception as e:  # its import may fail in any way; the line says how
+        return None, f"cannot import {module} from {where} ({e.__class__.__name__}: {e})"
+    origin = Path(getattr(mod, "__file__", "") or "/").resolve()
+    if where not in origin.parents:
+        return None, f"{module} resolved to {origin}, not under {where}: refused"
+    return mod, None
+
+
+def reader(name, where: Path, deps):
+    """({declaration: file name, parse: fn(text, label) -> rows, resolve: fn(repo
+    name, repo dir, rows) -> (docs, failed)}, None), or (None, why): the docs
+    declaration's one reader, imported from the dependency's own folder, so its
+    file name and grammar are never a second copy here."""
+    r = deps[name]["reader"]
+    mod, why = _module(where, r["module"])
+    if mod is None:
+        return None, why
+    out = {k: getattr(mod, r[k], None) for k in READER_ATTRS}
+    if not (isinstance(out["declaration"], str) and out["declaration"]):
+        return None, f"{r['module']}.{r['declaration']} is not a file name"
+    for k in ("parse", "resolve"):
+        if not callable(out[k]):
+            return None, f"{r['module']} has no function {r[k]}"
+    return out, None
+
+
 def comparator(name, where: Path, deps):
     """(fn(path) -> meaning, None), or (None, why). The function is imported from the
     dependency's own folder and nowhere else: a module of that name found elsewhere
@@ -135,15 +173,9 @@ def comparator(name, where: Path, deps):
     c = deps[name].get("comparator")
     if c is None:
         return None, f"{DEPS_FILE} `{name}` declares no comparator"
-    if str(where) not in sys.path:
-        sys.path.append(str(where))
-    try:
-        mod = importlib.import_module(c["module"])
-    except Exception as e:  # its import may fail in any way; the line says how
-        return None, f"cannot import {c['module']} from {where} ({e.__class__.__name__}: {e})"
-    origin = Path(getattr(mod, "__file__", "") or "/").resolve()
-    if where not in origin.parents:
-        return None, f"{c['module']} resolved to {origin}, not under {where}: refused"
+    mod, why = _module(where, c["module"])
+    if mod is None:
+        return None, why
     fn = getattr(mod, c["function"], None)
     if not callable(fn):
         return None, f"{c['module']} has no function {c['function']}"
@@ -176,4 +208,8 @@ def audit(tool_root: Path = TOOL_ROOT, discovered=None):
             why = runner(name, where, deps)[1]
             if why:
                 findings.append(why)
+        if "reader" in d:  # its file, not an import: an import is cached once a process
+            f = where / (d["reader"]["module"].replace(".", "/") + ".py")
+            if not f.is_file():
+                findings.append(f"{DEPS_FILE} `{name}`: {f} (its reader) is not a file")
     return findings, f"{len(deps)} dependencies against {len(found)} discovered repos"

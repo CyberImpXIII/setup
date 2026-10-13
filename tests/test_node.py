@@ -14,12 +14,13 @@ import subprocess
 import unittest
 
 from setuplib import core
-from tests.helpers import ROOT, SETUP, Case, git, git_repo, hook_listing, snapshot, workspace_cli
+from tests.helpers import DOCS_DECLARATION, ROOT, SETUP, Case, git, git_repo, hook_listing, snapshot, workspace_cli
 
 HOOK_FILES = sorted(rel for rel, _ in hook_listing() or [])  # what the hooks dependency lists
 GITHOOKS = next(c for c in core.load_spec()["components"] if c["name"] == "githooks")
 SCAFFOLD = ["CLAUDE.md", "TODO.md", "dev.sh", "services.json", "checks.json", ".gitignore", "devtools/parts.py",
-            ".claude/settings.json", *HOOK_FILES, *(f"{GITHOOKS['dir']}/{f}" for f in GITHOOKS["files"])]
+            ".claude/settings.json", *HOOK_FILES, *(f"{GITHOOKS['dir']}/{f}" for f in GITHOOKS["files"]),
+            *DOCS_DECLARATION]
 CHECKS_CLI = workspace_cli("checks")[1]
 REBUILD = [str(SETUP), ".", "--node", "--rebuild"]
 ID = ["-c", "user.email=t@example.invalid", "-c", "user.name=t"]
@@ -326,14 +327,15 @@ class Rebuild(NodeCase):
         self.assertEqual((top / "out.txt").read_text(), "one\n")
 
     def test_a_generated_file_in_neither_the_tree_nor_the_commit_is_drift_and_rendered(self):
+        # not TODO.md: the docs declaration names it, so its absence is the docs line's drift too
         top = self.tree()
         write_node(top)
-        git(["rm", "-q", "TODO.md"], top)
+        git(["rm", "-q", "checks.json"], top)
         commit_all(top, "drop")
         code, _, lines = self.rebuild()
-        self.assertEqual((code, lines["TODO.md"]["status"]), (0, "drift"))
-        self.assertIn("neither", lines["TODO.md"]["detail"])
-        self.assertTrue((top / "TODO.md").is_file())
+        self.assertEqual((code, lines["checks.json"]["status"]), (0, "drift"))
+        self.assertIn("neither", lines["checks.json"]["detail"])
+        self.assertTrue((top / "checks.json").is_file())
 
     def test_the_render_is_for_this_node(self):
         # the name changes the output: proof the render takes this node's data

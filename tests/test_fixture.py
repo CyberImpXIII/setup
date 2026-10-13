@@ -3,7 +3,7 @@ component, and its check stub fails by name rather than faking green."""
 import json
 import subprocess
 
-from tests.helpers import HOOK_SOURCE, Case, git, hook_listing
+from tests.helpers import DOCS_DECLARATION, HOOK_SOURCE, Case, git, hook_listing
 
 
 class Fixture(Case):
@@ -12,7 +12,7 @@ class Fixture(Case):
         self.assertEqual(code, 0)
         self.assertEqual(self.statuses(res), {
             "repo": "installed", "rules": "installed", "hooks": "installed",
-            "todo": "installed", "check": "installed", "parts": "installed", "services": "installed", "cli": "none",
+            "todo": "installed", "docs": "installed", "check": "installed", "parts": "installed", "services": "installed", "cli": "none",
             "data": "none", "params": "installed", "ignore": "installed",
             # the default hook source (the hooks dependency) registers git-stamp.sh and write-ledger.sh
             "githooks": "installed", "commit": "installed",
@@ -27,7 +27,7 @@ class Fixture(Case):
         # holds it to the proposal render); no proposal is written beside it
         githooks = {".githooks/check-pass", ".githooks/commit-msg", ".githooks/pre-commit"}
         self.assertEqual(tracked, {"CLAUDE.md", "TODO.md", "dev.sh", "services.json", "checks.json", "devtools/parts.py",
-                                   ".gitignore", ".claude/settings.json"} | hooks | githooks)
+                                   ".gitignore", ".claude/settings.json"} | hooks | githooks | set(DOCS_DECLARATION))
         self.assertEqual(git(["config", "--get", "core.hooksPath"], repo).stdout, "")
         self.assertFalse((repo / ".claude/settings.proposed.json").exists())
         self.assertEqual(git(["status", "--porcelain", "--untracked-files=all"], repo).stdout, "")

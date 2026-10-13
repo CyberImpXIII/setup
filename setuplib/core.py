@@ -715,6 +715,62 @@ class Setup:
         self.w.write(c["file"], _fill((TOOL_ROOT / c["template"]).read_text(), {"name": self.name}))
         return Result("todo", "installed", f"{c['file']} with the four standard headings")
 
+    def _docs_reader(self):
+        """(reader, None) or (None, why): the docs dependency's reader (deps.reader),
+        imported once a run."""
+        if getattr(self, "_docs_cache", None) is None:
+            name = self.comp["docs"]["dependency"]
+            if self.deps is None:
+                self._docs_cache = (None, self.dep_why)
+            else:
+                where, why = deps.resolve(name, deps=self.deps)
+                self._docs_cache = (None, why) if where is None else deps.reader(name, where, self.deps)
+        return self._docs_cache
+
+    def c_docs(self):
+        """The repo's docs declaration. Its file name, grammar and resolution are the
+        reader's (never a copy here): absent, the `rows` entries that resolve here are
+        written; present, it is the owner's and only read."""
+        c = self.comp["docs"]
+        rd, why = self._docs_reader()
+        if rd is None:
+            return Result("docs", "none", f"no docs reader ({why}): nothing reads a declaration, none written")
+        f = rd["declaration"]
+        rendered = {rel for rel, _ in self.w.written}
+
+        def resolves(kind, arg):
+            if kind == "file" and arg in rendered:
+                return True
+            try:
+                return not rd["resolve"](self.name, str(self.target), [(kind, arg)])[1]
+            except Exception:  # the reader's own failure: not a row that resolves
+                return False
+        want = [(r["kind"], r["arg"]) for r in c["rows"] if resolves(r["kind"], r["arg"])]
+        if (self.target / f).exists() and not (self.target / f).is_file():
+            return Result("docs", "drift", f"{f} is not a file; not overwritten")
+        text = _read(self.target / f)
+        if text is None:
+            if not want:
+                return Result("docs", "none", f"no {f} written: none of its rows resolves here "
+                                              f"({', '.join(r['arg'] for r in c['rows'])})")
+            body = "\n".join(c["header"]) + "\n" + "".join(f"{k}\t{a}\n" for k, a in want)
+            self.w.write(f, body)
+            return Result("docs", "installed", f"{f}: {', '.join(f'{k} {a}' for k, a in want)}")
+        try:
+            rows = rd["parse"](text, f)
+            failed = rd["resolve"](self.name, str(self.target), rows)[1]
+        except Exception as e:  # the reader refuses it: its words, never a guess here
+            return Result("docs", "drift", f"{f} does not parse ({e.__class__.__name__}: {e}); not overwritten")
+        if failed:
+            return Result("docs", "drift", f"{f}: " + "; ".join(f"{k}: {r}" for k, r in failed)
+                          + ": the index fails on it; not overwritten")
+        have = {(k, a) for k, a in rows if k != "help"}
+        lack = [f"{k} {a}" for k, a in want if (k, a) not in have]
+        if lack:
+            return Result("docs", "needs-owner", f"{f} declares {len(rows)} row(s) and lacks {', '.join(lack)}, "
+                                                 "which resolve here: the owner adds them (never edited here)")
+        return Result("docs", "unchanged", f"{f} present: {len(rows)} row(s), each resolves")
+
     def c_check(self):
         c = self.comp["check"]
         f = self.target / c["file"]

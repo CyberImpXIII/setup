@@ -13,6 +13,12 @@
       "path": "tools/checks",
       "cli": "checks",
       "runner": "checkslib/parts.py"
+    },
+    "docs": {
+      "_used_by": "the docs component: the shared docs index that reads each repo's docs declaration. Its file name (<reader.module>.<reader.declaration>), its grammar (<reader.parse>(text, label), raising on a line it does not read) and its resolution (<reader.resolve>(repo name, repo dir, rows) -> (docs, failed)) are imported from <path>, never copied here. Without this dependency nothing reads a declaration, so none is written",
+      "path": "knowledge-base",
+      "cli": "kb",
+      "reader": {"module": "kblib.local", "declaration": "DECLARATION", "parse": "parse_declaration", "resolve": "docs_of"}
     }
   }
 }

@@ -46,6 +46,20 @@ _, _HOOKS_CLI = workspace_cli("hooks")
 HOOK_SOURCE = _HOOKS_CLI.parent / "source" if _HOOKS_CLI else None  # the default hook source; None: lone clone
 
 
+def _docs_declaration():
+    """[the docs declaration's file name], as the docs dependency's reader names it;
+    [] in a lone clone, where the docs component writes none."""
+    from setuplib import core, deps
+    name = next(c for c in core.load_spec()["components"] if c["name"] == "docs")["dependency"]
+    d, _ = deps.load()
+    where = deps.resolve(name, deps=d)[0] if d else None
+    rd = deps.reader(name, where, d)[0] if where else None
+    return [rd["declaration"]] if rd else []
+
+
+DOCS_DECLARATION = _docs_declaration()  # what a new repo's docs component writes (CLAUDE.md is always rendered)
+
+
 def hook_source(path: Path, hooks, settings=None, body="exit 0\n"):
     """A --hooks-from fixture the hooks dependency's `list` accepts: each hook declared
     (`# hooks: applies_to=all`) with its test beside it, and settings.json (`settings`,

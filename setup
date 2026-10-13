@@ -61,7 +61,7 @@
       the progress to make (the checks' `regenerate` is the gate). Run it on a
       copy: --dry-run writes nothing.
   setup components            what each component installs, and the status vocabulary
-  setup plans <dir> [--steps [--todo CLI] [--cited-in FILE]... [--json]]
+  setup plans <dir> [--steps [--todo CLI] [--cited-in FILE]... [--json] | --facts [--root DIR] [--json]]
       every PLAN-*.md there that is not done has a "Setup component" heading,
       and in every plan each section status marker is valid and placed, and no section
       number is carried twice; the last line is `ok ... N sections: a open, b approved,
@@ -75,6 +75,16 @@
       `CLI -C <repo> get <id>` failing), unplaceable, group. --cited-in FILE checks
       each `PLAN-*.md §<s> [step <n>]` citation in FILE: ok, dangling or ambiguous.
       The last line counts them. Exit 0 whatever it finds; 2 if FILE is unreadable.
+      --facts [--root DIR] [--json] instead re-derives the plans' facts:
+      each fact cited as `<cmd>` → <value> in a plan not done (PLAN-architecture
+      §12 item 3) is re-run and compared: the command must be one argv (no pipe,
+      redirect or substitution) naming a CLI exactly one cli.json under DIR
+      (default: <dir>) declares, and a verb in that cli.json's read.verbs; it runs
+      from <dir>, without a shell, and its stripped stdout must equal <value>.
+      One line per fact not the same: changed, failed, not-declared,
+      not-one-command, ambiguous; the last line counts them and the
+      `(read by hand, <date>)` marks. Exit 0 when every fact is the same, 1
+      otherwise, 2 when <dir> or DIR is not a folder (setuplib/facts.py).
   setup plans steps <file> [--json]
       the steps of one plan, as the one parser reads G1's grammar (setuplib/steps.py):
       a numbered item under a heading starting Steps, Phase or Handoff (or nested in
@@ -115,7 +125,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from setuplib import audit, core, fsw, plans, steps  # noqa: E402
+from setuplib import audit, core, facts, fsw, plans, steps  # noqa: E402
 
 SUBCOMMANDS = ["components", "plans", "audit"]
 
@@ -142,7 +152,7 @@ def cmd_components(_):
 
 
 PLANS_USAGE = {
-    "": "setup plans <dir> [--steps [--todo CLI] [--cited-in FILE]... [--json]]",
+    "": "setup plans <dir> [--steps [--todo CLI] [--cited-in FILE]... [--json] | --facts [--root DIR] [--json]]",
     "show": "setup plans show <file> §<n>",
     "list": "setup plans list <dir> [--all]",
     "steps": "setup plans steps <file> [--json]",
@@ -178,13 +188,18 @@ def plans_gate(args):
     p.add_argument("--todo")
     p.add_argument("--cited-in", action="append", default=[])
     p.add_argument("--json", action="store_true")
+    p.add_argument("--facts", action="store_true")
+    p.add_argument("--root")
     try:
         a = p.parse_args(args)
     except SystemExit:
         a = None
-    if a is None or ((a.todo or a.cited_in or a.json) and not a.steps):
+    if a is None or ((a.todo or a.cited_in) and not a.steps) or (a.json and not (a.steps or a.facts)) \
+            or (a.steps and a.facts) or (a.root and not a.facts):
         print(f"usage: {PLANS_USAGE['']}", file=sys.stderr)
         return 2
+    if a.facts:
+        return facts_report(Path(a.dir), Path(a.root) if a.root else Path(a.dir), a.json)
     if a.steps:
         return steps_report(Path(a.dir), a.todo, a.cited_in, a.json)
     findings, note = audit.audit_plans(Path(a.dir))
@@ -199,6 +214,38 @@ def plans_gate(args):
     if not findings:  # the ok line stays last: a caller reads the last line
         print(f"  ok    {note}: every plan not done has a Setup component heading")
     return 1 if findings else 0
+
+
+def facts_report(folder, root, as_json):
+    """`setup plans <dir> --facts` (PLAN-architecture §12 item 3): each
+    `` `<cmd>` → <value> `` in each plan not done, re-run when the command is a
+    declared read verb of a cli.json under `root` (default: the folder), and its
+    value compared. Exit 0 when every fact is the same; 1 when one changed, could
+    not be re-run, or cites a command that is not a declared read verb; 2 when the
+    folder or the root is not a folder."""
+    for what, d in (("the folder", folder), ("--root", root)):
+        if not d.is_dir():
+            print(f"plans --facts: {what} {d} is not a folder", file=sys.stderr)
+            return 2
+    clis, bad = facts.declared(root)
+    rows, by_hand = [], 0
+    for path, text in _live_plans(folder):
+        found, marks = facts.parse(path.name, text)
+        by_hand += marks
+        rows += [facts.check(f, folder, clis) for f in found]
+    counts = {k: sum(r["status"] == k for r in rows) for k in facts.STATUSES}
+    unreadable = [{"path": p, "why": w} for p, w in bad]
+    if as_json:
+        print(json.dumps({"facts": rows, "counts": counts, "by_hand": by_hand, "unreadable_cli_json": unreadable}))
+    else:
+        for r in rows:
+            if r["status"] != "same":
+                print(f"{r['status']:<16} {r['doc']}:{r['line']}  `{r['cmd']}`  {r['why']}")
+        for u in unreadable:
+            print(f"note             {u['path']}: not read ({u['why']})")
+        summary = ", ".join(f"{v} {k}" for k, v in counts.items() if v)
+        print(f"facts: {len(rows)} cited ({summary or 'none'}); {by_hand} read by hand")
+    return 1 if any(r["status"] != "same" for r in rows) else 0
 
 
 def steps_report(folder, todo_cli, cited_in, as_json):

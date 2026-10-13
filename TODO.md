@@ -2,6 +2,24 @@
 
 ## Own bugs
 
+- **The hooks component renders the hook source's work tree, uncommitted edits
+  and all** (found 2026-10-13: four repos -- knowledge-base, scripts,
+  site-scrapers, tools/todo -- hold uncommitted hook copies, and tools/checks held
+  an uncommitted runner 1.3.0 that a parts pass would have copied into ten repos).
+  The parts component now renders the runner as its repo's HEAD holds it
+  (`deps.committed`; `tests/test_parts_component.py` Committed; three mutants).
+  The hooks side is not done: its listing (`hooks list --json --source`) and the
+  comparator read the work tree. Fix: render from `git archive HEAD <source>` into
+  a throwaway folder and pass that as `--source`, or refuse while
+  `git status -- <source>` in the hooks repo is not empty.
+- **plans `--facts` grammar collides with prose mappings**: on the workspace
+  2026-10-13 `setup plans . --facts` exit 1, 14 cited (13 not-declared, 1
+  not-one-command): most are prose `x` → `y` mappings, and PLAN-architecture
+  line 525 is the grammar's own `<cmd>` example. The plan's author picks: another
+  arrow for prose, or a narrower grammar (a fact marked, e.g. `fact:`).
+- **plans add / edit: the second digest check (just before the write) has no
+  fixture**; the mutant set covers the first only.
+
 - **A lone clone's `./dev.sh check` is red on `hooks`, `mutants` and `audit`.** By
   design since 2026-10-04 (CLAUDE.md, "A lone clone is red, on purpose"):
   `test-troubleshooting.sh` (a shared hook test, owned by tools/hooks: its own

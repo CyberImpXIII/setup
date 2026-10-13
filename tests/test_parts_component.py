@@ -34,6 +34,8 @@ def runner_source():
 
 
 SRC, WHERE = runner_source()
+# what setup renders: the runner as its repo's HEAD holds it (Committed, below)
+BODY = None if SRC is None else deps.committed(WHERE, SRC)[0]
 
 
 def commit_all(repo, msg):
@@ -48,7 +50,7 @@ class Live(Case):
         if SRC is None:
             self.skipTest("lone clone: no checks dependency (LoneClone below covers it)")
         self.repo = git_repo(self.tmp / "r")
-        self.body = SRC.read_bytes()
+        self.body = BODY
 
     def parts(self, *args):
         r = self.run_setup("r", "--only", "parts", *args, "--json")
@@ -80,7 +82,7 @@ class Live(Case):
         code, res = self.parts()
         self.assertEqual((code, res["status"]), (0, "installed"), res["detail"])
         self.assertEqual((self.repo / REL).read_bytes(), self.body)
-        self.assertIn(pymeaning.version(SRC), res["detail"])
+        self.assertIn(pymeaning.version(BODY), res["detail"])
         changed = {p for p in set(snapshot(self.repo)) ^ set(before) if not p.startswith(".git/")}
         self.assertEqual(changed, {REL, REL.rsplit("/", 1)[0] + "/"})  # the file and its folder, nothing else
         code, res = self.parts()
@@ -91,7 +93,7 @@ class Live(Case):
         self.parts()
         r = subprocess.run(["python3", "-I", str(self.repo / REL), "version"], capture_output=True, text=True,
                            cwd=self.repo)
-        self.assertEqual((r.returncode, r.stdout.strip()), (0, pymeaning.version(SRC)), r.stderr)
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, pymeaning.version(BODY)), r.stderr)
 
     def test_a_comment_only_difference_is_refreshed(self):
         f = self.plant(self.body.replace(b"\n", b"\n# an older header line\n", 1))
@@ -119,7 +121,7 @@ class Live(Case):
         self.assertNotEqual(f.read_bytes(), self.body)
 
     def test_an_older_version_is_named_in_the_drift_line(self):
-        v = pymeaning.version(SRC)
+        v = pymeaning.version(BODY)
         self.plant(self.body.replace(f'VERSION = "{v}"'.encode(), b'VERSION = "0.0.1"', 1))
         code, res = self.parts()
         self.assertEqual(res["status"], "drift", res["detail"])
@@ -197,7 +199,7 @@ class OnlyAndTheGuard(Case):
 
     def test_a_dirty_hook_copy_blocks_the_hooks_and_any_render(self):
         (self.repo / self.hook).write_text("#!/bin/sh\necho the owner's uncommitted work\n")
-        (self.repo / REL).write_bytes(SRC.read_bytes() + b"\nDRIFTED = 1\n")
+        (self.repo / REL).write_bytes(BODY + b"\nDRIFTED = 1\n")
         commit_all(self.repo, "runner drifted, committed")
         (self.repo / self.hook).write_text("#!/bin/sh\necho more uncommitted work\n")
         r = self.run_setup("r", "--only", "hooks", "--rebuild")
@@ -206,11 +208,11 @@ class OnlyAndTheGuard(Case):
         r = self.run_setup("r", "--only", "parts", "--rebuild")
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
         self.assertIn(f"the tree is not clean ({self.hook})", r.stderr)
-        self.assertEqual((self.repo / REL).read_bytes(), SRC.read_bytes() + b"\nDRIFTED = 1\n")
+        self.assertEqual((self.repo / REL).read_bytes(), BODY + b"\nDRIFTED = 1\n")
         self.assertEqual((self.repo / self.hook).read_text(), "#!/bin/sh\necho more uncommitted work\n")
 
     def test_a_dirty_runner_copy_blocks_only_the_runner(self):
-        (self.repo / REL).write_bytes(SRC.read_bytes() + b"\nDRIFTED = 1\n")
+        (self.repo / REL).write_bytes(BODY + b"\nDRIFTED = 1\n")
         r = self.run_setup("r", "--only", "parts", "--rebuild")
         self.assertEqual(r.returncode, 2, r.stdout)
         r = self.run_setup("r", "--only", "hooks", "--rebuild")
@@ -236,6 +238,63 @@ class LoneClone(Case):
         self.assertEqual(snapshot(repo), before)
 
 
+class Committed(Case):
+    """The runner rendered is the one its repo's HEAD holds: another owner's
+    uncommitted edit to it is named in the line and never copied. A fixture
+    workspace: this tool copied beside a checks repo of its own."""
+
+    RUNNER = "checkslib/parts.py"
+
+    def setUp(self):
+        super().setUp()
+        ws = self.tmp / "ws"
+        self.tool = ws / "tools" / "setup"
+        shutil.copytree(ROOT, self.tool, ignore=shutil.ignore_patterns(".git", ".mutants", "__pycache__"))
+        self.dep = git_repo(ws / "tools" / "checks")
+        self.src = self.dep / self.RUNNER
+        self.src.parent.mkdir()
+        self.src.write_text('"""runner"""\nVERSION = "9.0.0"\n')
+        self.src.chmod(0o755)
+        commit_all(self.dep, "runner 9.0.0")
+        self.repo = git_repo(self.tmp / "r")
+
+    def parts(self, *args):
+        r = subprocess.run([str(self.tool / "setup"), "r", "--only", "parts", *args, "--json"], cwd=self.tmp,
+                           env=self.env, capture_output=True, text=True)
+        return r.returncode, json.loads(r.stdout)["results"][0]
+
+    def test_an_uncommitted_source_edit_is_named_and_not_rendered(self):
+        self.src.write_text('"""runner"""\nVERSION = "9.1.0"\n')  # the owner's work in progress
+        code, res = self.parts()
+        self.assertEqual((code, res["status"]), (0, "installed"), res["detail"])
+        copy = self.repo / REL
+        self.assertEqual(copy.read_bytes(), b'"""runner"""\nVERSION = "9.0.0"\n')
+        self.assertTrue(copy.stat().st_mode & 0o100, "the committed mode is kept")
+        self.assertIn("runner 9.0.0", res["detail"])
+        self.assertIn("uncommitted changes are its owner's, not rendered", res["detail"])
+        # counterfactual: once committed, the same edit is what --rebuild renders
+        commit_all(self.dep, "runner 9.1.0")
+        code, res = self.parts("--rebuild")
+        self.assertEqual((code, res["status"]), (0, "installed"), res["detail"])
+        self.assertEqual(copy.read_bytes(), b'"""runner"""\nVERSION = "9.1.0"\n')
+        self.assertNotIn("uncommitted", res["detail"])
+
+    def test_a_runner_never_committed_fails_and_writes_nothing(self):
+        other = self.src.with_name("new.py")
+        other.write_text("x = 1\n")
+        body, mode, dirty, why = deps.committed(self.dep, other)
+        self.assertIsNone(body)
+        self.assertIn("not committed", why)
+        self.src.unlink()
+        commit_all(self.dep, "runner removed")
+        self.src.write_text("x = 1\n")  # on disk, never committed
+        before = snapshot(self.repo)
+        code, res = self.parts()
+        self.assertEqual((code, res["status"]), (1, "failed"), res["detail"])
+        self.assertIn("not committed", res["detail"])
+        self.assertEqual(snapshot(self.repo), before)
+
+
 class ThisRepo(Case):
     def test_this_repos_copy_agrees_with_the_source(self):
         # the copies-agree check for this repo: a runner changed in its source and
@@ -244,9 +303,9 @@ class ThisRepo(Case):
             self.skipTest("lone clone: no source to agree with")
         mine = ROOT / REL
         self.assertTrue(mine.is_file(), f"{REL} missing: run ./setup . --only parts")
-        self.assertEqual(pymeaning.meaning(mine), pymeaning.meaning(SRC),
+        self.assertEqual(pymeaning.meaning(mine), pymeaning.meaning(BODY),
                          f"{REL} differs from {SRC} by meaning: ./setup . --only parts --rebuild")
-        self.assertEqual(mine.read_bytes(), SRC.read_bytes(), f"{REL}: header differs: ./setup . --only parts")
+        self.assertEqual(mine.read_bytes(), BODY, f"{REL}: header differs: ./setup . --only parts")
 
     def test_the_audits_skip_the_copy_and_read_the_rest(self):
         files = audit.code_files(ROOT)

@@ -7,6 +7,7 @@ clone): the caller says so, never guesses another place."""
 import importlib
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -62,6 +63,29 @@ def runner(name, where: Path, deps):
     if not p.is_file():
         return None, f"{DEPS_FILE} `{name}`: {where / r} is not a file"
     return p, None
+
+
+def committed(where: Path, path: Path):
+    """(bytes, mode, dirty, None): path as the dependency's HEAD holds it, its mode
+    there (0o755 or 0o644), and whether the work tree holds changes to it git has
+    not committed; or (None, None, None, why). What is rendered is the committed
+    source, never another owner's work in progress."""
+    where = where.resolve()
+    try:
+        rel = Path(path).resolve().relative_to(where).as_posix()
+    except ValueError:
+        return None, None, None, f"{path} is outside {where}"
+
+    def git(*a, text=True):
+        return subprocess.run(["git", "-C", str(where), *a], capture_output=True, text=text)
+    t = git("ls-tree", "HEAD", "--", rel)
+    if t.returncode != 0 or not t.stdout.strip():
+        return None, None, None, f"{rel} is not committed in {where} (HEAD holds no such file)"
+    b = git("show", f"HEAD:{rel}", text=False)
+    s = git("status", "--porcelain=v1", "--", rel)
+    if b.returncode != 0 or s.returncode != 0:
+        return None, None, None, f"git could not read {rel} at HEAD in {where}"
+    return b.stdout, 0o755 if t.stdout.split()[0] == "100755" else 0o644, bool(s.stdout.strip()), None
 
 
 def resolve(name, tool_root: Path = TOOL_ROOT, deps=None):

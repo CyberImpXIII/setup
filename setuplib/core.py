@@ -492,15 +492,15 @@ class Setup:
                 and (self.target / f["rel"]).read_bytes() != f["src"].read_bytes()]  # equal: nothing to lose
 
     def _parts_rebuild_rels(self):
-        """[the runner copy] when it is on disk and differs from the source byte for
-        byte (c_parts would write it), else []. No source: [] (c_parts fails, writing
-        nothing); the source's own repo gets no copy."""
-        src, where, _ = self._parts_source()
+        """[the runner copy] when it is on disk and differs from the committed source
+        byte for byte (c_parts would write it), else []. No source: [] (c_parts fails,
+        writing nothing); the source's own repo gets no copy."""
+        body, _, _, src, where, _ = self._parts_committed()
         rel = self.comp["parts"]["file"]
         dst = self.target / rel
-        if src is None or self.target.resolve() == where or not dst.is_file():
+        if body is None or self.target.resolve() == where or not dst.is_file():
             return []
-        return [rel] if dst.read_bytes() != src.read_bytes() else []
+        return [rel] if dst.read_bytes() != body else []
 
     def _hook_comparator(self):
         """(meaning(path) -> hash, how it compares). The hooks dependency's own function
@@ -731,6 +731,20 @@ class Setup:
         src, why = deps.runner(name, where, self.deps)
         return src, where, why
 
+    def _parts_committed(self):
+        """(body, mode, dirty, src, where, None), or (None, None, None, src, where, why):
+        the runner as its repo's HEAD holds it (deps.committed), read once a run. The
+        work tree's uncommitted changes to it (dirty) are its owner's work in
+        progress: never rendered."""
+        if getattr(self, "_parts_cache", None) is None:
+            src, where, why = self._parts_source()
+            if src is None:
+                self._parts_cache = (None, None, None, None, None, why)
+            else:
+                body, mode, dirty, why = deps.committed(where, src)
+                self._parts_cache = (body, mode, dirty, src, where, why)
+        return self._parts_cache
+
     def c_parts(self):
         """The shared suite runner as a rendered copy (PLAN-small-tasks §7 step 2), at
         the entry's `file`: absent, installed; byte-equal, unchanged; equal by meaning
@@ -738,20 +752,24 @@ class Setup:
         "header refreshed"; meaning differs, drift, byte-unchanged unless hooks_rebuild
         (--rebuild without --node: _rebuild_guard has already refused a differing copy
         with changes git does not hold). In the dependency's own repo, none: it runs
-        the source. The copy is never imported or run here."""
+        the source. The source is the runner as its repo's HEAD holds it, mode
+        included: uncommitted changes to it are named, never rendered. The copy is
+        never imported or run here."""
         rel = self.comp["parts"]["file"]
-        src, where, why = self._parts_source()
+        body, mode, dirty, src, where, why = self._parts_committed()
         if src is None:
             return Result("parts", "failed", f"no runner to render ({why}); nothing compared, nothing written")
         if self.stands_for.resolve() == where:  # a rebuild's render stands for the real path
             return Result("parts", "none", f"this repo is the runner's source ({src.relative_to(where)}): "
                                            "it runs that, no copy")
-        body = src.read_bytes()
-        want = pymeaning.meaning(src)
+        if body is None:
+            return Result("parts", "failed", f"no runner to render ({why}); nothing compared, nothing written")
+        want = pymeaning.meaning(body)
         if want is None:
-            return Result("parts", "failed", f"the source {src} does not parse; nothing compared, nothing written")
-        tag = f"{rel} (runner {pymeaning.version(src) or 'version unread'}, from {src})"
-        mode = 0o755 if os.access(src, os.X_OK) else 0o644
+            return Result("parts", "failed", f"the source {src} does not parse at its HEAD; nothing compared, "
+                                             "nothing written")
+        wip = "; its uncommitted changes are its owner's, not rendered" if dirty else ""
+        tag = f"{rel} (runner {pymeaning.version(body) or 'version unread'}, from {src} as committed{wip})"
         dst = self.target / rel
         dry = " (dry run, not written)" if self.dry_run else ""
         if not dst.exists():

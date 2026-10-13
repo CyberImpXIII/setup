@@ -630,6 +630,15 @@
      "run": ["python3", "-m", "unittest", "tests.test_plans.Add.test_a_subsection_goes_after_its_sibling_and_crlf_is_kept"]},
     {"id": "plans-add-one-section", "gate": "plans add: a new text that adds two sections is refused",
      "file": "setuplib/plans.py", "old": "    why = _one_section(body, s[\"level\"], \"the new section\")\n    if why:\n", "new": "    why = None\n    if why:\n",
-     "run": ["python3", "-m", "unittest", "tests.test_plans.Add.test_the_new_text_must_be_one_section"]}
+     "run": ["python3", "-m", "unittest", "tests.test_plans.Add.test_the_new_text_must_be_one_section"]},
+    {"id": "parts-renders-worktree", "gate": "parts: the runner rendered is its repo's HEAD, never another owner's uncommitted edit",
+     "file": "setuplib/core.py", "old": "                body, mode, dirty, why = deps.committed(where, src)\n", "new": "                body, mode, dirty, why = src.read_bytes(), 0o755, False, None\n",
+     "run": ["python3", "-m", "unittest", "tests.test_parts_component.Committed.test_an_uncommitted_source_edit_is_named_and_not_rendered"]},
+    {"id": "parts-uncommitted-unnamed", "gate": "parts: an uncommitted source edit left out is named in the line",
+     "file": "setuplib/core.py", "old": "        wip = \"; its uncommitted changes are its owner's, not rendered\" if dirty else \"\"\n", "new": "        wip = \"\"\n",
+     "run": ["python3", "-m", "unittest", "tests.test_parts_component.Committed.test_an_uncommitted_source_edit_is_named_and_not_rendered"]},
+    {"id": "parts-uncommitted-runner-read", "gate": "parts: a runner its repo never committed is no source",
+     "file": "setuplib/deps.py", "old": "    if t.returncode != 0 or not t.stdout.strip():\n", "new": "    if False:\n",
+     "run": ["python3", "-m", "unittest", "tests.test_parts_component.Committed.test_a_runner_never_committed_fails_and_writes_nothing"]}
   ]
 }

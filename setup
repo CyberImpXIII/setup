@@ -11,6 +11,13 @@
       hook copies and libraries and touches nothing else.
       A repo setup creates gets .claude/settings.json (the render a proposal would
       hold), committed; an existing repo only ever gets settings.proposed.json.
+      In an existing repo the run commits what it rendered, in the same run
+      ("setup: render N file(s) into <name>", exactly those files), or refuses
+      (exit 2, nothing written) when it would render into a tree with changes
+      git does not hold; settings.json rides in that commit only when it equals
+      settings.proposed.json byte for byte. A commit the repo's own git
+      hooks refuse leaves the render written and unstaged for its owner to
+      check and commit (the commit line needs-owner).
       The roster line's dir is <path> relative to DIR (default: the working
       folder), normalised; null when <path> is not under DIR. --plugins: a
       plug-in hook registry (JSON: root, ok, plugins[name, applies_to, faults,
@@ -39,8 +46,8 @@
       runner copy (devtools/parts.py: "--rebuild rewrote"); never settings.json,
       .githooks/ or anything setup does not render. Refused (exit 2, nothing written) while one of those copies has
       changes git does not hold (uncommitted, untracked or ignored), unless
-      --overwrite-uncommitted. Setup never commits here: the owner reviews
-      `git diff` and commits. Per repo: setup <repo> --only hooks --rebuild
+      --overwrite-uncommitted. The rewrite is committed in the same run, like
+      every render. Per repo: setup <repo> --only hooks --rebuild
       (or --only parts --rebuild for the runner alone)
   setup <path> --node [--rebuild] [...]
       also set up each child <path>/node.json lists (created as a repo nested in

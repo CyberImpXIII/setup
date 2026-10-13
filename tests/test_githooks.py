@@ -65,6 +65,9 @@ class Base(Case):
         if wired:
             (repo / ".claude").mkdir(exist_ok=True)
             (repo / ".claude/settings.json").write_text((src / "settings.json").read_text())
+        # committed: a render goes only into a clean tree (PLAN-architecture §11 S2)
+        git(["add", "-A"], repo)
+        git(["commit", "-q", "-m", "the owner's check and settings"], repo)
         return repo, src
 
     def setup(self, name, src, *extra, checks=True):
@@ -89,6 +92,9 @@ class Install(Base):
         self.assertEqual(self.hooks_path(repo), DIR)
         self.assertEqual(git(["config", "--get", SPEC["config"]], repo).stdout.strip(), str(FAKE_CHECKS))
         self.assertIn("the gates are on", line["detail"])
+        # core.hooksPath is set after the render's commit, so the gates never judge setup's own commit
+        self.assertEqual(res["commit"]["status"], "installed", res["commit"])
+        self.assertEqual(git(["status", "--porcelain"], repo).stdout.strip(), "")  # the proposal: ignored
         # a second run changes nothing
         before = snapshot(repo)
         _, res = self.setup("r", src)
@@ -197,6 +203,8 @@ class Install(Base):
         (repo / DIR).mkdir()
         (repo / DIR / "commit-msg").write_text("#!/bin/sh\nexit 0\n")
         os.chmod(repo / DIR / "commit-msg", 0o755)
+        git(["add", "-A"], repo)
+        git(["commit", "-q", "-m", "the owner's own commit-msg"], repo)
         code, res = self.setup("r", src)
         self.assertEqual((code, res["githooks"]["status"]), (1, "drift"), res["githooks"])
         self.assertEqual((repo / DIR / "commit-msg").read_text(), "#!/bin/sh\nexit 0\n")
@@ -221,7 +229,7 @@ class Install(Base):
             os.chmod(repo / DIR / "pre-commit", 0o755)
         git(["config", "core.hooksPath", DIR], repo)
         git(["add", "-A"], repo)
-        git(["commit", "-q", "--no-verify", "-m", "base"], repo)
+        git(["commit", "-q", "--no-verify", "--allow-empty", "-m", "base"], repo)
         return repo, src
 
     def session_commit(self, repo):
@@ -245,11 +253,13 @@ class Install(Base):
         rest = [f for f in SPEC["files"] if f not in SPEC["runs"]]
         self.assertTrue(rest and all((repo / DIR / f).exists() for f in rest), rest)
         self.assertTrue((repo / ".claude/hooks/git-stamp.sh").exists(), res["hooks"])
-        # and setup's output can be committed by the repo's own agent, as it is
+        # and setup's output is committable: setup committed it, under the repo's active folder
+        self.assertEqual(res["commit"]["status"], "installed", res["commit"])
+        self.assertEqual(git(["status", "--porcelain"], repo).stdout.strip(), "")
+        # once the stamp is wired (Jacob's settings, committed) the gates go in, and the folder stays active
+        (repo / ".claude/settings.json").write_text((src / "settings.json").read_text())
         r = self.session_commit(repo)
         self.assertEqual(r.returncode, 0, r.stderr)
-        # once the stamp is wired the gates go in, and the folder stays active
-        (repo / ".claude/settings.json").write_text((src / "settings.json").read_text())
         _, res = self.setup("r", src)
         self.assertEqual(res["githooks"]["status"], "installed", res["githooks"])
         for f in SPEC["runs"]:
@@ -278,7 +288,8 @@ class Hooks(Base):
         _, res = self.setup("r", src)
         self.assertEqual(self.hooks_path(self.repo), DIR, res["githooks"])
         git(["add", "-A"], self.repo)
-        r = git(["commit", "-q", "--no-verify", "-m", "base"], self.repo)
+        # the render is committed by setup itself; this adds the proposal, if anything
+        r = git(["commit", "-q", "--no-verify", "--allow-empty", "-m", "base"], self.repo)
         self.assertEqual(r.returncode, 0, r.stderr)
 
     def sh(self, argv, session=False, **kw):
@@ -310,10 +321,11 @@ class Hooks(Base):
     def test_in_a_session_an_unstamped_commit_is_refused(self):
         self.change()
         self.assertEqual(self.record().returncode, 0)
+        before = git(["rev-parse", "HEAD"], self.repo).stdout
         r = self.commit(session=True)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("carries no Agent: trailer", r.stderr)
-        self.assertEqual(git(["rev-list", "--count", "HEAD"], self.repo).stdout.strip(), "2")
+        self.assertEqual(git(["rev-parse", "HEAD"], self.repo).stdout, before)
 
     def test_in_a_session_a_stamped_commit_passes_and_keeps_its_stamp(self):
         self.change()
@@ -486,7 +498,7 @@ class LiveNoSecrets(Base):
         _, res = self.run_json("r", "--hooks-from", str(src), "--checks", str(self.cli))
         self.assertEqual(self.hooks_path(repo), DIR, res["githooks"])
         git(["add", "-A"], repo)
-        git(["commit", "-q", "--no-verify", "-m", "base"], repo)
+        git(["commit", "-q", "--no-verify", "--allow-empty", "-m", "base"], repo)
 
         def attempt(rel):
             (repo / rel).write_text("x\n")

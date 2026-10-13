@@ -65,6 +65,10 @@ class Writer:
         self.root = root
         self.dry_run = dry_run
         self.written = []  # (relative path, include in the scaffold commit)
+        # an existing repo: a git config write waits for the render's commit (a
+        # core.hooksPath set first would gate setup's own commit), apply_config sets it
+        self.defer_config = False
+        self.pending_config = []
 
     def create_repo(self, existed_empty: bool):
         """mkdir (unless an empty folder is already there) and `git init`."""
@@ -101,11 +105,50 @@ class Writer:
                            capture_output=True, text=True)
         return None if r.returncode == 0 else (r.stderr.strip() or r.stdout.strip() or "git commit failed")
 
+    def commit_render(self, paths, message: str):
+        """An existing repo (PLAN-architecture §11 S2): commit exactly `paths` (`git
+        add`, then `git commit --only`, so nothing else staged rides along). When either
+        fails (the repo's own git hooks refuse it, say), `paths` are unstaged again and
+        the files stay written, for the repo's owner to check and commit (TODO.md: a
+        rollback meant no render could land in a gated repo). (None, None) committed,
+        or (why, None or why the unstaging failed)."""
+        if self.dry_run or not paths:
+            return None, None
+        r = subprocess.run(["git", "add", "--", *paths], cwd=self.root, capture_output=True, text=True)
+        if r.returncode == 0:
+            r = subprocess.run(["git", "commit", "-q", "-m", message, "--only", "--", *paths], cwd=self.root,
+                               capture_output=True, text=True)
+            if r.returncode == 0:
+                return None, None
+        why = (r.stderr.strip() or r.stdout.strip() or "git commit failed")[-300:]
+        u = subprocess.run(["git", "reset", "-q", "--", *paths], cwd=self.root, capture_output=True, text=True)
+        if u.returncode != 0:  # no HEAD yet: unstage by removing from the index only
+            u = subprocess.run(["git", "rm", "-q", "--cached", "--ignore-unmatch", "--", *paths],
+                               cwd=self.root, capture_output=True, text=True)
+        return why, None if u.returncode == 0 else (u.stderr.strip() or "git reset failed")[-120:]
+
+    def apply_config(self):
+        """Set the git config writes deferred while defer_config was on. None, or why
+        one failed."""
+        while self.pending_config:
+            key, value = self.pending_config.pop(0)
+            err = self._set_config(key, value)
+            if err:
+                return err
+        return None
+
     def git_config(self, key: str, value: str):
         """`git config --local key value` in the repo (the githooks component:
-        core.hooksPath, and the checks CLI its pre-commit runs). None, or why it failed."""
+        core.hooksPath, and the checks CLI its pre-commit runs). None, or why it failed.
+        With defer_config it is only recorded, for apply_config."""
         if self.dry_run:
             return None
+        if self.defer_config:
+            self.pending_config.append((key, value))
+            return None
+        return self._set_config(key, value)
+
+    def _set_config(self, key: str, value: str):
         r = subprocess.run(["git", "config", "--local", key, value], cwd=self.root,
                            capture_output=True, text=True)
         return None if r.returncode == 0 else (r.stderr.strip() or f"git config {key} failed")

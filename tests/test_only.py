@@ -13,7 +13,8 @@ class Only(Case):
         src = hook_source(self.tmp / "src", ["a.sh", "b.sh"])
         before = snapshot(repo)
         code, res = self.run_json("r", "--hooks-from", str(src), "--only", "hooks")
-        self.assertEqual(list(res), ["hooks"], res)
+        self.assertEqual(list(res), ["hooks", "commit"], res)  # the render is committed in the same run
+        self.assertEqual(res["commit"]["status"], "installed", res["commit"])
         self.assertIn("4 installed", res["hooks"]["detail"])  # needs-jacob: the proposal is his
         self.assertTrue((repo / ".claude/hooks/a.sh").is_file())
         changed = {p for p in set(snapshot(repo)) ^ set(before) if not p.startswith(".git/")}

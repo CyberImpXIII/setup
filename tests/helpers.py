@@ -79,6 +79,14 @@ def git_repo(path: Path, commit=True):
     return path
 
 
+def commit_all(repo: Path, msg="the owner's work, committed"):
+    """Commit everything in the fixture repo: setup renders only into a clean tree
+    (PLAN-architecture §11 S2), so an owner's planted file is committed first."""
+    git(["add", "-A"], repo)
+    r = git(["commit", "-q", "--no-verify", "-m", msg], repo)
+    assert r.returncode == 0, r.stderr + r.stdout
+
+
 def snapshot(path: Path):
     """{relative path: (sha256, mode)} for every file, .git included: a dry run
     or a refusal must leave even the index alone."""

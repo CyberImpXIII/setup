@@ -16,7 +16,7 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from tests.helpers import HOOK_SOURCE, Case, git_repo, hook_listing, workspace_cli
+from tests.helpers import HOOK_SOURCE, Case, commit_all, git_repo, hook_listing, workspace_cli
 
 SRC = HOOK_SOURCE / "hooks" if HOOK_SOURCE else None  # the default source; None: lone clone
 HOOKS = sorted(p.name for p in SRC.glob("*.sh") if not p.name.startswith("test-")) if SRC else []
@@ -197,6 +197,7 @@ class UserScope(Case):
         mine = repo / ".claude/hooks" / BLOBS
         mine.write_text("#!/bin/sh\nold\n")
         mine.chmod(0o755)
+        commit_all(repo)  # an owner's copy, committed: setup renders only into a clean tree (S2)
         code, res = self.run_json("r", "--user-scope", self.report({BLOBS: True}))
         self.assertNotEqual(res["hooks"]["status"], "drift")
         self.assertEqual(mine.read_text(), "#!/bin/sh\nold\n")
@@ -211,6 +212,7 @@ class UserScope(Case):
         mine = repo / ".claude/hooks" / BLOBS
         mine.write_bytes((SRC / BLOBS).read_bytes())
         mine.chmod(0o644)
+        commit_all(repo)  # an owner's copy, committed: setup renders only into a clean tree (S2)
         code, res = self.run_json("r", "--user-scope", self.report({BLOBS: True}))
         self.assertEqual((code, res["hooks"]["status"]), (1, "drift"))
         self.assertIn("not executable", res["hooks"]["detail"])

@@ -50,7 +50,7 @@
      "runs": ["commit-msg", "pre-commit"],
      "check_file": "dev.sh", "record": ".githooks/check-pass record", "config": "githooks.checks",
      "stamp": "git-stamp.sh", "hooks": ["git-stamp.sh", "write-ledger.sh"], "needs": "jacob"},
-    {"name": "commit","installs": "in a repo setup just created only: one commit of exactly the files it wrote, .claude/settings.json among them (never add -A, never the settings proposal)"},
+    {"name": "commit","installs": "one commit of exactly the files it wrote (never add -A, never a proposal): in a repo setup just created, the scaffold, .claude/settings.json among them; in an existing repo, the render (git commit --only), with .claude/settings.json only when it is byte for byte settings.proposed.json; a run that would render into a tree with changes is refused, nothing written; a commit the repo's git hooks refuse leaves the render written and unstaged for its owner (needs-owner)"},
     {"name": "remote", "installs": "with --github only: a GitHub repo (public by default, --private on request), origin, and a push of the current branch; verified by the pushed sha and the visibility"},
     {"name": "agent",  "installs": "nothing: a folder agent is a roster entry, which setup does not own", "needs": "harness",
      "entry": {"name": "{name}", "dir": "{dir}", "repo": "{repo}", "start_here": "{dir}/CLAUDE.md", "precommit": "./dev.sh check"}},

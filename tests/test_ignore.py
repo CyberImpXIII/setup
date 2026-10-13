@@ -4,7 +4,7 @@ negation is drift, never overridden; a second run is a no-op."""
 import subprocess
 
 from setuplib import core
-from tests.helpers import Case, git, git_repo, snapshot
+from tests.helpers import Case, commit_all, git, git_repo, snapshot
 
 SPEC = core.load_spec()
 ENTRIES = next(c for c in SPEC["components"] if c["name"] == "ignore")["entries"]
@@ -39,6 +39,7 @@ class Ignore(Case):
         repo = git_repo(self.tmp / "old")
         old = "node_modules/\n# mine\n.env*\nbuild\n"  # .env* already covers .env
         (repo / ".gitignore").write_text(old)
+        commit_all(repo)  # the owner's file, committed: setup renders only into a clean tree (S2)
         before = snapshot(repo)
         code, res = self.run_json("old", "--dry-run")
         self.assertEqual(snapshot(repo), before)
@@ -58,12 +59,13 @@ class Ignore(Case):
     def test_the_shared_hooks_state_folder_is_ignored(self):
         # the shared hooks write per-repo run state under .claude/state/ (the write
         # ledger, writes.tsv; the check-pass stamp): any file there, any depth
+        # (written after the first run: before it they would be uncommitted changes, refused (S2))
         repo = git_repo(self.tmp / "r")
+        code, res = self.run_json("r")
+        self.assertEqual(res["ignore"]["status"], "installed", res["ignore"])
         for rel in [".claude/state/writes.tsv", ".claude/state/check-pass", ".claude/state/x/y.json"]:
             (repo / rel).parent.mkdir(parents=True, exist_ok=True)
             (repo / rel).write_text("x\n")
-        code, res = self.run_json("r")
-        self.assertEqual(res["ignore"]["status"], "installed", res["ignore"])
         self.assertNotIn(".claude/state", git(["status", "--porcelain", "--untracked-files=all"], repo).stdout)
         _, res = self.run_json("r")
         self.assertEqual(res["ignore"]["status"], "unchanged", res["ignore"])
@@ -71,12 +73,14 @@ class Ignore(Case):
     def test_missing_final_newline_is_completed_not_merged(self):
         repo = git_repo(self.tmp / "old")
         (repo / ".gitignore").write_text("dist")
+        commit_all(repo)  # the owner's file, committed: setup renders only into a clean tree (S2)
         self.run_json("old")
         self.assertEqual((repo / ".gitignore").read_text().splitlines(), ["dist", *LINES])
 
     def test_negation_of_a_baseline_path_is_drift_and_untouched(self):
         repo = git_repo(self.tmp / "old")
         (repo / ".gitignore").write_text("*.env\n!local.env\n")
+        commit_all(repo)  # the owner's file, committed: setup renders only into a clean tree (S2)
         code, res = self.run_json("old")
         self.assertEqual(code, 1)
         self.assertEqual(res["ignore"]["status"], "drift")
@@ -87,6 +91,7 @@ class Ignore(Case):
         # appending *.bak after !keep.bak would re-ignore keep.bak: the owner's to place
         repo = git_repo(self.tmp / "old")
         (repo / ".gitignore").write_text("*.cfg\n!keep.bak\n")
+        commit_all(repo)  # the owner's file, committed: setup renders only into a clean tree (S2)
         code, res = self.run_json("old")
         self.assertEqual((code, res["ignore"]["status"]), (1, "drift"), res["ignore"])
         detail = res["ignore"]["detail"]
@@ -98,6 +103,7 @@ class Ignore(Case):
         repo = git_repo(self.tmp / "old")
         old = "build/*\n!build/keep.txt\n"
         (repo / ".gitignore").write_text(old)
+        commit_all(repo)  # the owner's file, committed: setup renders only into a clean tree (S2)
         code, res = self.run_json("old")
         self.assertEqual((code, res["ignore"]["status"]), (0, "installed"), res["ignore"])
         new = (repo / ".gitignore").read_text()
@@ -113,6 +119,7 @@ class Ignore(Case):
         # !keep.bak/ keeps a folder; *.bak would re-ignore the folder itself
         repo = git_repo(self.tmp / "old")
         (repo / ".gitignore").write_text("*.d\n!keep.bak/\n")
+        commit_all(repo)  # the owner's file, committed: setup renders only into a clean tree (S2)
         code, res = self.run_json("old")
         self.assertEqual((code, res["ignore"]["status"]), (1, "drift"), res["ignore"])
         self.assertIn("*.bak would re-ignore keep.bak/", res["ignore"]["detail"])
@@ -120,6 +127,7 @@ class Ignore(Case):
     def test_glob_negation_is_drift_with_the_reason_not_a_guess(self):
         repo = git_repo(self.tmp / "old")
         (repo / ".gitignore").write_text("*.txt\n!keep*.txt\n")
+        commit_all(repo)  # the owner's file, committed: setup renders only into a clean tree (S2)
         code, res = self.run_json("old")
         self.assertEqual((code, res["ignore"]["status"]), (1, "drift"), res["ignore"])
         self.assertIn("!keep*.txt (.gitignore:2) is a pattern", res["ignore"]["detail"])
@@ -131,6 +139,7 @@ class Ignore(Case):
         (repo / ".gitignore").write_text("dist\n")
         (repo / "sub").mkdir()
         (repo / "sub" / ".gitignore").write_text("!keep.bak\n")
+        commit_all(repo)  # the owner's file, committed: setup renders only into a clean tree (S2)
         code, res = self.run_json("old")
         self.assertEqual(res["ignore"]["status"], "installed", res["ignore"])
 
@@ -168,6 +177,7 @@ class Ignore(Case):
         repo = git_repo(self.tmp / "old")
         self.commit_files(repo, "keep.env")
         (repo / ".gitignore").write_text("".join(x + "\n" for x in LINES) + "!keep.env\n")
+        commit_all(repo)  # the owner's file, committed: setup renders only into a clean tree (S2)
         code, res = self.run_json("old")
         self.assertEqual((code, res["ignore"]["status"]), (0, "unchanged"), res["ignore"])
 
@@ -176,5 +186,6 @@ class Ignore(Case):
         repo = git_repo(self.tmp / "old")
         (repo / ".gitignore").write_text("x\n")
         (repo / ".git/info/exclude").write_text("*.bak\n")
+        commit_all(repo)  # the owner's file, committed: setup renders only into a clean tree (S2)
         self.run_json("old")
         self.assertIn("*.bak", (repo / ".gitignore").read_text().splitlines())

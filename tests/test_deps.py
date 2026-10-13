@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 from setuplib import audit, core, deps
-from tests.helpers import ROOT, Case, git_repo, workspace_cli
+from tests.helpers import ROOT, Case, commit_all, git_repo, workspace_cli
 
 DOC = json.loads((ROOT / deps.DEPS_FILE).read_text())
 
@@ -184,6 +184,7 @@ class HooksLine(Case):
         repo = git_repo(self.tmp / "r")
         (repo / ".claude/hooks").mkdir(parents=True)
         (repo / ".claude/hooks/a.sh").write_bytes((src / "hooks/a.sh").read_bytes() + b"# comment\n")
+        commit_all(repo)  # an owner's copy, committed: setup renders only into a clean tree (S2)
         _, res = self.run_json("r", "--hooks-from", str(src))
         self.assertIn("header refreshed", res["hooks"]["detail"])
         self.assertNotEqual(res["hooks"]["status"], "drift")

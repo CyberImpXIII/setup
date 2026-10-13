@@ -60,6 +60,7 @@ class Contract(Case):
         repo = git_repo(self.tmp / "r")
         mine = '{"name": "r", "services": [], "tags": ["x"]}\n'
         (repo / "services.json").write_text(mine)
+        commit_all(repo, "the owner's services.json")
         _, res = self.run_json("r")
         self.assertEqual(res["services"]["status"], "unchanged")
         self.assertEqual((repo / "services.json").read_text(), mine)
@@ -72,6 +73,7 @@ class Contract(Case):
         self.assertIn("checks.json", git(["ls-files"], self.tmp / "fresh").stdout.split())
         repo = git_repo(self.tmp / "r")
         (repo / "checks.json").write_text('{"todo-valid": {}}\n')
+        commit_all(repo, "the owner's checks.json")
         _, res = self.run_json("r")
         self.assertEqual(res["params"]["status"], "unchanged")
         self.assertEqual((repo / "checks.json").read_text(), '{"todo-valid": {}}\n')
@@ -82,6 +84,7 @@ class Contract(Case):
         self.assertFalse((self.tmp / "fresh/cli.json").exists())
         repo = git_repo(self.tmp / "r")
         (repo / "cli.json").write_text("{}\n")
+        commit_all(repo, "the owner's cli.json")
         _, res = self.run_json("r")
         self.assertEqual(res["cli"]["status"], "unchanged")
         self.assertEqual((repo / "cli.json").read_text(), "{}\n")

@@ -93,8 +93,13 @@ class Fixture(Case):
         for rel in (self.logic, self.header, self.missing):
             self.assertEqual((self.repo / rel).read_bytes(), self.src[rel].read_bytes(), rel)
         self.assert_own_untouched()  # settings.json and the repo's own pre-commit: never
+        # PLAN-architecture §11 S2: the render is committed in the same run, exactly its files
+        committed = git(["show", "--name-only", "--format=", "HEAD"], self.repo).stdout.split()
         self.assertEqual(git(["log", "-1", "--format=%s"], self.repo).stdout.strip(),
-                         "drifted, as found in the wild", "setup never commits in a repo it did not create")
+                         f"setup: render {len(committed)} file(s) into r")
+        self.assertTrue({self.logic, self.header, self.missing} <= set(committed), committed)
+        left = git(["status", "--porcelain", "--untracked-files=all"], self.repo).stdout.split("\n")
+        self.assertEqual([x for x in left if x and not x.endswith("settings.proposed.json")], [])
         # the second run: plain, nothing differs, nothing reported, exit 0
         code, res, lines = self.doc("--only", "hooks")
         self.assertEqual((code, lines), (0, []))
@@ -146,10 +151,11 @@ class Fixture(Case):
 
     def test_a_file_setup_does_not_render_never_blocks_and_is_kept(self):
         mine = self.repo / ".claude/hooks/mine.sh"
-        mine.write_text("#!/bin/sh\n# the owner's, uncommitted\n")
+        mine.write_text("#!/bin/sh\n# the owner's\n")
+        commit_all(self.repo, "the owner's own hook")  # uncommitted, the clean-tree rule refuses (test_render_commit)
         code, res, lines = self.doc("--only", "hooks", "--rebuild")
         self.assertEqual(code, 0, res["hooks"]["detail"])
-        self.assertEqual(mine.read_text(), "#!/bin/sh\n# the owner's, uncommitted\n")
+        self.assertEqual(mine.read_text(), "#!/bin/sh\n# the owner's\n")
         self.assertNotIn(".claude/hooks/mine.sh", [x["path"] for x in lines])
 
     def test_rebuild_dry_run_writes_nothing_and_says_so(self):

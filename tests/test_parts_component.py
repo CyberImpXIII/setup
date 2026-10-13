@@ -54,7 +54,7 @@ class Live(Case):
         r = self.run_setup("r", "--only", "parts", *args, "--json")
         self.assertIn(r.returncode, (0, 1), r.stderr)
         doc = json.loads(r.stdout)
-        self.assertEqual([x["component"] for x in doc["results"]], ["parts"])
+        self.assertEqual([x["component"] for x in doc["results"]], ["parts", "commit"])  # S2: committed in the run
         return r.returncode, doc["results"][0]
 
     def snap(self):
@@ -125,13 +125,14 @@ class Live(Case):
         self.assertEqual(res["status"], "drift", res["detail"])
         self.assertIn("copy 0.0.1", res["detail"])
 
-    def test_rebuild_rewrites_drift_and_never_commits(self):
+    def test_rebuild_rewrites_drift_and_commits_it_in_the_same_run(self):
         f = self.plant(self.body + b"\nDRIFTED = 1\n")
         code, res = self.parts("--rebuild")
         self.assertEqual((code, res["status"]), (0, "installed"), res["detail"])
         self.assertIn("--rebuild rewrote", res["detail"])
         self.assertEqual(f.read_bytes(), self.body)
-        self.assertEqual(git(["log", "-1", "--format=%s"], self.repo).stdout.strip(), "a copy, as found")
+        self.assertEqual(git(["log", "-1", "--format=%s"], self.repo).stdout.strip(), "setup: render 1 file(s) into r")
+        self.assertEqual(git(["show", "--name-only", "--format=", "HEAD"], self.repo).stdout.split(), [REL])
         code, res = self.parts()
         self.assertEqual((code, res["status"]), (0, "unchanged"))
 
@@ -179,8 +180,10 @@ class Live(Case):
 
 
 class OnlyAndTheGuard(Case):
-    """--rebuild reads only what this run renders: a dirty hook copy blocks --only
-    hooks, never --only parts; a dirty runner copy blocks --only parts, never --only hooks."""
+    """--rebuild's own guard reads only what this run renders: a dirty hook copy is
+    named by --only hooks; a dirty runner copy never blocks --only hooks when the hooks
+    render nothing. Since PLAN-architecture §11 S2 any change in the tree refuses a run
+    that would render (test_render_commit), so a dirty hook copy blocks --only parts too."""
 
     def setUp(self):
         super().setUp()
@@ -192,7 +195,7 @@ class OnlyAndTheGuard(Case):
         commit_all(self.repo, "copies")
         self.hook = next(rel for rel, _ in hook_listing() if rel.endswith("/no-inline-blobs.sh"))
 
-    def test_a_dirty_hook_copy_blocks_only_the_hooks(self):
+    def test_a_dirty_hook_copy_blocks_the_hooks_and_any_render(self):
         (self.repo / self.hook).write_text("#!/bin/sh\necho the owner's uncommitted work\n")
         (self.repo / REL).write_bytes(SRC.read_bytes() + b"\nDRIFTED = 1\n")
         commit_all(self.repo, "runner drifted, committed")
@@ -201,8 +204,9 @@ class OnlyAndTheGuard(Case):
         self.assertEqual(r.returncode, 2, r.stdout)
         self.assertIn(self.hook, r.stderr)
         r = self.run_setup("r", "--only", "parts", "--rebuild")
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertEqual((self.repo / REL).read_bytes(), SRC.read_bytes())
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn(f"the tree is not clean ({self.hook})", r.stderr)
+        self.assertEqual((self.repo / REL).read_bytes(), SRC.read_bytes() + b"\nDRIFTED = 1\n")
         self.assertEqual((self.repo / self.hook).read_text(), "#!/bin/sh\necho more uncommitted work\n")
 
     def test_a_dirty_runner_copy_blocks_only_the_runner(self):

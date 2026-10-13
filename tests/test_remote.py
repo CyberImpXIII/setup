@@ -51,10 +51,13 @@ class Remote(Case):
         self.assertEqual(sum(c.startswith("repo create") for c in self.calls()), 1)
 
     def test_existing_repo_without_commits_is_not_pushed(self):
+        # a full run commits its own render first (PLAN-architecture §11 S2), so the
+        # remote alone is what meets a repo with no commits
         git_repo(self.tmp / "r", commit=False)
-        code, res = self.run_json("r", "--github")
+        code, res = self.run_json("r", "--github", "--only", "remote")
         self.assertEqual((code, res["remote"]["status"]), (1, "failed"))
         self.assertIn("no commits", res["remote"]["detail"])
+        self.assertEqual([c for c in self.calls() if c.startswith("repo")], [])
 
     def test_no_flag_no_remote(self):
         code, res = self.run_json("fresh")

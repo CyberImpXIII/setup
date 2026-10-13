@@ -1310,19 +1310,158 @@ class Setup:
             raise Refused(f"--only {self.only} runs one component on an existing repo, and "
                           f"{self.label} is not one yet (a full run creates it)")
         self._rebuild_guard()
+        self._clean_guard()
+        if not self.is_new and not self.dry_run:
+            self.w.defer_config = True  # set after the render's commit (c_commit), never gating it
         results = []
         for c in self.spec["components"]:
-            if self.only and c["name"] != self.only:
+            if self.only and c["name"] not in (self.only, "commit"):
                 continue
+            if self.only and c["name"] == "commit":
+                continue  # with --only, the commit runs after the one component, whatever its place
             res = getattr(self, "c_" + c["name"])()
             results.append(res)
             if c["name"] == "repo" and res.status == "failed":
                 break
+        if self.only:
+            results.append(self.c_commit())
         return results
+
+    SETTINGS = ".claude/settings.json"
+    PROPOSAL = ".claude/settings.proposed.json"
+    # the commit a render makes in an existing repo stops at the first of these
+    PROBE_STOP = "commit"
+
+    def _dirty(self):
+        """The paths git status reports as changed (staged, unstaged, untracked; not
+        ignored), sorted. Refused when git status cannot run: a dirty tree would be
+        guessed clean."""
+        r = _git(["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all"], self.target)
+        if r.returncode != 0:
+            raise Refused(f"could not read git status ({(r.stderr.strip() or 'git status failed')[-200:]}), so "
+                          "it cannot tell whether the tree is clean (setup commits what it renders)")
+        # setup's own proposals (never committed; the baseline .gitignore ignores them) are not a change
+        mine = {self.PROPOSAL, self.comp["registry"]["file"]}
+        return sorted({e[3:] for e in r.stdout.split("\0") if len(e) > 3} - mine)
+
+    def _settings_rides(self, dirty):
+        """True when settings.json is among the dirty paths and is byte for byte its
+        proposal (Jacob 2026-10-12, PLAN-architecture §11: then it is committed with
+        the render); any other settings difference stays Jacob's."""
+        if self.SETTINGS not in dirty:
+            return False
+        live, prop = self.target / self.SETTINGS, self.target / self.PROPOSAL
+        return live.is_file() and prop.is_file() and live.read_bytes() == prop.read_bytes()
+
+    def _riders(self, dirty):
+        """The dirty paths a render may commit with it: settings.json equal to its
+        proposal, and, with --overwrite-uncommitted under --rebuild, the rendered
+        copies the run overwrites."""
+        ok = {self.SETTINGS} if self._settings_rides(dirty) else set()
+        if self.overwrite_uncommitted and self.hooks_rebuild:
+            ok |= set(self._hook_rebuild_rels() if self.only in (None, "hooks") else [])
+            ok |= set(self._parts_rebuild_rels() if self.only in (None, "parts") else [])
+        return ok
+
+    def _would_render(self):
+        """What this run would write into the tree (PLAN-architecture §11 S2): the
+        components up to the commit, run once more as a dry run on a copy of this
+        Setup. [committable paths], plus `<data import>` when the data component would
+        run the repo's import."""
+        probe = copy.copy(self)
+        probe.dry_run, probe.w = True, Writer(self.target, True)
+        probe.hook_lines, probe.children, probe.rebuild_lines, probe.node_cfg = [], [], None, None
+        probe._listed_memo = None
+        out = []
+        for c in self.spec["components"]:
+            if c["name"] == self.PROBE_STOP:
+                break
+            if self.only and c["name"] != self.only:
+                continue
+            res = getattr(probe, "c_" + c["name"])()
+            if c["name"] == "data" and res.status == "installed":
+                out.append("<data import>")
+        return sorted({rel for rel, keep in probe.w.written if keep}) + out
+
+    def _clean_guard(self):
+        """An existing repo, a run that writes (PLAN-architecture §11 S2: the renderer
+        commits what it renders, in the same run, or writes nothing): refused, before
+        any write, when the tree holds changes (other than the riders, _riders) and the
+        run would render something into it. A run that renders nothing is let through
+        (it writes at most a gitignored proposal). The render's commit is c_commit's."""
+        self.dirty_at_start, self.riders = [], set()
+        if self.is_new or self.dry_run:
+            return
+        dirty = self._dirty()
+        self.dirty_at_start, self.riders = dirty, self._riders(dirty)
+        rest = [d for d in dirty if d not in self.riders]
+        if not rest:
+            return
+        would = self._would_render()
+        if would:
+            more = f" and {len(rest) - 10} more" if len(rest) > 10 else ""
+            raise Refused(f"the tree is not clean ({', '.join(rest[:10])}{more}) and this run would render "
+                          f"{len(would)} file(s) ({', '.join(would[:5])}{', ...' if len(would) > 5 else ''}): "
+                          "setup commits what it renders in the same run, so it renders only into a clean tree; "
+                          "commit or discard those changes first (a settings.json equal to its "
+                          "settings.proposed.json is committed with the render)")
+
+    def _commit_render(self):
+        """c_commit for an existing repo: commit exactly the files this run rendered
+        (plus settings.json, when it rode in equal to its proposal and still is),
+        then set any deferred git config. A dry run says what it would commit, or that
+        the real run would be refused."""
+        rendered = sorted({rel for rel, keep in self.w.written if keep})
+        if self.rebuild:
+            return Result("commit", "none", "a node rebuild commits nothing: git diff is the finding")
+        if self.dry_run:
+            if not rendered:
+                return Result("commit", "none", "nothing would be rendered: nothing to commit")
+            dirty = self._dirty()
+            rest = [d for d in dirty if d not in self._riders(dirty)]
+            if rest:
+                return Result("commit", "needs-owner", f"a real run would be refused: the tree is not clean "
+                                                       f"({', '.join(rest[:10])}{', ...' if len(rest) > 10 else ''})")
+            return Result("commit", "installed", f"would commit the {len(rendered)} file(s) it would render, "
+                                                 "in this run")
+        paths = list(rendered)
+        rides = self.SETTINGS in self.riders and self._settings_rides([self.SETTINGS])
+        if rendered:
+            paths += [p for p in sorted(self.riders) if p not in paths and (p != self.SETTINGS or rides)]
+        notes = []
+        if self.SETTINGS in self.dirty_at_start and not (rendered and rides):
+            notes.append(f"{self.SETTINGS} differs from HEAD and was not committed (it is Jacob's"
+                         + (": nothing was rendered to commit it with)" if rides else
+                            f", and differs from {self.PROPOSAL})"))
+        if not paths:
+            err = self.w.apply_config()
+            if err:
+                return Result("commit", "failed", f"nothing to commit, but a git config write failed: {err}")
+            return Result("commit", "none", "; ".join(["nothing rendered: nothing to commit", *notes]))
+        why, left = self.w.commit_render(paths, f"setup: render {len(rendered)} file(s) into {self.name}\n\n"
+                                                + "\n".join(paths) + "\n")
+        if why:
+            if left:
+                return Result("commit", "failed", f"the commit was refused ({why}), and unstaging the render "
+                                                  f"failed ({left})")
+            # the repo's own gates decide (TODO.md, S2 (1)): its owner checks and commits the render
+            err = self.w.apply_config()
+            return Result("commit", "needs-owner",
+                          f"the commit was refused ({why}): the {len(rendered)} rendered file(s) are left written "
+                          "and unstaged for the repo's owner to check and commit (" + ", ".join(rendered[:5])
+                          + (", ..." if len(rendered) > 5 else "") + ")"
+                          + (f"; a git config write failed: {err}" if err else ""))
+        err = self.w.apply_config()
+        sha = _git(["rev-parse", "--short", "HEAD"], self.target).stdout.strip()
+        did = f"{sha} with exactly the {len(rendered)} file(s) it rendered" + (
+            f" and {', '.join(p for p in paths if p not in rendered)}" if len(paths) > len(rendered) else "")
+        if err:
+            return Result("commit", "failed", f"{did}; then a git config write failed: {err}")
+        return Result("commit", "installed", "; ".join([did, *notes]))
 
     def c_commit(self):
         if not self.is_new:
-            return Result("commit", "none", "an existing repo: setup never commits there, its owner does")
+            return self._commit_render()
         if self.dry_run:
             n = sum(1 for _, keep in self.w.written if keep)
             return Result("commit", "installed", f"would commit the {n} file(s) setup wrote")

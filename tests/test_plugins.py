@@ -5,7 +5,7 @@ shared hooks source prints for its plug-ins: {root, ok, plugins: [{name,
 applies_to, faults, registration}]}."""
 import json
 
-from tests.helpers import Case, git_repo
+from tests.helpers import Case, commit_all, git_repo
 
 CMD = "$CLAUDE_PROJECT_DIR/kb/hooks/pointers.sh"
 
@@ -42,6 +42,7 @@ class Plugins(Case):
     def test_plugin_for_another_place_is_not_proposed(self):
         top = git_repo(self.tmp / "ws")
         sub = git_repo(top / "sub")
+        (top / ".git/info/exclude").write_text("sub/\n")  # a nested repo is not the parent's change (S2)
         code, res = self.run_json("ws/sub", "--plugins", self.registry(top, "repos:."))
         self.assertEqual(self.proposed_commands(sub), [])
         self.assertNotEqual(res["hooks"]["status"], "failed")
@@ -53,6 +54,7 @@ class Plugins(Case):
         (top / ".claude").mkdir()
         quoted = '"$CLAUDE_PROJECT_DIR"/kb/hooks/pointers.sh'
         (top / ".claude/settings.json").write_text(json.dumps({"hooks": registration(quoted)}))
+        commit_all(top, "Jacob's settings")  # uncommitted, the run is refused (S2)
         _, res = self.run_json("ws", "--plugins", self.registry(top))
         self.assertEqual(self.proposed_commands(top), [quoted])
 

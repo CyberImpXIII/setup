@@ -51,6 +51,29 @@
   rule is held: the gate prints a `note steps:` line counting unplaceable steps and
   never fails on them. On the workspace 2026-10-13: 152 steps, 111 unplaceable
   (most plans carry no owner names yet).
+- **S2, the render commits itself (PLAN-architecture §11), built 2026-10-13**
+  (`tests/test_render_commit.py`). Choices open to Jacob: (1) **a commit the repo's
+  own git hooks refuse leaves the render written, unstaged, line `needs-owner`**
+  (first built as a rollback; changed the same day on transcripts' report, relayed
+  by the coordinator, that a rollback means no render can ever land in a gated
+  repo). The four repos with core.hooksPath=.githooks (emailTools,
+  tools/context-hygiene, tools/transcripts, tools/wizard) refuse setup's commit
+  (commit-msg wants an `Agent:` trailer in a session, pre-commit a recorded check
+  pass of that tree), so there the owner runs `./dev.sh check` and commits; the
+  next setup run refuses that tree until then. Settles if setup could pass the
+  gates itself (an `--agent` trailer, then the repo's check before committing).
+  (2) The data component's store, written by the repo CLI, is not in the render
+  commit. (3) A node parent whose children are nested repos may list them as
+  untracked: the parent then reads dirty; unverified -- settle: `./setup <node>
+  --node --dry-run` on a real node and read the commit line. (4) A dry run on a
+  dirty tree says `needs-owner` ("a real run would be refused"). (5) **Open for
+  Jacob:** addon-bench asks that a run into a dirty tree render and commit only
+  the rendered paths (its tree holds his uncommitted wiring-apply settings.json,
+  not equal to the proposal). The plan says "refuses to render into a repo whose
+  tree is dirty", so that is what is built; `git commit --only` would make the
+  narrower rule safe, and it is one condition in `_clean_guard` if he says so.
+  (6) An uncommitted deletion of a copy setup would restore is a change git does
+  not hold, so it refuses too (tests commit the deletion first).
 - **The full suite under load, 2026-10-13**: one run (42 min, load ~57) had
   `test_contract.LiveContract.test_a_verb_the_check_command_does_not_implement_turns_the_line_red`
   red (gates `failed`, not `drift`); alone it passed in 19 s. unverified: a timeout

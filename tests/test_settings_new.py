@@ -85,15 +85,22 @@ class ExistingRepo(Case):
         self.assertEqual(res["hooks"]["status"], "needs-jacob")
         self.assertFalse((repo / SETTINGS).exists())
         self.assertTrue((repo / PROPOSAL).is_file())
-        self.assertEqual(res["commit"]["status"], "none")
+        # the render is committed (PLAN-architecture §11 S2), never a settings file
+        self.assertEqual(res["commit"]["status"], "installed", res["commit"])
+        committed = git(["show", "--name-only", "--format=", "HEAD"], repo).stdout.split()
+        self.assertNotIn(SETTINGS, committed)
+        self.assertNotIn(PROPOSAL, committed)
 
     def test_existing_settings_json_is_untouched(self):
         repo = git_repo(self.tmp / "r")
         (repo / ".claude").mkdir()
         own = '{"permissions": {"allow": ["Bash(ls:*)"]}}'
         (repo / SETTINGS).write_text(own)
+        git(["add", SETTINGS], repo)
+        git(["commit", "-q", "-m", "Jacob's settings"], repo)  # uncommitted, the run is refused (test_render_commit)
         self.run_json("r")
         self.assertEqual((repo / SETTINGS).read_text(), own)
+        self.assertNotIn(SETTINGS, git(["show", "--name-only", "--format=", "HEAD"], repo).stdout.split())
 
     def test_a_later_run_on_a_created_repo_only_proposes(self):
         # once created, the repo is an existing one: what setup wrote is now Jacob's
@@ -105,9 +112,10 @@ class ExistingRepo(Case):
         self.assertEqual(res["hooks"]["status"], "needs-jacob")
         self.assertEqual((repo / SETTINGS).read_bytes(), before)
         self.assertIn("Stop", json.loads((repo / PROPOSAL).read_text())["hooks"])
-        # the proposal is ignored, so the repo shows only the new hook copy and its test
-        self.assertEqual(git(["status", "--porcelain", "--untracked-files=all"], repo).stdout,
-                         "?? .claude/hooks/only-one.sh\n?? .claude/hooks/test-only-one.sh\n")
+        # the proposal is ignored; the new hook copy and its test are the render, committed
+        self.assertEqual(git(["status", "--porcelain", "--untracked-files=all"], repo).stdout, "")
+        self.assertEqual(sorted(git(["show", "--name-only", "--format=", "HEAD"], repo).stdout.split()),
+                         [".claude/hooks/only-one.sh", ".claude/hooks/test-only-one.sh"])
 
 
 CHECKS_CLI = workspace_cli("checks")[1]

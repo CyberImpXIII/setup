@@ -7,7 +7,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from tests.helpers import ROOT, Case, git_repo, hook_source, workspace_cli
+from tests.helpers import ROOT, Case, commit_all, git_repo, hook_source, workspace_cli
 
 TOP, HOOKS_CLI = workspace_cli("hooks")
 SOURCE = HOOKS_CLI.parent / "source" if HOOKS_CLI else None
@@ -54,6 +54,7 @@ class Hooks(Case):
         self.run_json("r")
         rel, src = listing()[0]
         (repo / rel).unlink()
+        commit_all(repo, "a copy removed")  # an uncommitted deletion is refused too (S2)
         _, res = self.run_json("r")
         self.assertEqual(res["hooks"]["status"], "needs-jacob")  # the proposal; the copy itself installed
         self.assertIn("1 installed, 0 header refreshed", res["hooks"]["detail"])
@@ -65,6 +66,7 @@ class Hooks(Case):
         rel, src = next((r, s) for r, s in listing() if r.endswith("/no-inline-blobs.sh"))
         mine = repo / rel
         mine.write_bytes(src.read_bytes().replace(b"\n", b"\n# an older header line\n\n", 1))
+        commit_all(repo, "an older copy, committed")  # setup renders only into a clean tree (S2)
         _, res = self.run_json("r")
         self.assertNotIn(res["hooks"]["status"], ("drift", "failed"), res["hooks"]["detail"])
         self.assertIn("header refreshed", res["hooks"]["detail"])
@@ -86,6 +88,7 @@ class Hooks(Case):
         (repo / ".claude/hooks").mkdir(parents=True)
         mine = repo / ".claude/hooks/no-inline-blobs.sh"
         mine.write_text("#!/bin/sh\nlocal edit\n")
+        commit_all(repo, "a local edit, committed")  # uncommitted, the run is refused (S2)
         code, res = self.run_json("r")
         self.assertEqual((code, res["hooks"]["status"]), (1, "drift"))
         self.assertIn(".claude/hooks/no-inline-blobs.sh: its logic differs", res["hooks"]["detail"])
@@ -129,6 +132,7 @@ class Hooks(Case):
                "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [
                    {"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/own.sh"}]}]}}
         (repo / ".claude/settings.json").write_text(json.dumps(own))
+        commit_all(repo, "Jacob's settings")  # uncommitted, the run is refused (S2)
         _, res = self.run_json("r")
         self.assertEqual(res["hooks"]["status"], "needs-jacob")
         prop = json.loads((repo / ".claude/settings.proposed.json").read_text())
@@ -145,6 +149,7 @@ class Hooks(Case):
         repo = git_repo(self.tmp / "r")
         (repo / ".claude").mkdir()
         (repo / ".claude/settings.json").write_text("{not json")
+        commit_all(repo, "Jacob's settings")  # uncommitted, the run is refused (S2)
         code, res = self.run_json("r")
         self.assertEqual((code, res["hooks"]["status"]), (1, "failed"))
         self.assertFalse((repo / ".claude/settings.proposed.json").exists())
@@ -212,6 +217,7 @@ class LoneClone(Case):
         repo = git_repo(self.tmp / "r")
         (repo / ".claude/hooks").mkdir(parents=True)
         (repo / ".claude/hooks/a.sh").write_bytes((src / "hooks/a.sh").read_bytes() + b"# comment\n")
+        commit_all(repo)  # an owner's copy, committed: setup renders only into a clean tree (S2)
         res = self.run_lone(str(repo), "--hooks-from", str(src))
         self.assertEqual(res["hooks"]["status"], "drift")
         self.assertIn("byte for byte", res["hooks"]["detail"])

@@ -1,6 +1,6 @@
 """The rules block: installed, kept, updated when behind, never overwritten when edited."""
 from setuplib.core import TOOL_ROOT, sha12
-from tests.helpers import Case, git_repo
+from tests.helpers import Case, commit_all, git_repo
 
 TMPL = (TOOL_ROOT / "templates/shared-rules.md").read_text()
 
@@ -13,6 +13,7 @@ class Rules(Case):
     def repo_with(self, text):
         repo = git_repo(self.tmp / "r")
         (repo / "CLAUDE.md").write_text(text)
+        commit_all(repo)  # setup renders only into a clean tree (S2)
         return repo
 
     def test_current_block_is_unchanged(self):

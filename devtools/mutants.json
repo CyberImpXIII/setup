@@ -594,6 +594,21 @@
      "run": ["python3", "-m", "unittest", "tests.test_deps.Audit.test_a_missing_runner_is_a_finding"]},
     {"id": "runner-copy-stale", "gate": "this repo's runner copy agrees with its source (the copies-agree check)",
      "file": "devtools/parts.py", "old": "\"\"\"parts.py -- the one shared suite runner", "new": "\"\"\"parts.py -- a stale copy of the shared suite runner",
-     "run": ["python3", "-m", "unittest", "tests.test_parts_component.ThisRepo.test_this_repos_copy_agrees_with_the_source"]}
+     "run": ["python3", "-m", "unittest", "tests.test_parts_component.ThisRepo.test_this_repos_copy_agrees_with_the_source"]},
+    {"id": "steps-store-guessed", "gate": "plans --steps: a store item with no CLI to look it up is unchecked, never guessed (G5)",
+     "file": "setuplib/steps.py", "old": "        return \"unchecked\", f\"store item {t['value']}: pass --todo CLI to look it up\"", "new": "        return \"open\", t[\"value\"]",
+     "run": ["python3", "-m", "unittest", "tests.test_steps.Resolve.test_without_a_store_cli_a_store_item_is_unchecked_never_guessed"]},
+    {"id": "steps-tag-in-code-span", "gate": "plans steps: a track tag inside a code span is text (G1)",
+     "file": "setuplib/steps.py", "old": "    bare = CODE_RX.sub(lambda m: \" \" * len(m.group(0)), text)", "new": "    bare = text",
+     "run": ["python3", "-m", "unittest", "tests.test_steps.Parse.test_a_tag_inside_a_code_span_is_text"]},
+    {"id": "steps-two-tags-placeable", "gate": "plans steps: a step with two track tags is unplaceable (G1)",
+     "file": "setuplib/steps.py", "old": "    if len(at) > 1:", "new": "    if False:",
+     "run": ["python3", "-m", "unittest", "tests.test_steps.Parse.test_grammar"]},
+    {"id": "steps-cite-ambiguous-ok", "gate": "plans --cited-in: a step two lists carry is ambiguous, not ok",
+     "file": "setuplib/steps.py", "old": "    if len(hits) > 1:", "new": "    if False:",
+     "run": ["python3", "-m", "unittest", "tests.test_steps.Reverse.test_a_step_two_lists_carry_is_ambiguous"]},
+    {"id": "steps-gate-fails-on-unplaceable", "gate": "plans: unplaceable steps are counted, never a failure (G2's failing rule held)",
+     "file": "setup", "old": "    for f in findings:\n        print(f\"  FAIL  {f}\")\n    if not findings:  # the ok line", "new": "    findings = findings + bad if Path(a.dir).is_dir() else findings\n    for f in findings:\n        print(f\"  FAIL  {f}\")\n    if not findings:  # the ok line",
+     "run": ["python3", "-m", "unittest", "tests.test_steps.Gate.test_unplaceable_steps_are_counted_never_a_failure"]}
   ]
 }

@@ -38,6 +38,24 @@
 
 ## Open decisions
 
+- **Plan steps (PLAN-services §4 step 6.1, §3 G1/G5), built 2026-10-13**
+  (`setuplib/steps.py`, `setup plans steps`, `setup plans <dir> --steps`,
+  `tests/test_steps.py`). Choices made here, open to the plan owners: (1) a steps
+  heading is one whose title STARTS with Steps, Phase or Handoff (a literal prefix,
+  so "Phased rollout" or "Handoffs that survive..." count too; say if that is
+  wrong); (2) an owner is the leading backticked names before a colon: setup cannot
+  read the roster, so a name is not checked against it; (3) G5's "evidence dated
+  after the plan's date" is not built: a plan has no defined date field;
+  (4) a store item is looked up only through `--todo CLI` (`CLI -C <repo> get <id>`,
+  JSON `closed`); without it the step is `unchecked`, never guessed. G2's failing
+  rule is held: the gate prints a `note steps:` line counting unplaceable steps and
+  never fails on them. On the workspace 2026-10-13: 152 steps, 111 unplaceable
+  (most plans carry no owner names yet).
+- **The full suite under load, 2026-10-13**: one run (42 min, load ~57) had
+  `test_contract.LiveContract.test_a_verb_the_check_command_does_not_implement_turns_the_line_red`
+  red (gates `failed`, not `drift`); alone it passed in 19 s. unverified: a timeout
+  in the checks CLI under load -- settle: rerun the full suite on an idle machine.
+
 - **`setup plans show|list|edit` and section status, built 2026-10-09** (PLAN-todo-tool
   §9 step 6, PLAN-services §3 step 2). Choices made here, open to the plan owners:
   (a) the status marker is `<!-- status: open|approved|done -->` on the first line

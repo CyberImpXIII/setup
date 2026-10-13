@@ -54,10 +54,24 @@
       the progress to make (the checks' `regenerate` is the gate). Run it on a
       copy: --dry-run writes nothing.
   setup components            what each component installs, and the status vocabulary
-  setup plans <dir>           every PLAN-*.md there that is not done has a "Setup component" heading,
+  setup plans <dir> [--steps [--todo CLI] [--cited-in FILE]... [--json]]
+      every PLAN-*.md there that is not done has a "Setup component" heading,
       and in every plan each section status marker is valid and placed, and no section
       number is carried twice; the last line is `ok ... N sections: a open, b approved,
       c done, d unstated` (the sections of the plans not done), or the FAIL lines.
+      Before it, a `note  steps: N steps, k unplaceable (...)` line: G2's failing
+      rule is held (PLAN-services §3), so an unplaceable step is counted, never a
+      failure. --steps instead reports each step of each plan not done, one line
+      `<status> <file> §<s> step <n>  <detail>`: open, closed, needs-yes,
+      superseded, untracked (an owner, no tag), dangling (the tag does not
+      resolve), unchecked (could not look it up: a store item without --todo, or
+      `CLI -C <repo> get <id>` failing), unplaceable, group. --cited-in FILE checks
+      each `PLAN-*.md §<s> [step <n>]` citation in FILE: ok, dangling or ambiguous.
+      The last line counts them. Exit 0 whatever it finds; 2 if FILE is unreadable.
+  setup plans steps <file> [--json]
+      the steps of one plan, as the one parser reads G1's grammar (setuplib/steps.py):
+      a numbered item under a heading starting Steps, Phase or Handoff (or nested in
+      one), `` `owner`: `` at its start, at most one `track: <form>` ending it.
       A section is a numbered heading (`## 3. Title`, `### 7.12 Title`, `## 2a. Title`)
       through the line before the next heading of its level or above, trailing blank
       lines dropped. Its status is a marker on the first non-blank line under it:
@@ -94,7 +108,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from setuplib import audit, core, fsw, plans  # noqa: E402
+from setuplib import audit, core, fsw, plans, steps  # noqa: E402
 
 SUBCOMMANDS = ["components", "plans", "audit"]
 
@@ -121,9 +135,10 @@ def cmd_components(_):
 
 
 PLANS_USAGE = {
-    "": "setup plans <dir>",
+    "": "setup plans <dir> [--steps [--todo CLI] [--cited-in FILE]... [--json]]",
     "show": "setup plans show <file> §<n>",
     "list": "setup plans list <dir> [--all]",
+    "steps": "setup plans steps <file> [--json]",
     "edit": "setup plans edit <file> §<n> --from <src> --digest <sha256> [--dry-run]",
 }
 
@@ -131,19 +146,118 @@ PLANS_USAGE = {
 def cmd_plans(args):
     action = args[0] if args and args[0] in PLANS_USAGE else ""
     rest = args[1:] if action else args
-    return {"": plans_gate, "show": plans_show, "list": plans_list, "edit": plans_edit}[action](rest)
+    return {"": plans_gate, "show": plans_show, "list": plans_list, "steps": plans_steps,
+            "edit": plans_edit}[action](rest)
+
+
+def _live_plans(folder):
+    """[(path, text)] for each PLAN-*.md in folder whose own status is not done."""
+    out = []
+    for p in sorted(Path(folder).glob("PLAN-*.md")):
+        text = p.read_text()
+        if not audit.plan_findings(p.name, text)[1]:
+            out.append((p, text))
+    return out
+
+
+def _cite(s):
+    return f"{s['file']} §{s['section'] or '-'} step {s['step']}"
 
 
 def plans_gate(args):
-    if len(args) != 1:
+    p = argparse.ArgumentParser(prog="setup plans", add_help=False)
+    p.add_argument("dir")
+    p.add_argument("--steps", action="store_true")
+    p.add_argument("--todo")
+    p.add_argument("--cited-in", action="append", default=[])
+    p.add_argument("--json", action="store_true")
+    try:
+        a = p.parse_args(args)
+    except SystemExit:
+        a = None
+    if a is None or ((a.todo or a.cited_in or a.json) and not a.steps):
         print(f"usage: {PLANS_USAGE['']}", file=sys.stderr)
         return 2
-    findings, note = audit.audit_plans(Path(args[0]))
+    if a.steps:
+        return steps_report(Path(a.dir), a.todo, a.cited_in, a.json)
+    findings, note = audit.audit_plans(Path(a.dir))
+    if Path(a.dir).is_dir():  # G2's failing rule is held: the unplaceable steps are counted, never a failure
+        found = [s for path, text in _live_plans(a.dir) for s in steps.parse(path.name, text)]
+        bad = [_cite(s) for s in found if not s["placeable"]]
+        first = f" ({', '.join(bad[:5])}{', ...' if len(bad) > 5 else ''})" if bad else ""
+        print(f"  note  steps: {len(found)} steps, {len(bad)} unplaceable{first}; `setup plans {a.dir} --steps` "
+              "lists them (G2's failing rule is held: never a failure)")
     for f in findings:
         print(f"  FAIL  {f}")
     if not findings:  # the ok line stays last: a caller reads the last line
         print(f"  ok    {note}: every plan not done has a Setup component heading")
     return 1 if findings else 0
+
+
+def steps_report(folder, todo_cli, cited_in, as_json):
+    """`setup plans <dir> --steps`: each step of each plan not done, with what its
+    track tag resolves to (G5), and each plan citation in the --cited-in files
+    checked (the reverse check). A report: exit 0 whatever it finds (G2 is held);
+    2 when the folder or a cited file cannot be read."""
+    if not folder.is_dir():
+        print(f"plans --steps: {folder} is not a folder", file=sys.stderr)
+        return 2
+    texts = []
+    for f in cited_in:
+        try:
+            texts.append((f, Path(f).read_text()))
+        except (OSError, UnicodeDecodeError) as e:
+            print(f"plans --steps: --cited-in {f}: cannot be read ({getattr(e, 'strerror', None) or e})",
+                  file=sys.stderr)
+            return 2
+    rows = []
+    for path, text in _live_plans(folder):
+        for s in steps.parse(path.name, text):
+            status, detail = steps.resolve(s, folder, todo_cli)
+            rows.append({**s, "status": status, "detail": detail})
+    cites, cache = [], {}
+    for f, text in texts:
+        for c in steps.citations(f, text):
+            status, why = steps.check_citation(c, folder, cache)
+            cites.append({**c, "status": status, "why": why})
+    counts = {k: sum(r["status"] == k for r in rows) for k in steps.STATUSES}
+    ccounts = {k: sum(c["status"] == k for c in cites) for k in steps.CITE_STATUSES}
+    if as_json:
+        print(json.dumps({"steps": rows, "counts": counts, "citations": cites, "citation_counts": ccounts}))
+        return 0
+    for r in rows:
+        print(f"  {r['status']:<11} {_cite(r)}  {r['detail'] or ''}".rstrip())
+    for c in cites:
+        ref = f"{c['plan']} §{c['section']}" + (f" step {c['step']}" if c["step"] else "")
+        print(f"  {c['status']:<11} {c['source']}:{c['line']}  {ref}  {c['why'] or ''}".rstrip())
+    by = ", ".join(f"{n} {k}" for k, n in counts.items() if n)
+    cby = ", ".join(f"{n} {k}" for k, n in ccounts.items() if n)
+    print(f"steps: {len(rows)} steps{': ' + by if by else ''}; {len(cites)} citation(s){': ' + cby if cby else ''}; "
+          "a report, never a failure (G2's failing rule is held)")
+    return 0
+
+
+def plans_steps(args):
+    if not args or len(args) > 2 or (len(args) == 2 and args[1] != "--json"):
+        print(f"usage: {PLANS_USAGE['steps']}", file=sys.stderr)
+        return 2
+    _, text, why = _read_plan(args[0])
+    if why:
+        print(f"plans steps: {why}", file=sys.stderr)
+        return 1
+    name = Path(args[0]).name
+    got = steps.parse(name, text)
+    if len(args) == 2:
+        print(json.dumps(got))
+        return 0
+    for s in got:
+        state = "group" if s["children"] else "placeable" if s["placeable"] else "unplaceable"
+        track = s["track"]["value"] if s["track"] else "-"
+        why = f"  ({s['why']})" if s["why"] else ""
+        print(f"  {state:<11} {_cite(s)}  line {s['line']}  owners {', '.join(s['owners']) or '-'}  "
+              f"track {track}{why}")
+    print(f"{name}: {len(got)} steps, {sum(not s['placeable'] for s in got)} unplaceable")
+    return 0
 
 
 def _read_plan(path):

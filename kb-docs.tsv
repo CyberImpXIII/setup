@@ -1,0 +1,5 @@
+# Docs this repo declares for the shared docs index, one `kind<TAB>arg` per line:
+# file <path.md>, glob <pattern.md> (** recurses), help ./<command> --help. Only .md files,
+# paths inside the repo. Written once by setup; the owner's from then on.
+file	CLAUDE.md
+file	TODO.md

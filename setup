@@ -3,7 +3,7 @@
 
   setup <path> [--dry-run] [--github [--private] [--owner O]] [--name N] [--hooks-from DIR]
                [--plugins FILE] [--user-scope FILE] [--relative-to DIR] [--checks CLI] [--data-repo DIR]
-               [--only COMPONENT] [--json]
+               [--only COMPONENT] [--no-commit] [--json]
       install every component in components.json; one line each, then a result line.
       --only COMPONENT: run that one component alone (a name `setup components`
       lists), on an existing repo only (a new folder is refused: nothing else
@@ -18,6 +18,12 @@
       settings.proposed.json byte for byte. A commit the repo's own git
       hooks refuse leaves the render written and unstaged for its owner to
       check and commit (the commit line needs-owner).
+      --no-commit: an existing repo only, never with --node: the render is
+      written and NOT committed, and the commit line (needs-owner) names every
+      path written, so the owner checks and commits it with its own work in one
+      commit (a repo whose pre-commit wants the render and whose tree holds
+      that work). A tree with changes is let through; refused (exit 2, nothing
+      written) when a path the run would write holds changes git does not.
       The roster line's dir is <path> relative to DIR (default: the working
       folder), normalised; null when <path> is not under DIR. --plugins: a
       plug-in hook registry (JSON: root, ok, plugins[name, applies_to, faults,
@@ -498,6 +504,7 @@ def cmd_setup(argv):
     p.add_argument("--rebuild", action="store_true")
     p.add_argument("--overwrite-uncommitted", action="store_true")
     p.add_argument("--only")
+    p.add_argument("--no-commit", action="store_true")
     p.add_argument("--json", action="store_true")
     try:
         a = p.parse_args(argv)
@@ -509,6 +516,9 @@ def cmd_setup(argv):
         return 2
     if a.only and a.node:
         print("setup: --only runs one component of one repo: not with --node", file=sys.stderr)
+        return 2
+    if a.no_commit and a.node:
+        print("setup: --no-commit leaves one repo's render uncommitted: not with --node", file=sys.stderr)
         return 2
     if a.private and not a.github:
         print("setup: --private only means something with --github", file=sys.stderr)
@@ -540,7 +550,8 @@ def cmd_setup(argv):
                    dir_base=dir_base, gh=os.environ.get("SETUP_GH", "gh"),
                    node=a.node, rebuild=a.rebuild and a.node, rebuild_dry=rebuild_dry, checks_cli=a.checks,
                    data_repo=data_repo(a.data_repo, cwd), only=a.only,
-                   hooks_rebuild=hooks_rebuild, overwrite_uncommitted=a.overwrite_uncommitted)
+                   hooks_rebuild=hooks_rebuild, overwrite_uncommitted=a.overwrite_uncommitted,
+                   no_commit=a.no_commit)
     try:
         results = s.run()
     except core.Refused as e:

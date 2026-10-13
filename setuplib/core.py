@@ -236,8 +236,12 @@ class Setup:
                  github: bool = False, private: bool = False, owner=None,
                  hooks_from=None, plugins_from=None, user_scope_from=None, dir_base=None, gh: str = "gh",
                  spec=None, node=False, rebuild=False, rebuild_dry=False, nest_in=None, stands_for=None,
-                 checks_cli=None, data_repo=None, only=None, hooks_rebuild=False, overwrite_uncommitted=False):
+                 checks_cli=None, data_repo=None, only=None, hooks_rebuild=False, overwrite_uncommitted=False, no_commit=False):
         self.target = target
+        # --no-commit: an existing repo's render is written and left uncommitted, each path
+        # named, for its owner to commit with its own work; a dirty tree is let through,
+        # a path the run would write that holds uncommitted changes is not (_clean_guard)
+        self.no_commit = no_commit
         # --rebuild without --node: a hook copy whose logic drifted from the source is
         # overwritten (only in the hooks component's rebuild scope); refused up front
         # when one it renders there has uncommitted changes, unless overwrite_uncommitted
@@ -1398,6 +1402,9 @@ class Setup:
             self.is_new, self._existed_empty = False, False
         else:
             self.is_new, self._existed_empty = preflight(self.target, self.nest_in)
+        if self.no_commit and self.is_new:
+            raise Refused(f"--no-commit leaves an existing repo's render for its owner to commit, and "
+                          f"{self.label} is not one yet (a new repo's scaffold is setup's own commit)")
         if self.only and self.is_new:
             raise Refused(f"--only {self.only} runs one component on an existing repo, and "
                           f"{self.label} is not one yet (a full run creates it)")
@@ -1498,6 +1505,14 @@ class Setup:
         if not rest:
             return
         would = self._would_render()
+        if would and self.no_commit:
+            mine = sorted(set(rest) & set(would))
+            if mine:
+                raise Refused(f"--no-commit: this run would write {len(mine)} path(s) holding changes git does "
+                              f"not ({', '.join(mine[:10])}{', ...' if len(mine) > 10 else ''}): writing "
+                              "would lose them; commit or discard those first (under --rebuild, "
+                              "--overwrite-uncommitted takes a rendered copy's changes as lost)")
+            return
         if would:
             more = f" and {len(rest) - 10} more" if len(rest) > 10 else ""
             raise Refused(f"the tree is not clean ({', '.join(rest[:10])}{more}) and this run would render "
@@ -1514,6 +1529,8 @@ class Setup:
         rendered = sorted({rel for rel, keep in self.w.written if keep})
         if self.rebuild:
             return Result("commit", "none", "a node rebuild commits nothing: git diff is the finding")
+        if self.no_commit:
+            return self._leave_render(rendered)
         if self.dry_run:
             if not rendered:
                 return Result("commit", "none", "nothing would be rendered: nothing to commit")
@@ -1558,6 +1575,28 @@ class Setup:
         if err:
             return Result("commit", "failed", f"{did}; then a git config write failed: {err}")
         return Result("commit", "installed", "; ".join([did, *notes]))
+
+    def _leave_render(self, rendered):
+        """--no-commit: nothing committed; every path written is named, for the owner
+        to check and commit with its own work. Deferred git config is set now."""
+        if not rendered:
+            return Result("commit", "none", "--no-commit: nothing " + ("would be " if self.dry_run else "")
+                                            + "rendered, nothing left to commit")
+        if self.dry_run and not self.is_new:
+            dirty = self._dirty()
+            mine = sorted((set(dirty) - self._riders(dirty)) & set(rendered))
+            if mine:
+                return Result("commit", "needs-owner", f"--no-commit: a real run would be refused: it would write "
+                                                       f"{len(mine)} path(s) holding changes git does not "
+                                                       f"({', '.join(mine)})")
+        err = None if self.dry_run else self.w.apply_config()
+        verb = "would be written" if self.dry_run else "written"
+        never = sorted({rel for rel, keep in self.w.written if not keep} - set(rendered))
+        return Result("commit", "failed" if err else "needs-owner",
+                      f"--no-commit: {len(rendered)} rendered file(s) {verb} and left uncommitted for the "
+                      f"owner to check and commit with its own work: {', '.join(rendered)}"
+                      + (f"; also {verb}, never to be committed: {', '.join(never)}" if never else "")
+                      + (f"; a git config write failed: {err}" if err else ""))
 
     def c_commit(self):
         if not self.is_new:

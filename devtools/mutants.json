@@ -675,6 +675,21 @@
      "run": ["python3", "-m", "unittest", "tests.test_deps.Audit.test_a_missing_reader_is_a_finding"]},
     {"id": "docs-reader-shape-unchecked", "gate": "deps: a reader entry that is not {module, declaration, parse, resolve} is refused at load",
      "file": "setuplib/deps.py", "old": "        if r is not None and not (", "new": "        if False and not (",
-     "run": ["python3", "-m", "unittest", "tests.test_deps.Vocabulary.test_load_refuses_what_it_does_not_read"]}
+     "run": ["python3", "-m", "unittest", "tests.test_deps.Vocabulary.test_load_refuses_what_it_does_not_read"]},
+    {"id": "nocommit-commits", "gate": "--no-commit: nothing is committed or staged",
+     "file": "setuplib/core.py", "old": "        if self.no_commit:\n            return self._leave_render(rendered)\n", "new": "        if False:\n            return self._leave_render(rendered)\n",
+     "run": ["python3", "-m", "unittest", "tests.test_nocommit.NoCommit.test_renders_into_a_dirty_tree_commits_nothing_and_names_each_path"]},
+    {"id": "nocommit-dirty-refused", "gate": "--no-commit: a tree holding the owner's work is let through",
+     "file": "setuplib/core.py", "old": "        if would and self.no_commit:\n", "new": "        if False:\n",
+     "run": ["python3", "-m", "unittest", "tests.test_nocommit.NoCommit.test_renders_into_a_dirty_tree_commits_nothing_and_names_each_path"]},
+    {"id": "nocommit-overwrites-uncommitted", "gate": "--no-commit: a path it would write that holds uncommitted changes is refused",
+     "file": "setuplib/core.py", "old": "            if mine:\n                raise Refused(f\"--no-commit:", "new": "            if False:\n                raise Refused(f\"--no-commit:",
+     "run": ["python3", "-m", "unittest", "tests.test_nocommit.NoCommit.test_a_path_it_would_write_with_uncommitted_changes_is_refused"]},
+    {"id": "nocommit-new-folder", "gate": "--no-commit: a new folder is refused (its scaffold is setup's own commit)",
+     "file": "setuplib/core.py", "old": "        if self.no_commit and self.is_new:\n", "new": "        if False:\n",
+     "run": ["python3", "-m", "unittest", "tests.test_nocommit.NoCommit.test_refused_on_a_new_folder_and_with_node"]},
+    {"id": "nocommit-paths-unnamed", "gate": "--no-commit: the commit line names every path written",
+     "file": "setuplib/core.py", "old": "f\"owner to check and commit with its own work: {', '.join(rendered)}\"", "new": "f\"owner to check and commit with its own work: {', '.join(rendered[:5])}\"",
+     "run": ["python3", "-m", "unittest", "tests.test_nocommit.NoCommit.test_renders_into_a_dirty_tree_commits_nothing_and_names_each_path"]}
   ]
 }

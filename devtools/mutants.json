@@ -618,6 +618,18 @@
     {"id":"render-config-not-deferred","gate":"S2: core.hooksPath is set after setup's own commit","file":"setuplib/fsw.py","old":"        if self.defer_config:\n            self.pending_config.append((key, value))","new":"        if False:\n            self.pending_config.append((key, value))","run":["python3","-m","unittest","tests.test_githooks.Install.test_a_ready_repo_gets_the_hooks_and_core_hooks_path"]},
     {"id":"facts-write-verb-run","gate":"§12.3: a cited command that is not a declared read verb fails and is never run","file":"setuplib/facts.py","old":"    if verb not in spec[\"read\"]:","new":"    if False:","run":["python3","-m","unittest","tests.test_facts.Facts.test_a_command_that_is_not_a_read_verb_is_never_run","tests.test_facts.Facts.test_each_kind_of_fact_gets_its_status"]},
     {"id":"facts-change-unseen","gate":"§12.3: a fact whose command now returns a different value is listed","file":"setuplib/facts.py","old":"    if now == fact[\"value\"]:","new":"    if True:","run":["python3","-m","unittest","tests.test_facts.Facts.test_a_changed_value_is_listed_and_the_same_one_is_not"]},
-    {"id":"facts-pipe-run","gate":"§12.3: only one argv is re-run, never a shell line","file":"setuplib/facts.py","old":"    if SHELL_RX.search(cmd):","new":"    if False:","run":["python3","-m","unittest","tests.test_facts.Facts.test_each_kind_of_fact_gets_its_status"]}
+    {"id":"facts-pipe-run","gate":"§12.3: only one argv is re-run, never a shell line","file":"setuplib/facts.py","old":"    if SHELL_RX.search(cmd):","new":"    if False:","run":["python3","-m","unittest","tests.test_facts.Facts.test_each_kind_of_fact_gets_its_status"]},
+    {"id": "plans-add-number-taken", "gate": "plans add: a new section takes a number no heading carries",
+     "file": "setuplib/plans.py", "old": "    if taken:\n", "new": "    if False:\n",
+     "run": ["python3", "-m", "unittest", "tests.test_plans.Add.test_a_number_already_carried_is_refused"]},
+    {"id": "plans-add-level", "gate": "plans add: the new section's heading is numbered, at the level of the one it follows",
+     "file": "setuplib/plans.py", "old": "    if not m or len(m.group(1)) != s[\"level\"]:", "new": "    if not m:",
+     "run": ["python3", "-m", "unittest", "tests.test_plans.Add.test_the_new_heading_must_be_numbered_at_the_level_of_n"]},
+    {"id": "plans-add-bytes", "gate": "plans add: the file's own line ends are kept, and used for the new section",
+     "file": "setuplib/plans.py", "old": "    out = head + nl + nl.join(body) + nl + gap + tail", "new": "    out = head + \"\\n\" + \"\\n\".join(body) + \"\\n\" + gap + tail",
+     "run": ["python3", "-m", "unittest", "tests.test_plans.Add.test_a_subsection_goes_after_its_sibling_and_crlf_is_kept"]},
+    {"id": "plans-add-one-section", "gate": "plans add: a new text that adds two sections is refused",
+     "file": "setuplib/plans.py", "old": "    why = _one_section(body, s[\"level\"], \"the new section\")\n    if why:\n", "new": "    why = None\n    if why:\n",
+     "run": ["python3", "-m", "unittest", "tests.test_plans.Add.test_the_new_text_must_be_one_section"]}
   ]
 }

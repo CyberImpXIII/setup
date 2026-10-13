@@ -1,5 +1,5 @@
 """Plan sections: one addressed by its number (`§n`), the status each one states,
-and the one-section replace `setup plans edit` writes (PLAN-todo-tool.md §9 step 6,
+and the one-section replace `setup plans edit` and insert `setup plans add` write (PLAN-todo-tool.md §9 step 6,
 PLAN-services.md §3). Pure functions over text: the CLI reads and writes (through
 fsw.Writer) and runs the plans gate (audit.plan_findings) around an edit.
 
@@ -140,25 +140,77 @@ def replace(name, text, ref, new):
     s, why = resolve(name, text, ref)
     if why:
         return None, why
-    body = new.splitlines()
-    while body and not body[-1].strip():
-        body.pop()
+    body = _body(new)
     if not body:
         return None, "the replacement is empty"
     m = NUMBERED_RX.match(body[0])
     if not m or m.group(2) != s["number"] or len(m.group(1)) != s["level"]:
         return None, (f"the replacement must start with the heading of §{s['number']} at its level "
                       f"(`{'#' * s['level']} {s['number']}...`), not {body[0][:60]!r}")
-    heads, open_fence = _headings(body)
-    if open_fence:
-        return None, "the replacement opens a code fence it does not close"
-    extra = [i for i, lv, _, _ in heads if i > 0 and lv <= s["level"]]
-    if extra:
-        return None, (f"the replacement has a heading at or above its level on its line {extra[0] + 1}: "
-                      "it would add a section (edit one section at a time)")
+    why = _one_section(body, s["level"], "the replacement")
+    if why:
+        return None, why
     # split keeping line ends, so every byte outside the section is the original's
     kept = text.splitlines(keepends=True)
     last = kept[s["end"] - 1]
     tail_nl = last[len(last.rstrip("\r\n")):]  # the section's own last line ending ("" at an unterminated end)
     out = "".join(kept[:s["start"]]) + "\n".join(body) + tail_nl + "".join(kept[s["end"]:])
     return (out, (s["start"] + 1, s["end"], s["start"] + len(body))), None
+
+
+def _body(new):
+    """`new` as lines, trailing blank lines dropped."""
+    body = new.splitlines()
+    while body and not body[-1].strip():
+        body.pop()
+    return body
+
+
+def _one_section(body, level, what):
+    """Why `body` (its first line a numbered heading at `level`) is not exactly one
+    section, or None: a fence left open would hide the headings after it, and a
+    later heading at `level` or above would add a section."""
+    heads, open_fence = _headings(body)
+    if open_fence:
+        return f"{what} opens a code fence it does not close"
+    extra = [i for i, lv, _, _ in heads if i > 0 and lv <= level]
+    if extra:
+        return (f"{what} has a heading at or above its level on its line {extra[0] + 1}: "
+                "it would add a section (one section at a time)")
+    return None
+
+
+def insert(name, text, ref, new):
+    """Insert `new`, one new section, after the section `ref` names and everything
+    under it, one blank line before it (`setup plans add`). `new` starts with a
+    numbered heading at that section's level whose number no heading in the text
+    carries, and is one section (_one_section). Every byte of the text is kept; the
+    one byte added outside `new` is a line end, when the text ended without one.
+    ((new text, (its number, first line, last line)), None) or (None, why)."""
+    s, why = resolve(name, text, ref)
+    if why:
+        return None, why
+    body = _body(new)
+    if not body:
+        return None, "the new section is empty"
+    m = NUMBERED_RX.match(body[0])
+    if not m or len(m.group(1)) != s["level"]:
+        return None, (f"the new section must start with a numbered heading at §{s['number']}'s level "
+                      f"(`{'#' * s['level']} <n>. Title`), not {body[0][:60]!r}")
+    taken = [x for x in sections(text) if x["number"] == m.group(2)]
+    if taken:
+        return None, (f"{name}: §{m.group(2)} is already carried (line {taken[0]['start'] + 1}): "
+                      "a new section takes a number no heading carries")
+    why = _one_section(body, s["level"], "the new section")
+    if why:
+        return None, why
+    kept = text.splitlines(keepends=True)
+    last = kept[s["end"] - 1]
+    nl = last[len(last.rstrip("\r\n")):] or "\n"  # the file's own line end where it is cut
+    head, tail = "".join(kept[:s["end"]]), "".join(kept[s["end"]:])
+    if not head.endswith(("\n", "\r")):
+        head += nl
+    gap = nl if tail and not tail.startswith(("\n", "\r\n")) else ""
+    out = head + nl + nl.join(body) + nl + gap + tail
+    first = s["end"] + 2
+    return (out, (m.group(2), first, first + len(body) - 1)), None

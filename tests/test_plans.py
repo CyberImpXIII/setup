@@ -303,3 +303,100 @@ class Edit(Case):
         r = self.run_setup("plans", "edit", str(self.plan), "§1")
         self.assertEqual(r.returncode, 2)
         self.assertIn("usage: setup plans edit <file> §<n> --from <src> --digest <sha256> [--dry-run]", r.stderr)
+
+
+class Add(Case):
+    """`setup plans add <file> --after §<n> --from <src> --digest <sha256>`: one new
+    section after §<n> and everything under it; one fixture per refusal."""
+
+    def setUp(self):
+        super().setUp()
+        self.dir = self.tmp / "plans"
+        self.dir.mkdir()
+        self.plan = self.dir / "PLAN-x.md"
+        self.plan.write_text(PLAN)
+
+    def digest(self):
+        return self.run_setup("plans", "show", str(self.plan), "§1").stderr.split()[1]
+
+    def add(self, ref, body, *extra, digest=None):
+        src = self.tmp / "new.md"
+        src.write_text(body)
+        return self.run_setup("plans", "add", str(self.plan), "--after", ref, "--from", str(src),
+                              "--digest", digest or self.digest(), *extra)
+
+    def assertRefused(self, r, why, before=PLAN):
+        self.assertEqual((r.returncode, r.stdout), (1, ""), r.stderr)
+        self.assertIn("plans add: refused, nothing written: ", r.stderr)
+        self.assertIn(why, r.stderr)
+        self.assertEqual(self.plan.read_text(), before)
+
+    def test_adds_the_section_after_the_whole_of_n_and_keeps_every_byte(self):
+        r = self.add("§2", "## 2b. Added\n<!-- status: open -->\n\nnew\n\n\n")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        cut = PLAN.index("## 2a.")  # after §2's subsection and fenced text, before §2a
+        want = PLAN[:cut].rstrip("\n") + "\n\n## 2b. Added\n<!-- status: open -->\n\nnew\n\n" + PLAN[cut:]
+        got = self.plan.read_text()
+        self.assertEqual(got, want)
+        self.assertEqual(r.stdout, "plans add: PLAN-x.md §2b added after §2 (lines 22-25); "
+                                   f"digest {hashlib.sha256(got.encode()).hexdigest()}\n")
+        self.assertEqual(self.run_setup("plans", "show", str(self.plan), "§2b").stdout,
+                         "## 2b. Added\n<!-- status: open -->\n\nnew\n")
+        self.assertIn("1 open, 1 approved, 1 done, 4 unstated", self.run_setup("plans", str(self.dir)).stdout)
+
+    def test_a_subsection_goes_after_its_sibling_and_crlf_is_kept(self):
+        crlf = PLAN.replace("\n", "\r\n").encode()
+        self.plan.write_bytes(crlf)
+        r = self.add("§7.12", "### 7.13 Next\n\nnext\n")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        cut = crlf.index(b"deep\r\n") + len(b"deep\r\n")
+        self.assertEqual(self.plan.read_bytes(), crlf[:cut] + b"\r\n### 7.13 Next\r\n\r\nnext\r\n" + crlf[cut:])
+
+    def test_a_stale_digest_is_refused(self):
+        d = self.digest()
+        changed = PLAN.replace("\none\n", "\none, edited elsewhere\n")
+        self.plan.write_text(changed)
+        self.assertRefused(self.add("§1", "## 1a. New\n", digest=d), "PLAN-x.md changed since digest", before=changed)
+
+    def test_an_add_into_a_red_folder_is_refused(self):
+        (self.dir / "PLAN-y.md").write_text("# PLAN-y\n\n## 1. Only\n")
+        self.assertRefused(self.add("§1", "## 1a. New\n"), "is already red (1 finding(s))")
+
+    def test_an_add_that_would_turn_the_gate_red_is_refused(self):
+        self.assertRefused(self.add("§1", "## 1a. New\n<!-- status: finished -->\n"),
+                           "the add would turn `setup plans")
+
+    def test_a_number_already_carried_is_refused(self):
+        self.assertRefused(self.add("§1", "## 3. Again\n"), "§3 is already carried (line 30)")
+
+    def test_the_new_heading_must_be_numbered_at_the_level_of_n(self):
+        self.assertRefused(self.add("§2", "### 2b. Too deep\n"), "at §2's level")
+        self.assertRefused(self.add("§2", "## Unnumbered\n"), "at §2's level")
+
+    def test_the_new_text_must_be_one_section(self):
+        self.assertRefused(self.add("§1", "## 1a. New\n\n## 1b. Smuggled\n"), "it would add a section")
+        self.assertRefused(self.add("§1", "## 1a. New\n\n```\n## 5. hidden\n"), "opens a code fence it does not close")
+        self.assertRefused(self.add("§1", "\n\n"), "the new section is empty")
+
+    def test_a_missing_section_a_non_plan_or_an_unreadable_source_is_refused(self):
+        self.assertRefused(self.add("§4", "## 4a. New\n"), "PLAN-x.md: no section §4")
+        r = self.run_setup("plans", "add", str(self.plan), "--after", "§1", "--from", str(self.tmp / "nope.md"),
+                           "--digest", self.digest())
+        self.assertRefused(r, "nope.md: cannot be read")
+        other = self.dir / "notes.md"
+        other.write_text(PLAN)
+        r = self.run_setup("plans", "add", str(other), "--after", "§1", "--from", str(other), "--digest", "0" * 64)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("notes.md is not a plan (PLAN-*.md)", r.stderr)
+
+    def test_dry_run_writes_nothing(self):
+        d = self.digest()
+        r = self.add("§1", "## 1a. New\n", "--dry-run", digest=d)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, f"plans add: PLAN-x.md §1a would be added after §1 (lines 9-9); digest {d}\n")
+        self.assertEqual(self.plan.read_text(), PLAN)
+
+    def test_wrong_usage_is_exit_2(self):
+        r = self.run_setup("plans", "add", str(self.plan), "§1")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("usage: setup plans add <file> --after §<n> --from <src> --digest <sha256> [--dry-run]", r.stderr)

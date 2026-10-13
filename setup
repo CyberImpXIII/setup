@@ -108,6 +108,13 @@
       <sha256> (it changed since it was shown), when `setup plans <its dir>` is red
       before or would be red after. Prints `plans edit: <file> §<n> replaced (lines
       A-B now A-C); digest <new sha256>`.
+  setup plans add <file> --after §<n> --from <src> --digest <sha256> [--dry-run]
+      inserts <src>, one new section, after §<n> and everything under it, with one
+      blank line before it; every other byte is kept. <src> starts with a numbered
+      heading at §<n>'s level whose number no heading in the file carries, and adds
+      no other section at that level or above. Refused as edit is (the digest, the
+      gate before and after, nothing written). Prints `plans add: <file> §<m> added
+      after §<n> (lines A-B); digest <new sha256>`.
   setup audit content         setup names no repo, repo path or repo command
   setup audit direction       setup reads nothing of the delegation layer
   setup audit deps            each tool dependencies.json names (installed FROM) is a discovered repo
@@ -157,6 +164,7 @@ PLANS_USAGE = {
     "list": "setup plans list <dir> [--all]",
     "steps": "setup plans steps <file> [--json]",
     "edit": "setup plans edit <file> §<n> --from <src> --digest <sha256> [--dry-run]",
+    "add": "setup plans add <file> --after §<n> --from <src> --digest <sha256> [--dry-run]",
 }
 
 
@@ -164,7 +172,7 @@ def cmd_plans(args):
     action = args[0] if args and args[0] in PLANS_USAGE else ""
     rest = args[1:] if action else args
     return {"": plans_gate, "show": plans_show, "list": plans_list, "steps": plans_steps,
-            "edit": plans_edit}[action](rest)
+            "edit": plans_edit, "add": plans_add}[action](rest)
 
 
 def _live_plans(folder):
@@ -355,23 +363,30 @@ def plans_list(args):
     return 0
 
 
-def plans_edit(args):
-    p = argparse.ArgumentParser(prog="setup plans edit", add_help=False)
+def _plan_args(action, ref_flag=None):
+    """The parser `plans edit` and `plans add` share: <file>, the section (a positional,
+    or `ref_flag`), --from, --digest, --dry-run."""
+    p = argparse.ArgumentParser(prog=f"setup plans {action}", add_help=False)
     p.add_argument("file")
-    p.add_argument("ref")
+    p.add_argument(ref_flag, dest="ref", required=True) if ref_flag else p.add_argument("ref")
     p.add_argument("--from", dest="src", required=True)
     p.add_argument("--digest", required=True)
     p.add_argument("--dry-run", action="store_true")
-    try:
-        a = p.parse_args(args)
-    except SystemExit:
-        print(f"usage: {PLANS_USAGE['edit']}", file=sys.stderr)
-        return 2
+    return p
+
+
+def _guarded_plan_write(action, a, change):
+    """The one guarded write of a plan file (`plans edit`, `plans add`): refused,
+    exit 1, nothing written, when the file is not a PLAN-*.md, its digest is not
+    --digest (it changed since it was shown; checked again just before the write),
+    <src> cannot be read, `setup plans <its dir>` is red before, `change` refuses,
+    or the gate would be red after. change(name, text, new) -> ((out, line), None)
+    or (None, why); `line` is what the success line says was done."""
     plan = Path(a.file)
     name, folder = plan.name, plan.parent
 
     def refuse(why):
-        print(f"plans edit: refused, nothing written: {why}", file=sys.stderr)
+        print(f"plans {action}: refused, nothing written: {why}", file=sys.stderr)
         return 1
 
     if not (name.startswith("PLAN-") and name.endswith(".md")):
@@ -385,7 +400,7 @@ def plans_edit(args):
         now = plans.digest(raw_now)
         return None if now == a.digest else (
             f"{name} changed since digest {a.digest[:12]}... (now {now[:12]}...): "
-            "show the section again and redo the edit on what is there now")
+            "show the section again and redo the change on what is there now")
 
     raw, text, why = _read_plan(plan)
     why = why or stale()
@@ -398,21 +413,54 @@ def plans_edit(args):
     before, _ = audit.audit_plans(folder)
     if before:
         return refuse(f"`setup plans {folder}` is already red ({len(before)} finding(s)), first: {before[0]}")
-    done, why = plans.replace(name, text, a.ref, new)
+    done, why = change(name, text, new)
     if why:
         return refuse(why)
-    out, (first, old_last, new_last) = done
+    out, line = done
     after, _ = audit.audit_plans(folder, {name: out})
     if after:
-        return refuse(f"the edit would turn `setup plans {folder}` red, first: {after[0]}")
+        return refuse(f"the {action} would turn `setup plans {folder}` red, first: {after[0]}")
     why = stale()
     if why:
         return refuse(why)
     fsw.Writer(folder, a.dry_run).write(name, out)
-    verb = "would be replaced" if a.dry_run else "replaced"
-    print(f"plans edit: {name} §{a.ref.lstrip('§')} {verb} (lines {first}-{old_last} now {first}-{new_last}); "
+    print(f"plans {action}: {name} {line(a.dry_run)}; "
           f"digest {plans.digest(out.encode()) if not a.dry_run else a.digest}")
     return 0
+
+
+def plans_edit(args):
+    try:
+        a = _plan_args("edit").parse_args(args)
+    except SystemExit:
+        print(f"usage: {PLANS_USAGE['edit']}", file=sys.stderr)
+        return 2
+
+    def change(name, text, new):
+        done, why = plans.replace(name, text, a.ref, new)
+        if why:
+            return None, why
+        out, (first, old_last, new_last) = done
+        return (out, lambda dry: f"§{a.ref.lstrip('§')} {'would be replaced' if dry else 'replaced'} "
+                                 f"(lines {first}-{old_last} now {first}-{new_last})"), None
+    return _guarded_plan_write("edit", a, change)
+
+
+def plans_add(args):
+    try:
+        a = _plan_args("add", "--after").parse_args(args)
+    except SystemExit:
+        print(f"usage: {PLANS_USAGE['add']}", file=sys.stderr)
+        return 2
+
+    def change(name, text, new):
+        done, why = plans.insert(name, text, a.ref, new)
+        if why:
+            return None, why
+        out, (num, first, last) = done
+        return (out, lambda dry: f"§{num} {'would be added' if dry else 'added'} after §{a.ref.lstrip('§')} "
+                                 f"(lines {first}-{last})"), None
+    return _guarded_plan_write("add", a, change)
 
 
 def cmd_audit(args):

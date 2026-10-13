@@ -56,6 +56,17 @@
 
 ## Open decisions
 
+- **core.hooksPath is unset in 11 of the 14 rendered repos (probe 2026-10-13, by
+  design, reported by applications).** Set: emailTools, tools/wizard, tools/transcripts.
+  Unset: applications, income, chronjobScheduler, data-bridge, hub, usage, hooks,
+  research, addon-bench, checks, setup itself. setup sets it only when nothing would
+  be refused for want of wiring; in applications the githooks line (needs-owner)
+  names what is missing: its dev.sh does not run `.githooks/check-pass record`, and no
+  `--checks CLI`. Gated: test_githooks `test_a_check_that_does_not_record_its_pass_leaves_them_off`,
+  mutant githooks-on-when-unready (red 2026-10-13). Open: the rendered hooks'
+  headers say only "Runs once core.hooksPath points at this folder", not what
+  setup waits for; changing the templates makes every existing copy drift.
+
 - **Suspicion, unproven: the dry-run probe's `--only` filter has no mutant.** The
   `only-runs-everything` mutant now breaks the run loop's filter (`not in (self.only,
   "commit")`, core.py); the probe loop's `if self.only and c["name"] != self.only`

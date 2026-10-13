@@ -94,6 +94,22 @@ class Data(Case):
         _, res = self.run_json("plain")
         self.assertEqual(res["data"]["status"], "none")
 
+    def test_a_cli_json_without_a_store_is_none_and_runs_nothing(self):
+        # `store` is optional in cli.json: a CLI with no store has nothing to generate
+        (self.repo / "cli.json").write_text(json.dumps({"cli": "tool", "verbs": VERBS}))
+        commit_all(self.repo, "a storeless cli")
+        code, res = self.with_data()
+        self.assertEqual((code, res["data"]["status"]), (0, "none"), res["data"])
+        self.assertIn("declares no `store`", res["data"]["detail"])
+        self.assertEqual((self.calls(), self.store()), ([], None))
+
+    def test_a_cli_json_with_a_store_present_is_unchanged(self):
+        (self.repo / "data").mkdir()
+        (self.repo / "data/store.db").write_text("{}")
+        code, res = self.with_data()
+        self.assertEqual(res["data"]["status"], "unchanged", res["data"])
+        self.assertEqual(self.calls(), [])
+
     def test_an_existing_store_is_never_dropped(self):
         (self.repo / "data").mkdir()
         (self.repo / "data/store.db").write_text('{"mine": 0}')

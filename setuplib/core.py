@@ -898,6 +898,9 @@ class Setup:
         if not (self.target / f).exists():
             return Result("data", "none", f"no {f}: no store is declared here")
         doc, why = _json_file(self.target / f)
+        if not why and isinstance(doc, dict) and "store" not in doc:
+            # `store` is optional in cli.json (a CLI with no store of its own): nothing to generate
+            return Result("data", "none", f"{f} declares no `store`: no store is declared here")
         why = why or _cli_shape(doc)
         if why:
             return Result("data", "drift", f"{f} {why}: nothing run (the shared accessor gates its shape)")

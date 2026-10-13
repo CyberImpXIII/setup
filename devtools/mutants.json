@@ -690,6 +690,9 @@
      "run": ["python3", "-m", "unittest", "tests.test_nocommit.NoCommit.test_refused_on_a_new_folder_and_with_node"]},
     {"id": "nocommit-paths-unnamed", "gate": "--no-commit: the commit line names every path written",
      "file": "setuplib/core.py", "old": "f\"owner to check and commit with its own work: {', '.join(rendered)}\"", "new": "f\"owner to check and commit with its own work: {', '.join(rendered[:5])}\"",
-     "run": ["python3", "-m", "unittest", "tests.test_nocommit.NoCommit.test_renders_into_a_dirty_tree_commits_nothing_and_names_each_path"]}
+     "run": ["python3", "-m", "unittest", "tests.test_nocommit.NoCommit.test_renders_into_a_dirty_tree_commits_nothing_and_names_each_path"]},
+    {"id": "data-storeless-is-drift", "gate": "data: a cli.json declaring no store (optional there) is none, not drift",
+     "file": "setuplib/core.py", "old": "        if not why and isinstance(doc, dict) and \"store\" not in doc:", "new": "        if False:",
+     "run": ["python3", "-m", "unittest", "tests.test_data.Data.test_a_cli_json_without_a_store_is_none_and_runs_nothing"]}
   ]
 }

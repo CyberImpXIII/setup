@@ -56,6 +56,16 @@
 
 ## Open decisions
 
+- **A node's `stores.json` (proposed by the hub owner, 2026-10-13; not built, wait
+  for a dispatch carrying an approval line).** PLAN-hub.md on origin/plan/hub
+  (63cf780), its Setup component table's `stores.json` row, and PLAN-services.md §3
+  step 3 ("Two more from the hub owner", item 1) say setup should render a
+  read-only `stores.json` beside hub.json at a node. It would be built from every
+  owner's cli.json `store` field, mode 0444, re-rendered on every run, and `drift`
+  when it no longer matches. The hub hook and server would both read it. Note:
+  `store` is optional in cli.json now (3a3c3db), so a storeless repo adds no row.
+  tools/setup has no cli.json of its own yet.
+
 - **core.hooksPath is unset in 11 of the 14 rendered repos (probe 2026-10-13, by
   design, reported by applications).** Set: emailTools, tools/wizard, tools/transcripts.
   Unset: applications, income, chronjobScheduler, data-bridge, hub, usage, hooks,

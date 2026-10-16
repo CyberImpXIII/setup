@@ -1,9 +1,10 @@
+<!-- rendered by todo from todo.json (71 open, 1 closed in todo-history.json; seal d96edd393966): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
 
-- **The hooks component renders the hook source's work tree, uncommitted edits
-  and all** (found 2026-10-13: four repos -- knowledge-base, scripts,
+- **su-1 · The hooks component renders the hook source's work tree, uncommitted edits and all**
+  (found 2026-10-13: four repos -- knowledge-base, scripts,
   site-scrapers, tools/todo -- hold uncommitted hook copies, and tools/checks held
   an uncommitted runner 1.3.0 that a parts pass would have copied into ten repos).
   The parts component now renders the runner as its repo's HEAD holds it
@@ -12,21 +13,31 @@
   comparator read the work tree. Fix: render from `git archive HEAD <source>` into
   a throwaway folder and pass that as `--source`, or refuse while
   `git status -- <source>` in the hooks repo is not empty.
-- **plans `--facts` grammar collides with prose mappings**: on the workspace
+  · added: 2026-10-15
+
+- **su-2 · plans `--facts` grammar collides with prose mappings**
+  : on the workspace
   2026-10-13 `setup plans . --facts` exit 1, 14 cited (13 not-declared, 1
   not-one-command): most are prose `x` → `y` mappings, and PLAN-architecture
   line 525 is the grammar's own `<cmd>` example. The plan's author picks: another
   arrow for prose, or a narrower grammar (a fact marked, e.g. `fact:`).
-- **The baseline `.gitignore` does not ignore `.progress/`** (2026-10-15): a repo
+  · added: 2026-10-15
+
+- **su-3 · The baseline `.gitignore` does not ignore `.progress/`**
+  (2026-10-15): a repo
   whose `dev.sh check` hands its parts to the rendered runner (`devtools/parts.py`)
   gets an untracked `.progress/` (the runner's progress file and part logs). Added
   here by hand; the baseline (components.json `ignore`) should carry it once a repo
   has the `parts` component. Probe: `./setup <repo with parts> --dry-run` after a
   check, then `git status --short`.
-- **plans add / edit: the second digest check (just before the write) has no
-  fixture**; the mutant set covers the first only.
+  · added: 2026-10-15
 
-- **A lone clone's `./dev.sh check` is red on `hooks`, `mutants` and `audit`.** By
+- **su-4 · plans add / edit: the second digest check (just before the write) has no fixture**
+  ; the mutant set covers the first only.
+  · added: 2026-10-15
+
+- **su-5 · A lone clone's `./dev.sh check` is red on `hooks`, `mutants` and `audit`.**
+  By
   design since 2026-10-04 (CLAUDE.md, "A lone clone is red, on purpose"):
   `test-troubleshooting.sh` (a shared hook test, owned by tools/hooks: its own
   TODO.md's first bug) fails with "site-scrapers NOT FOUND above" outside the
@@ -48,7 +59,9 @@
   test_hooks' LoneClone does) so only the LoneClone classes depend on the
   workspace; ~100 call sites, worth it only if a lone clone's check is ever meant
   to be green.
-- **A fresh clone's `./dev.sh hooks` FAILs 7 hooks as registered nowhere**
+  · added: 2026-10-15
+
+- **su-6 · A fresh clone's `./dev.sh hooks` FAILs 7 hooks as registered nowhere**
   (probe 2026-10-08, `git clone` to the scratchpad): `settings.proposed.json` is
   gitignored, so a clone has only Jacob's settings.json (3 registrations). True (they
   run nowhere there) and the line says `run ./setup .`; it clears once Jacob applies
@@ -56,13 +69,32 @@
   found the income agent's report true: a hook test's exit 3 (UNCHECKED: no
   site-scrapers above) read as FAIL. Fixed 2026-10-08: UNCHECKED with its reason,
   gate exit 3 (`tests/test_hooks_gate.py`, three mutants).
-- **The agent line's `"repo"` reads "none yet" in a dry run on a new folder**,
+  · added: 2026-10-15
+
+- **su-7 · The agent line's `"repo"` reads "none yet" in a dry run on a new folder**
+  ,
   though the real run would make a local repo and print "local, no remote yet".
   Deliberate: it reports the target as it is now (dispatcher's brief, 2026-10-04).
+  · added: 2026-10-15
 
 ## Open decisions
 
-- **`setup fanout` (built 2026-10-13, interrupted; tested and committed 2026-10-15).**
+- **su-8 · Hook re-renders and kb-docs.tsv into other repos: blocked on permission**
+  (2026-10-15, coordinator's PLAN-repo-setup §7.10 and PLAN-knowledge-base §11
+  step 3). `setup <repo> --only hooks --rebuild --no-commit` was denied by the
+  permission system in tools/transcripts and in this repo, so nothing was
+  re-rendered; this repo's `self` gate stays red on `.claude/lib/ledger.sh`. Dry
+  runs: ledger.sh, store-guard.sh and test-store-guard.sh drifted in addon-bench,
+  applications, emailTools, income, chronjobScheduler, data-bridge, tools/checks,
+  tools/hub, tools/research, tools/usage; ledger.sh only in tools/transcripts and
+  tools/wizard; knowledge-base and scripts also want commit.sh, git-funnel.sh and
+  their tests (needs-jacob); site-scrapers and tools/todo refused (uncommitted
+  store-guard copies). `--only docs` dry run: kb-docs.tsv `installed` in every
+  repo but this one; would commit in 11 clean repos, needs-owner in 8 dirty ones.
+  Hinges on Jacob granting writes into other repos (or each owner running it).
+  · added: 2026-10-15
+
+- **su-9 · `setup fanout` (built 2026-10-13, interrupted; tested and committed 2026-10-15).**
   Not yet run on the real workspace. Choices open to Jacob: (1) repos run one after
   another, not in parallel (each repo's check may be heavy; parallel across
   processes is a later flag); (2) the check run is `./dev.sh check` in the repo that
@@ -78,9 +110,10 @@
   clone) and lists it as a repo to render into. Expected: skip a nested repo unless
   its parent's node.json names it a child (setup's own nesting rule), counted.
   Not fixed yet.
+  · added: 2026-10-15
 
-- **A node's `stores.json` (proposed by the hub owner, 2026-10-13; not built, wait
-  for a dispatch carrying an approval line).** PLAN-hub.md on origin/plan/hub
+- **su-10 · A node's `stores.json` (proposed by the hub owner, 2026-10-13; not built, wait for a dispatch carrying an approval line).**
+  PLAN-hub.md on origin/plan/hub
   (63cf780), its Setup component table's `stores.json` row, and PLAN-services.md §3
   step 3 ("Two more from the hub owner", item 1) say setup should render a
   read-only `stores.json` beside hub.json at a node. It would be built from every
@@ -88,9 +121,10 @@
   when it no longer matches. The hub hook and server would both read it. Note:
   `store` is optional in cli.json now (3a3c3db), so a storeless repo adds no row.
   tools/setup has no cli.json of its own yet.
+  · added: 2026-10-15
 
-- **core.hooksPath is unset in 11 of the 14 rendered repos (probe 2026-10-13, by
-  design, reported by applications).** Set: emailTools, tools/wizard, tools/transcripts.
+- **su-11 · core.hooksPath is unset in 11 of the 14 rendered repos (probe 2026-10-13, by design, reported by applications).**
+  Set: emailTools, tools/wizard, tools/transcripts.
   Unset: applications, income, chronjobScheduler, data-bridge, hub, usage, hooks,
   research, addon-bench, checks, setup itself. setup sets it only when nothing would
   be refused for want of wiring; in applications the githooks line (needs-owner)
@@ -99,39 +133,55 @@
   mutant githooks-on-when-unready (red 2026-10-13). Open: the rendered hooks'
   headers say only "Runs once core.hooksPath points at this folder", not what
   setup waits for; changing the templates makes every existing copy drift.
+  · added: 2026-10-15
 
-- **Suspicion, unproven: the dry-run probe's `--only` filter has no mutant.** The
+- **su-12 · Suspicion, unproven: the dry-run probe's `--only` filter has no mutant.**
+  The
   `only-runs-everything` mutant now breaks the run loop's filter (`not in (self.only,
   "commit")`, core.py); the probe loop's `if self.only and c["name"] != self.only`
   (the old target, it survived there 2026-10-13) is gated by nothing known. Probe:
   delete those two lines and run `tests.test_only` and `tests.test_nocommit`.
-- **The --rebuild guard is mostly shadowed by S2's clean-tree rule**: a dirty copy is
+  · added: 2026-10-15
+
+- **su-13 · The --rebuild guard is mostly shadowed by S2's clean-tree rule**
+  : a dirty copy is
   refused by both, so its mutants are held by ignored copies (and --no-commit), the
   one case the clean-tree rule lets through (2026-10-13: three mutants retargeted).
+  · added: 2026-10-15
 
-- **The docs component (built 2026-10-13, d07bff9) writes the declaration only.**
+- **su-14 · The docs component (built 2026-10-13, d07bff9) writes the declaration only.**
   The index's owner asked for its refresh as a step in each repo's `dev.sh check`
   too: not done. dev.sh is the owner's once it exists, and the check template
   cannot name the index's command (content audit); it would need a dependency-fed
   template slot. Also: a declaration naming TODO.md makes a deleted TODO.md the
   docs line's drift (honest, but a second red for one cause). Open for Jacob.
-- **`--no-commit` (built 2026-10-13, e5da70a), used once.** Rendered, not
+  · added: 2026-10-15
+
+- **su-15 · `--no-commit` (built 2026-10-13, e5da70a), used once.**
+  Rendered, not
   committed, into tools/wizard and tools/transcripts (8 hook files each: commit.sh,
   git-funnel.sh and its test, prefer-recipes.sh and its test, test-store-guard.sh,
   lib/ledger.sh, lib/write-targets.sh); `checks one hooks-installed` green in both
   after. Their owners commit them with their own work. Unverified: that their full
   checks are then green (other parts may be red for other reasons).
-- **The pass's render commits in 11 other repos are local, not pushed** (applications,
+  · added: 2026-10-15
+
+- **su-16 · The pass's render commits in 11 other repos are local, not pushed**
+  (applications,
   emailTools, income, chronjobScheduler, data-bridge, hub, usage, hooks, research,
   addon-bench, checks): each owner pushes. After them: applications' check is red
   on its own dev.sh hook list (lists fewer hooks than `.claude/hooks` now holds),
   income's on `test.parts` (3 tests against the old runner's output, parts 1.3.0
   now); both reported to their owners.
-- **The workspace top's `.claude` repo is dirty** (` M settings.json`,
+  · added: 2026-10-15
+
+- **su-17 · The workspace top's `.claude` repo is dirty**
+  (` M settings.json`,
   `?? settings.json.bak`): `--only hooks` there (c4f052e) is refused until its
   owner commits or cleans it. `--no-commit` would render there now.
+  · added: 2026-10-15
 
-- **Plan steps (PLAN-services §4 step 6.1, §3 G1/G5), built 2026-10-13**
+- **su-18 · Plan steps (PLAN-services §4 step 6.1, §3 G1/G5), built 2026-10-13**
   (`setuplib/steps.py`, `setup plans steps`, `setup plans <dir> --steps`,
   `tests/test_steps.py`). Choices made here, open to the plan owners: (1) a steps
   heading is one whose title STARTS with Steps, Phase or Handoff (a literal prefix,
@@ -144,7 +194,9 @@
   rule is held: the gate prints a `note steps:` line counting unplaceable steps and
   never fails on them. On the workspace 2026-10-13: 152 steps, 111 unplaceable
   (most plans carry no owner names yet).
-- **S2, the render commits itself (PLAN-architecture §11), built 2026-10-13**
+  · added: 2026-10-15
+
+- **su-19 · S2, the render commits itself (PLAN-architecture §11), built 2026-10-13**
   (`tests/test_render_commit.py`). Choices open to Jacob: (1) **a commit the repo's
   own git hooks refuse leaves the render written, unstaged, line `needs-owner`**
   (first built as a rollback; changed the same day on transcripts' report, relayed
@@ -167,12 +219,17 @@
   narrower rule safe, and it is one condition in `_clean_guard` if he says so.
   (6) An uncommitted deletion of a copy setup would restore is a change git does
   not hold, so it refuses too (tests commit the deletion first).
-- **The full suite under load, 2026-10-13**: one run (42 min, load ~57) had
+  · added: 2026-10-15
+
+- **su-20 · The full suite under load, 2026-10-13**
+  : one run (42 min, load ~57) had
   `test_contract.LiveContract.test_a_verb_the_check_command_does_not_implement_turns_the_line_red`
   red (gates `failed`, not `drift`); alone it passed in 19 s. unverified: a timeout
   in the checks CLI under load -- settle: rerun the full suite on an idle machine.
+  · added: 2026-10-15
 
-- **`setup plans show|list|edit` and section status, built 2026-10-09** (PLAN-todo-tool
+- **su-21 · `setup plans show|list|edit` and section status, built 2026-10-09**
+  (PLAN-todo-tool
   §9 step 6, PLAN-services §3 step 2). Choices made here, open to the plan owners:
   (a) the status marker is `<!-- status: open|approved|done -->` on the first line
   under a numbered heading. PLAN-todo-tool §9 step 6 fixes the values ("a `status:`
@@ -186,14 +243,18 @@
   between the gate and the write cannot be opened from a test without a hook in the
   code). (e) An edit cannot add a section (a replacement with a new heading at its
   level is refused) and cannot touch an unnumbered heading such as `## Setup component`.
-- **`./dev.sh check` red on 2026-10-09 from tools/hooks' uncommitted work** (reported
+  · added: 2026-10-15
+
+- **su-22 · `./dev.sh check` red on 2026-10-09 from tools/hooks' uncommitted work**
+  (reported
   in the dispatch report, not fixed): `source/hooks/store-guard.sh` (untracked there)
   made the hooks dependency's `list --json` exit 1, so `self` and `mutants` were
   BASELINE-RED here. Same root as "The hook source is the dependency's working tree"
   below. `.claude/settings.json` here is also modified and not by this session; left
   unstaged.
+  · added: 2026-10-15
 
-- **Hook-copy re-render 2026-10-09 (dispatched, Jacob's "Yes I approve all"), partial.**
+- **su-23 · Hook-copy re-render 2026-10-09 (dispatched, Jacob's "Yes I approve all"), partial.**
   `--only hooks --rebuild` run and committed+pushed (rendered paths only) in addon-bench,
   applications, emailTools, income, knowledge-base, chronjobScheduler, data-bridge,
   scripts, site-scrapers, tools/setup; hooks moved to e2242bc mid-task (test-no-inline-blobs),
@@ -211,22 +272,32 @@
   nobody committed; its owner commits or discards it, then `--rebuild`); top level (not
   a git repo, and its .claude/ is harness's: skipped). The hub commit 03f33d2's message
   names dd23d32 (a tools/hooks .claude commit) instead of source eb09868; content correct.
-- **mutate.py leaves runs behind when killed.** 5 `.mutants/run-*` folders from Oct 4-5
+  · added: 2026-10-15
+
+- **su-24 · mutate.py leaves runs behind when killed.**
+  5 `.mutants/run-*` folders from Oct 4-5
   (515M; no unwritable dirs, so not a permission failure: most likely killed before its
   `finally`) were removed 2026-10-09. `shutil.rmtree(tmp, ignore_errors=True)` would also
   hide a real failure. Open: sweep stale `run-*` at the start of a run (none running),
   and report a cleanup that left files rather than ignoring it.
-- **check-partial in `gates.contract` (asked by checks, 2026-10-09; open).** checks'
+  · added: 2026-10-15
+
+- **su-25 · check-partial in `gates.contract` (asked by checks, 2026-10-09; open).**
+  checks'
   TODO asks setup's contract list (components.json, today `check-json, accessor,
   services-valid, registry-matches, rendered-matches`) to name `check-partial`. Not added:
   no repo meets its contract yet, so every `--checks` run would read it UNCHECKED; hinges
   on whether an UNCHECKED contract gate should fail setup's checks line (PLAN-small-tasks §6).
-- **hooks source test files lack +x.** `source/hooks/test-no-secrets.sh`,
+  · added: 2026-10-15
+
+- **su-26 · hooks source test files lack +x.**
+  `source/hooks/test-no-secrets.sh`,
   `test-primary-guard.sh`, `test-push-gate.sh` are 100644 in tools/hooks; setup renders
   copies +x, so tools/hooks' own `.claude/` copies read `mode` on every `--rebuild`.
   Reported to hooks in the 2026-10-09 hand-back.
+  · added: 2026-10-15
 
-- **githooks (PLAN-hard-gates §7 phase 2), built 2026-10-05; decisions for Jacob.**
+- **su-27 · githooks (PLAN-hard-gates §7 phase 2), built 2026-10-05; decisions for Jacob.**
   (1) *Strict match*: pre-commit accepts only a staged tree equal to the working
   tree the check passed on, so a partial commit (staging some changes, leaving
   others) is refused, and so is any commit in a tree holding another agent's
@@ -246,8 +317,9 @@
   `git-hooks` (§7); built as `githooks` (a component name is a method name).
   (7) `resumed_from` waits on harness `progress.sh`; the seam is `check-pass record
   --resumed-from K/N`. gates.json (§7a) is phase 3, not built here.
+  · added: 2026-10-15
 
-- **§7.11 data component, built 2026-10-05; three parts of §7.11 not built here.**
+- **su-28 · §7.11 data component, built 2026-10-05; three parts of §7.11 not built here.**
   (1) The `--node --rebuild` store row (`emerged`, `same`, `drift`, `state`): the
   rebuild renders into a scratch copy and has no store to compare; it needs `verify`
   on an existing store, which setup leaves to the shared `stores-exported`. Open:
@@ -260,7 +332,9 @@
   folder absent from the data repo): its `import` decides (exit non-zero: setup's
   line is failed). And the plan says cli.json "declares `stores`"; the shared
   schema's field is `store` (string or list): setup follows the schema.
-- **§7.12 built 2026-10-05: the hooks component renders from the hooks dependency**
+  · added: 2026-10-15
+
+- **su-29 · §7.12 built 2026-10-05: the hooks component renders from the hooks dependency**
   (`dependencies.json`, `setuplib/deps.py`, `setup audit deps`). This settles three
   old items: reading `hooks list --json`, defaulting the source to tools/hooks/source
   (the data-bridge "6 unchanged of 6" against a stale copy), and the content-audit
@@ -268,8 +342,10 @@
   Also fixed: `setup <repo> --dry-run` on an old six-file repo said "0 installed, 6
   unchanged of 6" (the income report); it now lists the 22 files the listing names
   (`test_old_six_file_repo_gets_the_rest_installed`). Still open, below.
-- **Drifted hook copies: `--rebuild` without `--node` built 2026-10-05 (§7.12, Jacob's
-  yes).** Per repo: `./setup <repo> --only hooks --rebuild` from the workspace top, then
+  · added: 2026-10-15
+
+- **su-30 · Drifted hook copies: `--rebuild` without `--node` built 2026-10-05 (§7.12, Jacob's yes).**
+  Per repo: `./setup <repo> --only hooks --rebuild` from the workspace top, then
   the owner reviews `git diff` and commits (setup never commits there). Not run on any
   real repo here (the dispatcher routes it per owner). Choices made, open to Jacob:
   (1) the uncommitted-work guard refuses the whole run (exit 2, nothing written) rather
@@ -286,7 +362,10 @@
   forbids setup's code and data to name the delegation layer's library folder by path;
   `test_every_file_the_listing_renders_is_in_scope` fails if the hooks tool adds a
   destination outside it.
-- **An active core.hooksPath no longer gets setup's gates while unready** (fixed
+  · added: 2026-10-15
+
+- **su-31 · An active core.hooksPath no longer gets setup's gates while unready**
+  (fixed
   2026-10-05, from emailTools' §7.12 step 2 run: setup at 13c6691 would have written
   commit-msg into its active `.githooks/` with git-stamp unregistered, refusing every
   session commit, setup's own output first). Now withheld (`runs` in components.json,
@@ -296,17 +375,29 @@
   runs (hooksPath unset). emailTools' githooks line stays `drift`: its own pre-commit is
   not the template, and merging the two is its owner's call. Open: a repo's own hook in
   `runs` is never wrapped or chained; whether setup should ever chain is undecided.
-- **Other repos owe a reinstall (§7.12 step 2, dispatched per owner).** `hooks copies
+  · added: 2026-10-15
+
+- **su-32 · Other repos owe a reinstall (§7.12 step 2, dispatched per owner).**
+  `hooks copies
   <top> --gate <loc>` showed ~18-21 non-ok files per location before this change;
   `setup <repo>` now installs the MISSING ones. Not run here (the brief: step 2).
-- **7 hooks here run only once Jacob applies the proposal.** `./setup .` rendered the
+  · added: 2026-10-15
+
+- **su-33 · 7 hooks here run only once Jacob applies the proposal.**
+  `./setup .` rendered the
   dependency's 10 hooks and 2 libraries; `.claude/settings.json` (Jacob's) registers 3,
   so `./dev.sh hooks` prints 7 `PENDING` lines and passes. Settle: Jacob runs `cp
   .claude/settings.proposed.json .claude/settings.json` here.
-- **The checks dependency is named but not read yet.** `dependencies.json` names
+  · added: 2026-10-15
+
+- **su-34 · The checks dependency is named but not read yet.**
+  `dependencies.json` names
   tools/checks so a future `checks run .` in the stub can resolve it; nothing in code
   consumes it today (`_used_by` says so). `audit deps` still gates it.
-- **The hook source is the dependency's working tree, not a commit.** Another agent's
+  · added: 2026-10-15
+
+- **su-35 · The hook source is the dependency's working tree, not a commit.**
+  Another agent's
   uncommitted edit in tools/hooks/source is what setup installs (and, since `--rebuild`
   without `--node`, what it overwrites a drifted copy with: this matters more now). Options: install from
   `git show HEAD:` in the dependency, or refuse a dirty source. Hinges on whether a
@@ -314,11 +405,16 @@
   (a dirty prefer-recipes.sh in the source turned every repo's hooks line to drift);
   that edit landed (tools/hooks 978e6cb..05a5ae4) and this repo's four copies were
   re-rendered with `--only hooks --rebuild` the same day. The decision stays open.
-- **`--user-scope` has no default** (built 2026-10-04, decision 19). The workspace run
+  · added: 2026-10-15
+
+- **su-36 · `--user-scope` has no default**
+  (built 2026-10-04, decision 19). The workspace run
   is `./setup <path> --user-scope <(cd tools/hooks && ./hooks copies .. --json)`; without
   it the hooks line says "user scope not checked" and behaviour is as before. A default
   would name the sibling tool: same dependency decision as above.
-- **The coverage rule is a second copy of tools/checks' `hooks-installed` rule**
+  · added: 2026-10-15
+
+- **su-37 · The coverage rule is a second copy of tools/checks' `hooks-installed` rule**
   (`_coverage` and `_user_scope_shape` in setuplib/core.py), not a shared helper:
   setup may not import a sibling tool (content/direction audits; the dependency
   decision above), and checks' rule lives in a check script that runs on import.
@@ -328,21 +424,28 @@
   NOT gated: that the two copies agree by meaning if checks' rule changes. Settle
   when the dependency decision lands (then both read one helper), or checks exposes
   the rule in checkslib and a workspace test here calls both on one fixture.
-- **After Jacob applies user scope, every repo still registering the shared hooks per
-  repo runs them twice** until its settings.json drops them. Setup's proposal does
+  · added: 2026-10-15
+
+- **su-38 · After Jacob applies user scope, every repo still registering the shared hooks per repo runs them twice**
+  until its settings.json drops them. Setup's proposal does
   that only when run with `--user-scope` on each repo (the proposal is still his to
   apply). This repo too: its own `./dev.sh hooks` REQUIRES each copy registered in
   `.claude/settings.json`, so applying the drop here turns that gate red. Needs a
   decision once user scope is on: `dev.sh hooks` accepts user-scope coverage (read
   from the same report) or keeps per-repo registration here deliberately.
-- **Plug-ins whose registration runs from below the registry's root fail** (built
+  · added: 2026-10-15
+
+- **su-39 · Plug-ins whose registration runs from below the registry's root fail**
+  (built
   2026-10-04, `--plugins`): tools/hooks gives one `registration`, with a command
   relative to the workspace top, so it is correct only for applies_to `repos:.`. A
   plug-in applying to another repo (or `all`, on any repo but the top) is `failed`
   with the reason, never a guessed path. Hinges on tools/hooks giving a per-repo
   registration if one is ever needed (none is today: kb-pointers is `repos:.`).
-- **kb-pointers cannot be proposed today: the workspace top is not a git repo, and
-  setup refuses it** (run 2026-10-04 from the top: `setup . --dry-run --plugins
+  · added: 2026-10-15
+
+- **su-40 · kb-pointers cannot be proposed today: the workspace top is not a git repo, and setup refuses it**
+  (run 2026-10-04 from the top: `setup . --dry-run --plugins
   <(...)` -> "refused: ... is not empty, and is not a git work tree"). kb-pointers is
   `repos:.`, the top only. The `--plugins` machinery is proven with the live registry
   re-rooted at a scratch repo (the proposal held exactly its `registration`). Needs a
@@ -350,12 +453,17 @@
   component, the proposal written, nothing else), or the dispatcher/harness writes
   the top's proposal from `hooks plugins --json` directly. Hinges on whether setup
   should ever touch a folder that is not a repo.
-- **`--plugins` has no default.** The workspace run is `./setup . --plugins <(cd
+  · added: 2026-10-15
+
+- **su-41 · `--plugins` has no default.**
+  The workspace run is `./setup . --plugins <(cd
   tools/hooks && ./hooks plugins --json)` from the top; without the flag the hooks line
   says "plug-in hooks not checked". A default would name the sibling tool: same
   dependency decision as above.
-- **td-9 (tools/todo: `devtools/mutate.py` duplicated from here), decided
-  2026-10-04: the runner moves to tools/checks, not into a setup component.** A
+  · added: 2026-10-15
+
+- **su-42 · td-9 (tools/todo: `devtools/mutate.py` duplicated from here), decided 2026-10-04: the runner moves to tools/checks, not into a setup component.**
+  A
   component would install one copy per repo, the eight-copies problem again; the
   procedure belongs in one place and each repo's `devtools/mutants.json` is the
   data. Shape: `checks mutants [PATH]` running PATH's mutants.json in throwaway
@@ -364,14 +472,23 @@
   beside then delete. Until then this copy is the original and todo's the
   extended one; neither is changed (no fork, no third copy). Needs the
   dependency decision above for setup's own `dev.sh` to call it. Reported below.
-- **Hook copies here are a ninth copy.** `tools/setup` is now in site-scrapers'
+  · added: 2026-10-15
+
+- **su-43 · Hook copies here are a ninth copy.**
+  `tools/setup` is now in site-scrapers'
   `check-hooks.sh` DECLARED (seen 2026-10-04), and `hooks copies` in tools/hooks
   compares every copy by meaning. unverified: knowledge-base's copy of that check
   declares it too -- settle (from knowledge-base): `grep -n tools/setup check-hooks.sh`.
-- **`--github` is public by default** (the dispatcher's brief and PLAN-tools-folder),
+  · added: 2026-10-15
+
+- **su-44 · `--github` is public by default**
+  (the dispatcher's brief and PLAN-tools-folder),
   while PLAN-repo-setup §2 says private. Followed the brief; the plan text is the
   dispatcher's to update.
-- **`audit-terms.json` `roster_names` is a copy of the roster** (not read from it:
+  · added: 2026-10-15
+
+- **su-45 · `audit-terms.json` `roster_names` is a copy of the roster**
+  (not read from it:
   the direction audit forbids that). Probe run 2026-10-04: the roster's agent
   names that are not also repo names are exactly the seven listed (harness,
   deep-work, dispatcher, planner, email-tools, job-import-scripts,
@@ -381,21 +498,27 @@
   names (`checks all --names`, reported to harness by checks); `checks.json`
   already makes that run green (checked 2026-10-04 with the roster's names).
   Until then, re-run the probe on each roster change.
-- **A root `.gitignore` negation with a pattern in it (`!keep*.txt`) still blocks
-  the append as drift** (2026-10-04): literal negations are now tested by git in a
+  · added: 2026-10-15
+
+- **su-46 · A root `.gitignore` negation with a pattern in it (`!keep*.txt`) still blocks the append as drift**
+  (2026-10-04): literal negations are now tested by git in a
   scratch repo (as a file and as a folder), but a pattern names no single path, and
   a representative path would be a guess. No workspace `.gitignore` holds a
   pattern negation (probe: `grep -n '^!'` over them, 2026-10-08): addon-bench and
   site-scrapers hold literal ones (`!.env.example`, `.sample`, `.template`), which
   do not block (`setup <repo> --dry-run --only ignore`: unchanged / installed).
   Revisit if a pattern negation appears.
-- **The negation test covers the negated path itself, not files inside a kept
-  folder** (decided 2026-10-04): after `build/*` and `!build/keep/`, an appended
+  · added: 2026-10-15
+
+- **su-47 · The negation test covers the negated path itself, not files inside a kept folder**
+  (decided 2026-10-04): after `build/*` and `!build/keep/`, an appended
   `*.bak` ignores `build/keep/x.bak`, which is the baseline doing its job, not an
   override (the negation's last match is the folder, not the file). Hinges on
   whether an owner ever means "keep everything in here" by a folder negation.
+  · added: 2026-10-15
 
-- **`check --json` validated by subprocess, not by a vendored schema** (2026-10-05).
+- **su-48 · `check --json` validated by subprocess, not by a vendored schema**
+  (2026-10-05).
   The stub's `--json` is held to a reviewed fixture in `tests/fixtures/` anywhere;
   this repo's own is the shared runner's (`devtools/parts.py`, since 2026-10-15:
   `devtools/checkjson.py`, the second emitter, is gone), held to a canned
@@ -403,22 +526,32 @@
   checks CLI, run on scratch repos) in the workspace, with the old `{"ok","error"}`
   shape as the counterfactual. No copy of the schema or its validator lives here.
   Cost: a schema change upstream is caught only in the workspace.
-- **Repos set up before 2026-10-05 keep the old stub's `{"ok": false, "error"}`**:
+  · added: 2026-10-15
+
+- **su-49 · Repos set up before 2026-10-05 keep the old stub's `{"ok": false, "error"}`**
+  :
   setup never overwrites `dev.sh` (an existing stub is `needs-owner`). Probe run
   2026-10-05, `grep -l SETUP-STUB */dev.sh */*/dev.sh` from the workspace top: none
   carry the stub today, so nothing to migrate (re-run 2026-10-08: still none).
+  · added: 2026-10-15
 
-- **A created repo whose render is empty gets no settings.json** (§7.9, built
+- **su-50 · A created repo whose render is empty gets no settings.json**
+  (§7.9, built
   2026-10-05). With `--user-scope` covering every shared hook and no plug-in applying,
   nothing is missing, so the hooks line is `unchanged` and no file is written or
   committed. §7.9 says the file also holds "the permission mode", but the render (the
   source settings.json) carries hooks only, so a created repo carries no permission
   mode either. Hinges on: whether every created repo must carry a settings.json (then
   write the empty render too) and whether a permission mode belongs in the source.
-- **PLAN-repo-setup §2 and §7.6 still say setup only writes `settings.proposed.json`**;
-  §7.9 is the exception, built here. The plan text is the planner's to reconcile.
+  · added: 2026-10-15
 
-- **node.json is read twice: by setuplib/node.py and by tools/checks' contract** (built
+- **su-51 · PLAN-repo-setup §2 and §7.6 still say setup only writes `settings.proposed.json`**
+  ;
+  §7.9 is the exception, built here. The plan text is the planner's to reconcile.
+  · added: 2026-10-15
+
+- **su-52 · node.json is read twice: by setuplib/node.py and by tools/checks' contract**
+  (built
   2026-10-05, §7.5/§7.10). Setup may not import a sibling tool, so `load` mirrors
   checks' `schema/node.schema.json` and its x-rules; the live tests (test_node
   LiveChecks: `checks run` on every repo of a two-level tree, and `checks one
@@ -427,38 +560,67 @@
   (96ceef9 plus their working tree, 2026-10-05). One rule is setup's own: a child
   inside another child is refused (checks accepts it); a record glob matching nothing
   is not flagged (as in checks).
-- **Two comparers of a rebuild exist by design**: setup's per-file report and checks'
+  · added: 2026-10-15
+
+- **su-53 · Two comparers of a rebuild exist by design**
+  : setup's per-file report and checks'
   regen engine (which distrusts the generator and counts from git and bytes). Only
   `failed` exits 1 here; drift and unaccounted are progress, `regenerate` is the gate.
-- **A generated file setup does not render is `failed`**: node.json's one `rebuild`
+  · added: 2026-10-15
+
+- **su-54 · A generated file setup does not render is `failed`**
+  : node.json's one `rebuild`
   is setup's, so a second generator (a file another tool renders) has no place yet.
   Hinges on the plan saying how a node composes generators.
-- **In checks' clone a plug-in registered at the top reads as drift**: the render's
+  · added: 2026-10-15
+
+- **su-55 · In checks' clone a plug-in registered at the top reads as drift**
+  : the render's
   path is the clone's (`stands_for`), so `repos:.` matched against the registry root
   fails there. CHECKS_ORIGIN is deliberately not read (coupling). Unverified until a
   node with a plug-in exists -- settle: `checks one regenerate .` on that node.
-- **Should a parent's .gitignore list its child paths?** Today a nested child shows as
+  · added: 2026-10-15
+
+- **su-56 · Should a parent's .gitignore list its child paths?**
+  Today a nested child shows as
   untracked `child/` in the parent and both readers skip it as a child. Not decided.
-- **A node with children needs a registry** (checks' registry-matches): settled
+  · added: 2026-10-15
+
+- **su-57 · A node with children needs a registry**
+  (checks' registry-matches): settled
   2026-10-05 (§14.8). Setup renders `registry.proposed.json`; the fixtures copy it to
   the registry node.json names (Jacob's step) and pass `checks run` on every repo.
-- **§14.8's `cli.json` skeleton `{store, cli, verbs: []}` is not installed** (2026-10-05).
+  · added: 2026-10-15
+
+- **su-58 · §14.8's `cli.json` skeleton `{store, cli, verbs: []}` is not installed**
+  (2026-10-05).
   No skeleton passes checks' cli.schema.json (`store` minLength/minItems 1, `cli`
   executable), and their `accessor` accepts no store with no cli.json, so writing one
   would turn every new repo red for nothing. The `cli` component reports `none`
   ("a repo with a store adds {store, cli, verbs}"). Hinges on the planner: change the
   plan's table row, or checks accepts an unfilled skeleton as needs-owner.
-- **The registry renders only `services`** (2026-10-05): §14.6 also gives a registry
+  · added: 2026-10-15
+
+- **su-59 · The registry renders only `services`**
+  (2026-10-05): §14.6 also gives a registry
   roles, owners and the server entry, which have no defined shape here (and roles are
   the roster's, which setup must not read). Hinges on the hub's registry plan.
-- **A fresh node with children exits 1 under `--checks` until Jacob applies the
-  registry proposal**: registry-matches is red (children, no `registry`), and that is
+  · added: 2026-10-15
+
+- **su-60 · A fresh node with children exits 1 under `--checks` until Jacob applies the registry proposal**
+  : registry-matches is red (children, no `registry`), and that is
   the true state; the registry line says `needs-jacob` with the copy command.
-- **`check-json` is gated to the audit role in checks, so `checks run` skips it**; the
+  · added: 2026-10-15
+
+- **su-61 · `check-json` is gated to the audit role in checks, so `checks run` skips it**
+  ; the
   gates component runs it by name (`checks one`), since it is a §14.8 contract gate.
   On this repo it takes ~4 min (the full suite); every `--checks` run on a repo with a
   real suite pays it. Hinges on checks (a shape-only mode) or accepting the cost.
-- **Setup's own run under `--checks` is red** (2026-10-05, before this commit):
+  · added: 2026-10-15
+
+- **su-62 · Setup's own run under `--checks` is red**
+  (2026-10-05, before this commit):
   `hooks-installed` fails, `.claude/hooks/ask-first.sh` missing here (the shared source
   has a hook this repo's copies lack), and `check-json` errored (exit 1) while this
   suite was mid-change. Re-checked 2026-10-08 with `../checks/checks run .` (not
@@ -471,8 +633,10 @@
   `./setup . --only hooks --rebuild` (Jacob's yes for drifted repos, same day): four
   files rewritten (logic), no-inline-blobs.sh, prefer-recipes.sh and their tests.
   Not re-run under `checks run .` since.
+  · added: 2026-10-15
 
-- **The `parts` component, built 2026-10-10** (top TODO Q6, PLAN-small-tasks §7
+- **su-63 · The `parts` component, built 2026-10-10**
+  (top TODO Q6, PLAN-small-tasks §7
   step 2). Choices made here, open to Jacob and the checks owner:
   (a) destination `devtools/parts.py`: devtools/ exists in 15 repos, no `parts.py`
   anywhere yet; components.json `parts.file` is the one place to change it.
@@ -491,14 +655,77 @@
   this repo (`ThisRepo`, mutant `runner-copy-stale`). A checks gate would cover
   every repo: suggest it to checks.
   Copies rendered so far: this repo only. Other repos get it on their next `./setup`.
+  · added: 2026-10-15
 
 ## Unconfirmed suspicions
 
-(none open)
-
 ## Reported to other owners
 
-- 2026-10-10, via the dispatcher (top TODO Q6 (b)): `./setup <repo> --only hooks
+- **su-65 · checks (2026-10-05, via the dispatcher):**
+  checks (2026-10-05, via the dispatcher): PLAN-hard-gates §3 row 6 says the
+  pre-commit runs no-secrets on the *staged diff*; `checks one no-secrets <repo>`
+  scans tracked plus would-be-committed working-tree files, so a secret staged and
+  then deleted from the working tree is not seen. The githooks pre-commit calls it
+  as is (`one no-secrets <top> --json`). Expected: a `--staged` mode, or the plan
+  amended. To hooks: `git commit --no-verify` skips the githooks gates; git-stamp.sh
+  (or phase 3) is the only place that can refuse it. (Settled 2026-10-05, §7.12: this
+  repo now renders git-stamp.sh and write-ledger.sh from the hooks dependency, and a
+  new repo is wired from its settings.json.)
+  · reported to: checks on 2026-10-05 (no counterpart yet)
+  · added: 2026-10-15
+
+- **su-66 · checks (2026-10-05, via the dispatcher):**
+  checks (2026-10-05, via the dispatcher): setup now consumes node.json
+  (`setuplib/node.py` mirrors schema/node.schema.json), so a schema change there
+  needs a matching change here; the live tests in tests/test_node.py go red if not.
+  Divergence: setup refuses a child inside another child, checks accepts it.
+  `setup . --node --rebuild` exits 1 only on a failed line (their engine reads any
+  non-zero exit as a `rebuild` finding, which is then correct).
+  · reported to: checks on 2026-10-05 (no counterpart yet)
+  · added: 2026-10-15
+
+- **su-67 · checks (2026-10-05, via the dispatcher):**
+  checks (2026-10-05, via the dispatcher): `checks one check-json tools/setup`
+  took 242.7 s against check-json's 280 s limit (an earlier run, 228.5 s): this
+  suite (123 tests + 67 mutants) is near the cap and will cross it as mutants
+  grow. PLAN-agent-groups §4.4 already says raise the limit; this is the evidence.
+  Also: check-json proves shape only. This repo's `--json` once printed a valid
+  report with every gate after `hooks` reading `fail` and no finding, from a bash
+  variable leak (fixed here, gate runs in a subshell, mutant `own-json-gate-clobbers`);
+  check-json passed it. Not a bug in checks, a reason for each repo's own wiring test.
+  · reported to: checks on 2026-10-05 (no counterpart yet)
+  · added: 2026-10-15
+
+- **su-68 · knowledge-base (2026-10-04, via the dispatcher):**
+  knowledge-base (2026-10-04, via the dispatcher): its TODO observation that
+  this CLAUDE.md's "Keeping these rules in sync" names only `../../CLAUDE.md` is
+  stale (it names all nine hand-synced copies; `tests/test_sync_list.py`'s live
+  comparison passes). The section's prose was reworded (commit "CLAUDE.md: sync
+  section"): it now says why the block-carrying tool folders stay out of the list.
+  Their item can be closed.
+  · reported to: knowledge-base on 2026-10-04 (no counterpart yet)
+  · added: 2026-10-15
+
+- **su-69 · checks (2026-10-04, via the dispatcher):**
+  checks (2026-10-04, via the dispatcher): take the mutant runner as `checks
+  mutants [PATH]` (td-9 decision above; start from tools/todo's copy, which has
+  the `edits` list). And to todo: td-9 is decided that way, so it waits on checks.
+  · reported to: checks on 2026-10-04 (no counterpart yet)
+  · added: 2026-10-15
+
+- **su-71 · hub (2026-10-04, via the dispatcher):**
+  hub (2026-10-04, via the dispatcher): the `ignore` component is new (fixes the hub
+  scaffold leaving `.claude/settings.proposed.json` untracked and writing no
+  `.gitignore`). Every repo set up before it lacks the baseline entries:
+  `tools/hub` first (its owner re-runs `./setup tools/hub` from the workspace
+  root and commits the appended `.gitignore`), then the rest on their next run.
+  · reported to: hub on 2026-10-04 (no counterpart yet)
+  · added: 2026-10-15
+
+## Notes
+
+- **su-64 · 2026-10-10, via the dispatcher (top TODO Q6 (b)):**
+  2026-10-10, via the dispatcher (top TODO Q6 (b)): `./setup <repo> --only hooks
   --rebuild` re-rendered the drifted hook copies in 14 repos (addon-bench,
   applications, emailTools, income, knowledge-base, scriptingTools/chronjobScheduler,
   scriptingTools/data-bridge, scripts, site-scrapers, tools/hooks, tools/hub,
@@ -520,55 +747,10 @@
   test_userscope tests and 3 mutants' baselines are red because store-guard.sh is
   not registered in tools/hooks `source/settings.json` (already in hooks/TODO.md);
   that file needs Jacob's yes.
+  · added: 2026-10-15
 
-- 2026-10-05, via the dispatcher, to checks: PLAN-hard-gates §3 row 6 says the
-  pre-commit runs no-secrets on the *staged diff*; `checks one no-secrets <repo>`
-  scans tracked plus would-be-committed working-tree files, so a secret staged and
-  then deleted from the working tree is not seen. The githooks pre-commit calls it
-  as is (`one no-secrets <top> --json`). Expected: a `--staged` mode, or the plan
-  amended. To hooks: `git commit --no-verify` skips the githooks gates; git-stamp.sh
-  (or phase 3) is the only place that can refuse it. (Settled 2026-10-05, §7.12: this
-  repo now renders git-stamp.sh and write-ledger.sh from the hooks dependency, and a
-  new repo is wired from its settings.json.)
-
-- 2026-10-05, via the dispatcher, to checks: setup now consumes node.json
-  (`setuplib/node.py` mirrors schema/node.schema.json), so a schema change there
-  needs a matching change here; the live tests in tests/test_node.py go red if not.
-  Divergence: setup refuses a child inside another child, checks accepts it.
-  `setup . --node --rebuild` exits 1 only on a failed line (their engine reads any
-  non-zero exit as a `rebuild` finding, which is then correct).
-
-- 2026-10-05, via the dispatcher, to checks: `checks one check-json tools/setup`
-  took 242.7 s against check-json's 280 s limit (an earlier run, 228.5 s): this
-  suite (123 tests + 67 mutants) is near the cap and will cross it as mutants
-  grow. PLAN-agent-groups §4.4 already says raise the limit; this is the evidence.
-  Also: check-json proves shape only. This repo's `--json` once printed a valid
-  report with every gate after `hooks` reading `fail` and no finding, from a bash
-  variable leak (fixed here, gate runs in a subshell, mutant `own-json-gate-clobbers`);
-  check-json passed it. Not a bug in checks, a reason for each repo's own wiring test.
-
-- 2026-10-04, via the dispatcher, to knowledge-base: its TODO observation that
-  this CLAUDE.md's "Keeping these rules in sync" names only `../../CLAUDE.md` is
-  stale (it names all nine hand-synced copies; `tests/test_sync_list.py`'s live
-  comparison passes). The section's prose was reworded (commit "CLAUDE.md: sync
-  section"): it now says why the block-carrying tool folders stay out of the list.
-  Their item can be closed.
-
-- 2026-10-04, via the dispatcher, to checks: take the mutant runner as `checks
-  mutants [PATH]` (td-9 decision above; start from tools/todo's copy, which has
-  the `edits` list). And to todo: td-9 is decided that way, so it waits on checks.
-- 2026-10-04, via the dispatcher, to the planner: the check component and §9 (1)
+- **su-70 · 2026-10-04, via the dispatcher, to the planner:**
+  2026-10-04, via the dispatcher, to the planner: the check component and §9 (1)
   both need setup to name a sibling tool, which its content audit forbids; the
   proposal is under Open decisions.
-- 2026-10-04, via the dispatcher: the `ignore` component is new (fixes the hub
-  scaffold leaving `.claude/settings.proposed.json` untracked and writing no
-  `.gitignore`). Every repo set up before it lacks the baseline entries:
-  `tools/hub` first (its owner re-runs `./setup tools/hub` from the workspace
-  root and commits the appended `.gitignore`), then the rest on their next run.
-- Done, seen 2026-10-04: the roster entry and its `"repo"`
-  (`github.com/CyberImpXIII/setup`); `setup plans` wired into `agents.sh check`
-  (`check_plans`); this CLAUDE.md in the rules-sync lists (the live
-  `test_sync_list` comparison passes); DECLARED in site-scrapers. The
-  "Constraints" end-marker suspicion is settled: the generator copies that section
-  from the top-level CLAUDE.md, which has no markers, and `.claude/agents/setup.md`
-  holds no `/shared` marker.
+  · added: 2026-10-15

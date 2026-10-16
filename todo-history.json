@@ -1,0 +1,41 @@
+{
+  "format": 2,
+  "repo": "setup",
+  "items": [
+    {
+      "id": "su-72",
+      "title": "DONE 2026-10-04: seen: the roster entry and its `\"repo\"` (`github.com/CyberImpXIII/setup`); `setup…",
+      "kind": "report",
+      "status": "done",
+      "evidence": "DONE 2026-10-04: seen: the roster entry and its `\"repo\"`\n(`github.com/CyberImpXIII/setup`); `setup plans` wired into `agents.sh check`\n(`check_plans`); this CLAUDE.md in the rules-sync lists (the live\n`test_sync_list` comparison passes); DECLARED in site-scrapers. The\n\"Constraints\" end-marker suspicion is settled: the generator copies that section\nfrom the top-level CLAUDE.md, which has no markers, and `.claude/agents/setup.md`\nholds no `/shared` marker.",
+      "probe": null,
+      "reported_to": null,
+      "parent": null,
+      "blocked_by": null,
+      "waits_on": null,
+      "repo": "setup",
+      "work": null,
+      "size": null,
+      "files": null,
+      "research": null,
+      "done_when": null,
+      "done_check": null,
+      "handoff": null,
+      "approved": null,
+      "dispatched": null,
+      "retire": null,
+      "tags": null,
+      "plan_pins": null,
+      "added": "2026-10-15",
+      "done": "2026-10-04",
+      "resolution": "done-deprecated",
+      "imported": {
+        "sha": "d339c2b0f50d4e7e",
+        "section": "setup TODO > Reported to other owners",
+        "title_from": "text",
+        "sep": ""
+      }
+    }
+  ],
+  "seal": "817f3f24a68e7162"
+}

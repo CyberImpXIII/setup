@@ -803,6 +803,27 @@ class Setup:
         src, why = deps.runner(name, where, self.deps)
         return src, where, why
 
+    def render_source(self, component):
+        """(the git work tree the component renders from, [paths in it that must be
+        committed], None), or (None, None, why): what `setup fanout` names as the
+        source commit. The rules block: this tool's template. The hooks: the hook
+        source (--hooks-from or the dependency's). The parts runner: its dependency,
+        rendered as HEAD holds it, so nothing more must be committed."""
+        if component == "rules":
+            where, paths = _toplevel(TOOL_ROOT), [self.comp["rules"]["template"]]
+            return where, paths, None if where else f"{TOOL_ROOT} is in no git work tree"
+        if component == "hooks":
+            if self.hooks_from is None:
+                return None, None, f"no hook source ({self.dep_why}); pass --hooks-from DIR"
+            where = _toplevel(self.hooks_from) if self.hooks_from.is_dir() else None
+            if where is None:
+                return None, None, f"the hook source {self.hooks_from} is in no git work tree: no commit to name"
+            return where, [self.hooks_from.resolve().relative_to(where).as_posix()], None
+        if component == "parts":
+            src, where, why = self._parts_source()
+            return (where.resolve(), [], None) if src is not None else (None, None, why)
+        return None, None, f"{component} has no render source setup can name"
+
     def _parts_committed(self):
         """(body, mode, dirty, src, where, None), or (None, None, None, src, where, why):
         the runner as its repo's HEAD holds it (deps.committed), read once a run. The
@@ -1697,6 +1718,9 @@ def tree_doc(label, results, s):
     if s.rebuild_lines is not None:
         doc["rebuild"] = [x.__dict__ for x in s.rebuild_lines]
     doc["hook_files"] = list(s.hook_lines)
+    # the paths this run wrote (a dry run: would write) that a render commit holds,
+    # from the repo's root (`setup fanout` commits exactly these after the repo's check)
+    doc["written"] = sorted({rel for rel, keep in s.w.written if keep})
     return doc
 
 

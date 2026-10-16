@@ -66,6 +66,24 @@
      "_contract": "PLAN-routing-tree.md §14.8: the shared checks beside the contract files",
      "contract": ["check-json", "accessor", "services-valid", "registry-matches", "rendered-matches"]}
   ],
+  "fanout": {
+    "_comment": "setup fanout <component> (PLAN-workspace-audit §3.2 option 2, Jacob's yes of 2026-10-13): the components it renders, each into every repo that declares it (`file` present there and, when given, holding `contains`); any other component is refused. The check runs in the repo after the render, the commit only after it passes. tests/test_fanout.py holds `contains` to what the rules component writes, and each component here to one setup renders.",
+    "declared_by": {
+      "rules": {"file": "CLAUDE.md", "contains": "<!-- shared:rules@"},
+      "hooks": {"file": ".claude/hooks"},
+      "parts": {"file": "devtools/parts.py"}
+    },
+    "check": ["./dev.sh", "check"],
+    "check_timeout": 3600,
+    "prune": [".git", "node_modules", "__pycache__", ".mutants", ".venv", "venv"],
+    "statuses": {
+      "committed": "rendered, the repo's check passed, and exactly the rendered files committed, the message naming the source commit",
+      "unchanged": "nothing to render: no check run, nothing committed",
+      "would-commit": "--dry-run: a real run would render these files, then check and commit; nothing written",
+      "undeclared": "a repo --repos names that does not declare the component: nothing run",
+      "failed": "named with why, never committed: refused, drift without --rebuild, a red or unfinished check (the render left written and uncommitted, its paths named), or a commit the repo's git hooks refused"
+    }
+  },
   "rebuild_statuses": {
     "regenerated": "a generated file rendered byte for byte, mode included, as the tree holds it (or, absent there, as the last commit does: written back)",
     "drift":       "a generated file rendered otherwise, or in neither the tree nor the last commit: the render is written and git diff is the finding; one with uncommitted changes is kept, not rendered",

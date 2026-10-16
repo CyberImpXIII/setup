@@ -693,6 +693,21 @@
      "run": ["python3", "-m", "unittest", "tests.test_nocommit.NoCommit.test_renders_into_a_dirty_tree_commits_nothing_and_names_each_path"]},
     {"id": "data-storeless-is-drift", "gate": "data: a cli.json declaring no store (optional there) is none, not drift",
      "file": "setuplib/core.py", "old": "        if not why and isinstance(doc, dict) and \"store\" not in doc:", "new": "        if False:",
-     "run": ["python3", "-m", "unittest", "tests.test_data.Data.test_a_cli_json_without_a_store_is_none_and_runs_nothing"]}
+     "run": ["python3", "-m", "unittest", "tests.test_data.Data.test_a_cli_json_without_a_store_is_none_and_runs_nothing"]},
+    {"id": "fanout-commits-red", "gate": "fanout: a repo whose check is red is never committed, and is named",
+     "file": "setuplib/fanout.py", "old": "    red = _check(tree, fo, opts[\"check_timeout\"])\n", "new": "    red = None\n",
+     "run": ["python3", "-m", "unittest", "tests.test_fanout.ThreeRepos.test_two_commits_and_one_named_failure"]},
+    {"id": "fanout-dirty-tree", "gate": "fanout: a tree holding its owner's uncommitted work fails, nothing written",
+     "file": "setuplib/fanout.py", "old": "    if st.returncode != 0 or st.stdout.strip():\n", "new": "    if st.returncode != 0:\n",
+     "run": ["python3", "-m", "unittest", "tests.test_fanout.Refusals.test_a_dirty_tree_fails_and_nothing_is_written"]},
+    {"id": "fanout-dry-run-writes", "gate": "fanout: --dry-run writes nothing and runs no check",
+     "file": "setuplib/fanout.py", "old": "    if opts[\"dry_run\"]:\n", "new": "    if False:\n",
+     "run": ["python3", "-m", "unittest", "tests.test_fanout.ThreeRepos.test_a_dry_run_writes_nothing_and_runs_no_check"]},
+    {"id": "fanout-dirty-source", "gate": "fanout: a source holding uncommitted changes is refused (no commit names it)",
+     "file": "setuplib/fanout.py", "old": "        if st.stdout.strip():\n            changed", "new": "        if False:\n            changed",
+     "run": ["python3", "-m", "unittest", "tests.test_fanout.Refusals.test_an_uncommitted_source_is_refused_before_any_repo"]},
+    {"id": "fanout-undeclared-rendered", "gate": "fanout: a repo that does not declare the component is not rendered into",
+     "file": "setuplib/fanout.py", "old": "    if not declared:\n", "new": "    if False:\n",
+     "run": ["python3", "-m", "unittest", "tests.test_fanout.ThreeRepos.test_repos_limits_the_run_and_names_an_undeclared_one"]}
   ]
 }

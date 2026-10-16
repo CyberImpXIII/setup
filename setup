@@ -66,6 +66,25 @@
       component lines are a dry run's. Only failed exits 1: drift and unaccounted are
       the progress to make (the checks' `regenerate` is the gate). Run it on a
       copy: --dry-run writes nothing.
+  setup fanout <component> [--repos PATH...] [--root DIR] [--rebuild] [--hooks-from DIR]
+               [--agent NAME] [--check-timeout S] [--dry-run] [--json]
+      one shared change into every repo that declares the component (components.json
+      `fanout`: rules, hooks, parts), each git work tree under DIR (default: the
+      working folder) or each --repos PATH; one after another, each step its own
+      process. Per repo: `setup <repo> --only <component> --dry-run` (a copy it
+      would keep as drift, or a refusal: failed, nothing written; nothing to
+      render: unchanged, no check, no commit), a clean tree (else failed), the
+      render (--no-commit), the repo's `./dev.sh check`, then a commit of exactly
+      the rendered files whose message names the source commit (the source's HEAD;
+      refused, exit 2, while what it renders from holds uncommitted changes). A red
+      check, a commit the repo's git hooks refuse: failed, the render left written
+      and uncommitted, its paths named. --rebuild (off by default) is passed to
+      setup: a drifted hook or runner copy is overwritten. --agent NAME adds an
+      `Agent: NAME` trailer (a repo's commit-msg hook asks for one in a session).
+      --dry-run stops before writing: would-commit. One line per repo (committed,
+      unchanged, would-commit, undeclared: a --repos path the component is not
+      for, failed), then a summary. Exit 1 when any repo failed; 2 on a usage
+      error or a source that cannot be named.
   setup components            what each component installs, and the status vocabulary
   setup plans <dir> [--steps [--todo CLI] [--cited-in FILE]... [--json] | --facts [--root DIR] [--json]]
       every PLAN-*.md there that is not done has a "Setup component" heading,
@@ -138,9 +157,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from setuplib import audit, core, facts, fsw, plans, steps  # noqa: E402
+from setuplib import audit, core, facts, fanout, fsw, plans, steps  # noqa: E402
 
-SUBCOMMANDS = ["components", "plans", "audit"]
+SUBCOMMANDS = ["components", "plans", "audit", "fanout"]
 
 
 def cmd_components(_):
@@ -161,6 +180,13 @@ def cmd_components(_):
         print(f"  {part}:")
         for k, v in hr[part].items():
             print(f"    {k:<12} {v}")
+    fo = spec["fanout"]
+    print("fanout (setup fanout <component>; a repo declares it by holding the file):")
+    for name, d in fo["declared_by"].items():
+        print(f"  {name:<8} {d['file']}" + (f" holding {d['contains']}" if "contains" in d else ""))
+    print("fanout statuses (one line per repo):")
+    for k, v in fo["statuses"].items():
+        print(f"  {k:<13} {v}")
     return 0
 
 
@@ -484,6 +510,50 @@ def cmd_audit(args):
         return 3  # could not run: never a pass
     print(f"  ok    {args[0]}: {note}")
     return 0
+
+
+def cmd_fanout(argv):
+    p = argparse.ArgumentParser(prog="setup fanout", add_help=False)
+    p.add_argument("component")
+    p.add_argument("--repos", nargs="+")
+    p.add_argument("--root")
+    p.add_argument("--rebuild", action="store_true")
+    p.add_argument("--hooks-from")
+    p.add_argument("--agent")
+    p.add_argument("--check-timeout", type=int)
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--json", action="store_true")
+    try:
+        a = p.parse_args(argv)
+    except SystemExit:
+        return 2
+    root = Path(a.root or ".").resolve()
+    if not root.is_dir():
+        print(f"setup fanout: --root {a.root} is not a folder", file=sys.stderr)
+        return 2
+    opts = {"rebuild": a.rebuild, "dry_run": a.dry_run, "agent": a.agent,
+            "hooks_from": Path(a.hooks_from).resolve() if a.hooks_from else None,
+            "check_timeout": a.check_timeout or fanout.spec()["check_timeout"]}
+    try:
+        doc = fanout.run(a.component, a.repos, root, opts)
+    except fanout.Usage as e:
+        print(f"setup fanout: {e}", file=sys.stderr)
+        return 2
+    if a.json:
+        print(json.dumps(doc))
+    else:
+        for r in doc["repos"]:
+            print(f"  {r['status']:<12} {r['path']}  {r['detail']}")
+        counts = {}
+        for r in doc["repos"]:
+            counts[r["status"]] = counts.get(r["status"], 0) + 1
+        failed = [r["path"] for r in doc["repos"] if r["status"] == "failed"]
+        summary = ", ".join(f"{n} {k}" for k, n in sorted(counts.items())) or "no repo declares it"
+        print(f"setup fanout {a.component} from {doc['source']['path']}@{doc['source']['commit'][:12]}"
+              f"{' (dry run, nothing written)' if a.dry_run else ''}: {summary}"
+              + (f"; {doc['undeclared']} other repo(s) do not declare it" if doc["undeclared"] else "")
+              + (f"; failed: {', '.join(failed)}" if failed else ""))
+    return 0 if doc["ok"] else 1
 
 
 def cmd_setup(argv):

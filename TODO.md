@@ -56,6 +56,23 @@
 
 ## Open decisions
 
+- **`setup fanout` (built 2026-10-13, interrupted; tested and committed 2026-10-15).**
+  Not yet run on the real workspace. Choices open to Jacob: (1) repos run one after
+  another, not in parallel (each repo's check may be heavy; parallel across
+  processes is a later flag); (2) the check run is `./dev.sh check` in the repo that
+  commits (for the workspace top's hooks: the `.claude` repo's own check); (3) the
+  source commit is the source repo's HEAD, refused while the rendered-from paths are
+  dirty; for `parts` the runner is read from HEAD already, so nothing more is
+  required; (4) a discovered repo the component is not for is counted, not listed;
+  (5) `dev.sh` stubs (named in the plan) are not a fanout component: setup never
+  overwrites an existing dev.sh, so there is nothing to fan out.
+  Own bug, seen 2026-10-15 in `setup fanout hooks --dry-run` from the workspace top:
+  discovery enters a git repo nested inside another work tree that no node.json
+  declares (`addon-bench/candidates/graphify/work/src/emailTools`, a candidate's
+  clone) and lists it as a repo to render into. Expected: skip a nested repo unless
+  its parent's node.json names it a child (setup's own nesting rule), counted.
+  Not fixed yet.
+
 - **A node's `stores.json` (proposed by the hub owner, 2026-10-13; not built, wait
   for a dispatch carrying an approval line).** PLAN-hub.md on origin/plan/hub
   (63cf780), its Setup component table's `stores.json` row, and PLAN-services.md §3

@@ -7,7 +7,7 @@ usage() {
   cat <<'EOF'
 ./dev.sh <command>
 
-  check      every gate below, in order; non-zero if any fails (--json: the one schema, via devtools/checkjson.py)
+  check      the parts of check.parts.json (each test module, then each gate below but plans) via devtools/parts.py: [--resume | --only NAME...] [--json]; non-zero if any part fails
   test       the unit tests (tests/), trimmed to the result unless something fails
   hooks      the shared hook copies: present, executable, parse, their own tests pass (exit 3 there: UNCHECKED, gate exit 3), registered (PENDING: only in the proposal, for Jacob)
   files      the files the tool needs: present, executable where they must be, data parses
@@ -69,13 +69,14 @@ cmd_hooks() {
 
 cmd_files() {
   local fails=0 f
-  for f in setup dev.sh templates/dev.sh tests/fake_gh.py tests/fake_checks.py devtools/mutate.py devtools/checkjson.py; do
+  for f in setup dev.sh templates/dev.sh tests/fake_gh.py tests/fake_checks.py devtools/mutate.py; do
     [ -x "$f" ] || { echo "  FAIL  $f missing or not executable"; fails=$((fails+1)); }
   done
-  for f in components.json dependencies.json audit-terms.json devtools/mutants.json checks.json gates.json tests/fixtures/*.json; do
+  for f in components.json dependencies.json audit-terms.json devtools/mutants.json checks.json gates.json check.parts.json tests/fixtures/*.json; do
     jq -e . "$f" >/dev/null 2>&1 || { echo "  FAIL  $f missing or does not parse"; fails=$((fails+1)); }
   done
-  for f in CLAUDE.md TODO.md .gitignore $(jq -r '.components[] | (.template, .head) // empty' components.json 2>/dev/null); do
+  # the runner copy is run by python3, never executed: present (its mode is the source's)
+  for f in CLAUDE.md TODO.md .gitignore devtools/parts.py $(jq -r '.components[] | (.template, .head) // empty' components.json 2>/dev/null); do
     [ -f "$f" ] || { echo "  FAIL  $f missing"; fails=$((fails+1)); }
   done
   bash -n templates/dev.sh 2>/dev/null || { echo "  FAIL  templates/dev.sh does not parse"; fails=$((fails+1)); }
@@ -112,45 +113,46 @@ cmd_plans() {
   ./setup plans "$1"
 }
 
-GATES=(test hooks files audit self mutants)
-
-# The role each gate's failure belongs to, in --json (code, tests, audit, docs):
-# a surviving mutant is a missing test; the audits are audit's; the rest is code.
-gate_role() { case "$1" in audit) echo audit ;; mutants) echo tests ;; *) echo code ;; esac; }
-
-# --json: stdout is exactly one document (devtools/checkjson.py), each gate's
-# output captured to a scratch file so its finding lines become the failures.
+# check: each test module and each gate above but plans, as the parts of
+# check.parts.json, run by the shared runner devtools/parts.py (PLAN-small-tasks
+# §3, §5; the parts component renders it): each part with its own timeout, its
+# result written to the progress file ($PROGRESS_FILE, default .progress/check.json)
+# as it ends, --resume re-running only the parts whose files changed or that did
+# not pass, --json the one schema (a part that exits 3 is `unchecked`). With
+# CHECK_PARTS=<file> it runs that file's parts instead (the shared check-partial
+# gate's fixture, and this repo's own tests of check).
+#
+# A green run of this repo's whole suite records the tree it ran on for the git
+# pre-commit hook (the githooks component), on stderr so --json stays one
+# document. Never recorded: a run of other parts or of some (--only), a tree that
+# changed meanwhile (check-pass refuses), or a run in which a part said UNCHECKED
+# (green by the schema, never a pass). Not recording never turns a green check
+# red: the commit is what is refused.
 cmd_check() {
-  local json=0 g code fails=0 capdir="" dest rows=() tree=""
-  [ "${1:-}" = "--json" ] && json=1
-  # the tree the gates run on, taken first, so an edit made meanwhile is never recorded as checked
-  [ -x .githooks/check-pass ] && tree=$(.githooks/check-pass tree 2>/dev/null)
-  [ $json -eq 1 ] && capdir=$(mktemp -d 2>/dev/null)
-  for g in "${GATES[@]}"; do
-    if [ $json -eq 1 ]; then
-      dest=/dev/null; [ -n "$capdir" ] && dest="$capdir/$g"
-      ( "cmd_$g" ) >"$dest" 2>&1; code=$?  # a subshell: a gate cannot touch this loop's variables
-      rows+=("$g:$(gate_role "$g"):$code:$dest")
-    else echo "== $g"; ( "cmd_$g" ); code=$?; fi
-    [ $code -ne 0 ] && fails=$((fails+1))
+  local a record=1 resume=0 tree="" code pf state rf args
+  for a in "$@"; do
+    case "$a" in --only) record=0 ;; --resume) resume=1 ;; esac
   done
-  if [ $json -eq 1 ]; then
-    python3 devtools/checkjson.py "${rows[@]}"; code=$?
-    [ -n "$capdir" ] && rm -rf "$capdir"
-    [ $code -eq 0 ] && record_pass "$tree" >&2
+  [ -n "${CHECK_PARTS:-}" ] && record=0
+  # the tree the parts run on, taken first, so an edit made meanwhile is never recorded as checked
+  [ $record = 1 ] && [ -x .githooks/check-pass ] && tree=$(.githooks/check-pass tree 2>/dev/null)
+  python3 devtools/parts.py run "${CHECK_PARTS:-check.parts.json}" "$@"; code=$?
+  { [ $code -eq 0 ] && [ $record = 1 ] && [ -n "$tree" ]; } || return $code
+  pf=${PROGRESS_FILE:-.progress/check.json}
+  state=$(jq -r 'if (.passed_steps | length) == .total and .state == "passed" then "all" else "partial" end' "$pf" 2>/dev/null)
+  if [ "$state" != all ]; then
+    echo "check: green, but not every part passed (one said UNCHECKED, or $pf is unreadable): the pass was not recorded" >&2
     return $code
   fi
-  [ $fails -eq 0 ] && echo "check: all ${#GATES[@]} gates green" || echo "check: $fails of ${#GATES[@]} gates FAILED"
-  [ $fails -eq 0 ] && record_pass "$tree"
-  return $((fails > 0))
-}
-
-# A green check records the tree it ran on for the git pre-commit hook (the githooks
-# component); a tree that changed while the gates ran is not recorded. Not recording
-# never turns a green check red: the commit is what is refused.
-record_pass() {
-  [ -n "$1" ] || return 0
-  .githooks/check-pass record --from "$1" || echo "check: green, but the pass was not recorded (see above)"
+  args=(--from "$tree")
+  if [ $resume = 1 ]; then
+    # parts.py writes resumed_from "K/N at <time>" when it skipped parts, null on a full run
+    rf=$(jq -r 'if .resumed_from == null then "-" else (.resumed_from | capture("^(?<r>[0-9]+/[0-9]+) at ").r) end' "$pf" 2>/dev/null)
+    [ -n "$rf" ] || { echo "check: green, but the resume point in $pf could not be read: the pass was not recorded" >&2; return $code; }
+    [ "$rf" != - ] && args+=(--resumed-from "$rf")
+  fi
+  .githooks/check-pass record "${args[@]}" >&2 || echo "check: green, but the pass was not recorded (see above)" >&2
+  return $code
 }
 
 case "${1:-}" in

@@ -10,3 +10,4 @@ __pycache__/
 *.bak
 registry.proposed.json
 .claude/state/
+.progress/

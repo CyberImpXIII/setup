@@ -1,6 +1,7 @@
 """`./dev.sh check --json` in the one schema every repo prints (the shared checks
 tool holds it, schema/check-json.schema.json): the stub setup installs, and this
-repo's own (devtools/checkjson.py, called by dev.sh).
+repo's own (the shared runner devtools/parts.py over check.parts.json, called by
+dev.sh: one check per part).
 
 Anywhere: each output equals its reviewed fixture in tests/fixtures/, and the
 exit code agrees with `ok`. In the workspace: the real validator (`check-json`,
@@ -9,14 +10,12 @@ each output, and fails the old `{"ok", "error"}` shape, the counterfactual that
 shows it is judging. No copy of the schema or its validator lives here: the
 fixtures are what this repo holds, the validator is what proves them."""
 import json
-import shutil
 import subprocess
 import unittest
 
 from tests.helpers import ROOT, Case, git_repo, workspace_cli
 
 FIX = ROOT / "tests" / "fixtures"
-HELPER = ROOT / "devtools" / "checkjson.py"
 _, CHECKS_CLI = workspace_cli("checks")
 LONE = "no shared checks CLI in a workspace around this tool (a lone clone)"
 # The validator sets this while it runs a repo's suite, and answers UNCHECKED to any
@@ -82,86 +81,59 @@ class Stub(Case, Live):
         self.assertIn("schema: $: missing `checks`", lines)
 
 
-def red_rows(tmp):
-    """Canned gate outputs, one of each finding kind devtools/checkjson.py reads."""
-    outs = {
-        "test": "..F.E\n" + "=" * 20 + "\nFAIL: test_check_stub_fails_by_name "
-                "(tests.test_fixture.Fixture.test_check_stub_fails_by_name)\nTraceback: x\n"
-                "ERROR: test_gone (tests.test_nowhere.Gone.test_gone)\nRan 5 tests\nFAILED (failures=1, errors=1)\n",
-        "hooks": "  ok    hooks: 3 hooks\n",
-        "files": "",
-        "audit": f"  FAIL  {ROOT}/setuplib/core.py:12: repo name x\n  FAIL  /elsewhere/y.py:3: repo name x\n"
-                 "  UNCHECKED: no sibling git repos within 2 folders\n",
-        "self": "  ok    self: 10 unchanged\n",
-        "mutants": "  SURVIVED  some-id: a gate stayed green\n  BASELINE-RED  python3 -m x exits 1 unmutated: a\n"
-                   "mutants: 1 of 2 red, 2 problem(s)\n",
-    }
-    codes = {"test": 1, "hooks": 0, "files": 1, "audit": 1, "self": 0, "mutants": 1}
-    roles = {"audit": "audit", "mutants": "tests"}
-    rows = []
-    for g, text in outs.items():
-        (tmp / g).write_text(text)
-        rows.append(f"{g}:{roles.get(g, 'code')}:{codes[g]}:{tmp / g}")
-    return rows
+SUITE_PART = """#!/bin/sh
+case "$1" in
+  p1) echo "  ok    p1" ;;
+  p2) echo "FAIL p2.txt:1 the second part is red"; exit 1 ;;
+  p3) echo "UNCHECKED: nothing to judge here"; exit 3 ;;
+esac
+"""
+WAIT = 120  # a three-part canned suite: a run past this is a hang (the real suite ran instead)
+
+
+def suite(tmp):
+    """A three-part suite (ok, fail, unchecked) in its own folder, for CHECK_PARTS."""
+    d = tmp / "suite"
+    d.mkdir()
+    (d / "part.sh").write_text(SUITE_PART)
+    for p in ("p1", "p2", "p3"):
+        (d / f"{p}.txt").write_text(f"{p}\n")
+    (d / "parts.json").write_text(json.dumps({"parts": [
+        {"name": p, "run": f"sh part.sh {p}", "files": [f"{p}.txt"], "timeout_s": 60} for p in ("p1", "p2", "p3")]}))
+    return d
 
 
 class Own(Case, Live):
-    """This repo's own --json: every gate a check, each finding line a failure."""
+    """This repo's own check is the shared runner's (devtools/parts.py over
+    check.parts.json): CHECK_PARTS hands it another suite, which is how the shared
+    check-partial gate drives it, and how this runs it without running itself."""
 
-    def helper(self, rows):
-        return subprocess.run([str(HELPER), *rows], capture_output=True, text=True)
+    def own(self, *args):
+        d = suite(self.tmp)
+        env = dict(self.env, CHECK_PARTS=str(d / "parts.json"), PROGRESS_FILE=str(d / "progress.json"))
+        return subprocess.run([str(ROOT / "dev.sh"), "check", *args], cwd=ROOT, env=env,
+                              capture_output=True, text=True, timeout=WAIT)
 
-    def test_red_report_is_the_fixture(self):
-        r = self.helper(red_rows(self.tmp))
-        self.assertEqual(r.returncode, 1, r.stderr)
-        self.assertEqual(json.loads(r.stdout), fixture("own-check-red.json"))
-
-    def test_green_report_is_the_fixture(self):
-        (self.tmp / "out").write_text("  FAIL  ignored: the gate exited 0\n")
-        r = self.helper([f"{g}:code:0:{self.tmp / 'out'}" for g in ("test", "files")])
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(json.loads(r.stdout), fixture("own-check-green.json"))
-
-    def test_no_gates_or_a_bad_row_is_refused_not_reported(self):
-        for rows in ([], ["test:code:x:/dev/null"], ["test::0:/dev/null"]):
-            r = self.helper(rows)
-            self.assertEqual((r.returncode, r.stdout), (64, ""), rows)
-
-    def test_dev_sh_wires_each_gate_through_the_helper(self):
-        """dev.sh's own check --json, end to end, with its gates swapped for canned
-        ones in a copy (the real suite would run this test inside itself)."""
-        d = self.tmp / "copy"
-        (d / "devtools").mkdir(parents=True)
-        shutil.copy(HELPER, d / "devtools")
-        text = (ROOT / "dev.sh").read_text()
-        gates, dispatch = "GATES=(test hooks files audit self mutants)\n", 'case "${1:-}" in\n'
-        self.assertEqual((text.count(gates), text.count(dispatch)), (1, 1), "dev.sh moved: update this test")
-        # a gate assigning names the loop uses (cmd_hooks once leaked `out` this way,
-        # emptying every later gate's findings) must change nothing outside itself
-        canned = ('cmd_files() { capdir=/nonexistent; dest=/dev/null; out=x; rows=(); json=0\n'
-                  '  echo "  FAIL  templates/dev.sh missing"; return 1; }\n'
-                  'cmd_audit() { echo "  FAIL  $PWD/setup:7: repo name x"; return 1; }\n'
-                  'cmd_mutants() { echo "  ok"; }\n')
-        text = text.replace(gates, "GATES=(files audit mutants)\n").replace(dispatch, canned + dispatch)
-        (d / "dev.sh").write_text(text)
-        (d / "dev.sh").chmod(0o755)
-        r = subprocess.run(["./dev.sh", "check", "--json"], cwd=d, capture_output=True, text=True)
+    def test_json_is_one_check_per_part(self):
+        r = self.own("--json")
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         doc = json.loads(r.stdout)
-        self.assertEqual([(c["name"], c["status"], [(f["message"], f["file"], f["line"], f["role"])
-                                                    for f in c["failures"]]) for c in doc["checks"]], [
-            ("files", "fail", [("templates/dev.sh missing", None, None, "code")]),
-            ("audit", "fail", [("setup:7: repo name x", "setup", 7, "audit")]),
-            ("mutants", "ok", [])])
         self.assertIs(doc["ok"], False)
+        self.assertEqual([(c["name"], c["status"]) for c in doc["checks"]],
+                         [("p1", "ok"), ("p2", "fail"), ("p3", "unchecked")])
+        (f,) = doc["checks"][1]["failures"]
+        self.assertEqual((f["file"], f["line"]), ("p2.txt", 1))
+
+    def test_text_says_n_of_m_and_names_the_failed_part(self):
+        r = self.own()
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        last = r.stdout.strip().splitlines()[-1]
+        self.assertRegex(last, r"^check: 1 of 3 passed; failed: p2 .*; unchecked: p3 ")
 
     @unittest.skipIf(CHECKS_CLI is None, LONE)
-    def test_reports_pass_the_validator(self):
-        red = self.helper(red_rows(self.tmp))
-        (self.tmp / "g").write_text("")
-        green = self.helper([f"test:code:0:{self.tmp / 'g'}"])
-        for name, r in (("red", red), ("green", green)):
-            self.assertEqual(self.validate(self.printing(name, r.stdout, r.returncode)), ("ok", []), name)
+    def test_its_json_passes_the_validator(self):
+        r = self.own("--json")
+        self.assertEqual(self.validate(self.printing("own", r.stdout, r.returncode)), ("ok", []))
 
 
 if __name__ == "__main__":

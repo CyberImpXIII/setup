@@ -17,6 +17,12 @@
   not-one-command): most are prose `x` → `y` mappings, and PLAN-architecture
   line 525 is the grammar's own `<cmd>` example. The plan's author picks: another
   arrow for prose, or a narrower grammar (a fact marked, e.g. `fact:`).
+- **The baseline `.gitignore` does not ignore `.progress/`** (2026-10-15): a repo
+  whose `dev.sh check` hands its parts to the rendered runner (`devtools/parts.py`)
+  gets an untracked `.progress/` (the runner's progress file and part logs). Added
+  here by hand; the baseline (components.json `ignore`) should carry it once a repo
+  has the `parts` component. Probe: `./setup <repo with parts> --dry-run` after a
+  check, then `git status --short`.
 - **plans add / edit: the second digest check (just before the write) has no
   fixture**; the mutant set covers the first only.
 
@@ -390,16 +396,13 @@
   whether an owner ever means "keep everything in here" by a folder negation.
 
 - **`check --json` validated by subprocess, not by a vendored schema** (2026-10-05).
-  The stub's `--json` and this repo's own (`devtools/checkjson.py`) are held to
-  reviewed fixtures in `tests/fixtures/` anywhere, and to the real `check-json`
-  validator (the shared checks CLI, run on scratch repos) in the workspace, with the
-  old `{"ok","error"}` shape as the counterfactual. No copy of the schema or its
-  validator lives here (a copy would need a second validator: duplicated procedure).
-  Cost: in a lone clone only the fixtures hold; a schema change upstream is caught
-  only in the workspace. `devtools/checkjson.py` is a second emitter beside checks'
-  `checkslib/devjson.py` (setup may not import a sibling tool): agreement by meaning
-  is gated by the live validator test, not by a shared helper. Revisit with the
-  dependency decision above.
+  The stub's `--json` is held to a reviewed fixture in `tests/fixtures/` anywhere;
+  this repo's own is the shared runner's (`devtools/parts.py`, since 2026-10-15:
+  `devtools/checkjson.py`, the second emitter, is gone), held to a canned
+  three-part suite; both are held to the real `check-json` validator (the shared
+  checks CLI, run on scratch repos) in the workspace, with the old `{"ok","error"}`
+  shape as the counterfactual. No copy of the schema or its validator lives here.
+  Cost: a schema change upstream is caught only in the workspace.
 - **Repos set up before 2026-10-05 keep the old stub's `{"ok": false, "error"}`**:
   setup never overwrites `dev.sh` (an existing stub is `needs-owner`). Probe run
   2026-10-05, `grep -l SETUP-STUB */dev.sh */*/dev.sh` from the workspace top: none

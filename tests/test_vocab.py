@@ -1,5 +1,6 @@
 """Documented == implemented, both directions: components, statuses, subcommands,
 and the one-writer rule."""
+import json
 import re
 import subprocess
 
@@ -58,11 +59,22 @@ class DevSh(Case):
         handlers = re.findall(r"^cmd_([a-z]+)\(\)", src, re.M)
         self.assertEqual(sorted(handlers), sorted(arms))
 
-    def test_check_runs_every_gate_but_plans(self):
+    def test_check_runs_every_module_and_every_gate_but_plans(self):
+        """check.parts.json (what `./dev.sh check` runs): one part per test module, one
+        per gate dev.sh dispatches but check, test and plans, and the runner takes it."""
         src = (ROOT / "dev.sh").read_text()
-        gates = re.search(r"^GATES=\((.*?)\)", src, re.M).group(1).split()
         arms = re.findall(r"^  ([a-z]+)\)", src[src.rindex('case "${1:-}" in'):], re.M)
-        self.assertEqual(sorted(gates), sorted(set(arms) - {"check", "plans"}))
+        parts = json.loads((ROOT / "check.parts.json").read_text())["parts"]
+        tests = [p for p in parts if p["name"].startswith("test.")]
+        modules = sorted(f.stem for f in (ROOT / "tests").glob("test_*.py"))
+        self.assertEqual([(p["name"], p["run"], p["files"]) for p in tests],
+                         [(f"test.{m[5:]}", f"python3 -m unittest -v tests.{m}", [f"tests/{m}.py"]) for m in modules])
+        gates = [p for p in parts if not p["name"].startswith("test.")]
+        self.assertEqual(sorted(p["name"] for p in gates), sorted(set(arms) - {"check", "test", "plans"}))
+        self.assertEqual([p["run"] for p in gates], [f"./dev.sh {p['name']}" for p in gates])
+        r = subprocess.run(["python3", "devtools/parts.py", "validate", "check.parts.json"], cwd=ROOT,
+                           capture_output=True, text=True)
+        self.assertEqual((r.returncode, r.stdout), (0, f"ok: {len(parts)} parts\n"), r.stderr)
 
 
 # Anything that changes disk or a remote. Only setuplib/fsw.py may contain these.

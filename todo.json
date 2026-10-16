@@ -2,7 +2,7 @@
   "format": 2,
   "repo": "setup",
   "prefix": "su",
-  "next": 73,
+  "next": 74,
   "render_gate_from": "2026-10-22",
   "hand_edits": [],
   "items": [
@@ -2445,7 +2445,39 @@
         "title_from": "text",
         "sep": ""
       }
+    },
+    {
+      "id": "su-73",
+      "title": "PLAN-services §4 step 8.4: the ## Research id rules in setup plans (blocked on step 8.2)",
+      "kind": "decision",
+      "status": "open",
+      "evidence": "Dispatched 2026-10-15 (coordinator, relayed as Jacob's 2026-10-12 approval of PLAN-services §4). Not built: §4 step 8 is 'in this order' and step 8.2 (the research CLI, R2 shape, R6 depth field) is not done: tools/research holds only its scaffold (dev.sh, devtools/parts.py; no CLI, no rs- index). No plan in the workspace carries an rs- id, and the Decisions sections are prose, not rows. Building it now would mean inventing the resolver's interface (e.g. 'research show <id> --json' -> {state: open|answered, depth: quick|full}) and the Decisions-row grammar, with no live test possible: a seam that cannot be gated. Proposed when 8.2 lands: 'setup plans <dir> --research CLI' (as --steps takes --todo CLI); without it every rs- id is a note 'unchecked', never a pass; with it an unresolved id, and an rs- id cited under a plan's ## Decisions that is open or answered only at quick, FAIL (fixtures both ways, a fake research CLI, a live test against the real one, a mutant).",
+      "probe": null,
+      "reported_to": null,
+      "parent": null,
+      "blocked_by": null,
+      "waits_on": null,
+      "repo": "setup",
+      "work": "code",
+      "size": "M",
+      "files": [
+        "setup",
+        "setuplib/plans.py"
+      ],
+      "research": null,
+      "done_when": "setup plans refuses a Decisions row resting on an rs- id answered only at quick, proven both ways against the real research CLI",
+      "done_check": null,
+      "handoff": null,
+      "approved": null,
+      "dispatched": null,
+      "retire": null,
+      "tags": null,
+      "plan_pins": null,
+      "added": "2026-10-15",
+      "done": null,
+      "resolution": null,
+      "imported": null
     }
   ],
-  "seal": "998d432365e87ce5"
+  "seal": "17f59ab8a233c59b"
 }

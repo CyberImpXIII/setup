@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (71 open, 1 closed in todo-history.json; seal d96edd393966): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (72 open, 1 closed in todo-history.json; seal 324b9c658059): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -655,6 +655,14 @@
   this repo (`ThisRepo`, mutant `runner-copy-stale`). A checks gate would cover
   every repo: suggest it to checks.
   Copies rendered so far: this repo only. Other repos get it on their next `./setup`.
+  · added: 2026-10-15
+
+- **su-73 · PLAN-services §4 step 8.4: the ## Research id rules in setup plans (blocked on step 8.2)**
+  Dispatched 2026-10-15 (coordinator, relayed as Jacob's 2026-10-12 approval of PLAN-services §4). Not built: §4 step 8 is 'in this order' and step 8.2 (the research CLI, R2 shape, R6 depth field) is not done: tools/research holds only its scaffold (dev.sh, devtools/parts.py; no CLI, no rs- index). No plan in the workspace carries an rs- id, and the Decisions sections are prose, not rows. Building it now would mean inventing the resolver's interface (e.g. 'research show <id> --json' -> {state: open|answered, depth: quick|full}) and the Decisions-row grammar, with no live test possible: a seam that cannot be gated. Proposed when 8.2 lands: 'setup plans <dir> --research CLI' (as --steps takes --todo CLI); without it every rs- id is a note 'unchecked', never a pass; with it an unresolved id, and an rs- id cited under a plan's ## Decisions that is open or answered only at quick, FAIL (fixtures both ways, a fake research CLI, a live test against the real one, a mutant).
+  · work: code
+  · size: M
+  · files: setup, setuplib/plans.py
+  · done when: setup plans refuses a Decisions row resting on an rs- id answered only at quick, proven both ways against the real research CLI
   · added: 2026-10-15
 
 ## Unconfirmed suspicions

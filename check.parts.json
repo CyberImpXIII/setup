@@ -51,6 +51,8 @@
    "always": "runs ./setup, which reads its dependencies in the workspace"},
   {"name": "test.render_commit", "run": "python3 -m unittest -v tests.test_render_commit", "files": ["tests/test_render_commit.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup, which reads its dependencies in the workspace"},
+  {"name": "test.research_ids", "run": "python3 -m unittest -v tests.test_research_ids", "files": ["tests/test_research_ids.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
+   "always": "runs the workspace's research CLI on a scratch store it builds"},
   {"name": "test.rules", "run": "python3 -m unittest -v tests.test_rules", "files": ["tests/test_rules.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup, which reads its dependencies in the workspace"},
   {"name": "test.settings_new", "run": "python3 -m unittest -v tests.test_settings_new", "files": ["tests/test_settings_new.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",

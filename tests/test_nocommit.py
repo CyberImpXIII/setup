@@ -44,7 +44,10 @@ class NoCommit(Case):
         r = self.run_setup("r", "--only", "hooks", "--rebuild")
         self.assertEqual(r.returncode, 2, r.stdout)
         self.assertIn("the tree is not clean", r.stderr)
+        self.assertIn("or pass --no-commit to write the render and commit nothing", r.stderr)  # su-85
         self.assertEqual(snapshot(self.repo), before)
+        dry = self.run_setup("r", "--only", "hooks", "--rebuild", "--dry-run")
+        self.assertIn("or pass --no-commit", dry.stdout)  # the dry run says it too
 
     def test_a_path_it_would_write_with_uncommitted_changes_is_refused(self):
         # a copy equal to the source but for a comment is rewritten ("header refreshed"):

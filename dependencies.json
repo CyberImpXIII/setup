@@ -19,6 +19,11 @@
       "path": "knowledge-base",
       "cli": "kb",
       "reader": {"module": "kblib.local", "declaration": "DECLARATION", "parse": "parse_declaration", "resolve": "docs_of"}
+    },
+    "research": {
+      "_used_by": "`setup plans`: the `## Research` id rules (setuplib/rsids.py, PLAN-services §3 R1, R6). Each `rs-` id a plan not done cites is resolved with `<cli> get <id> --json` (a read; the caller's environment passed through), and one cited under `## Decisions` must be answered at full depth. Without this dependency, ids cited are UNCHECKED, exit 3, never ok",
+      "path": "tools/research",
+      "cli": "research"
     }
   }
 }

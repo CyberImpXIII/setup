@@ -1543,7 +1543,13 @@ class Setup:
                           f"{len(would)} file(s) ({', '.join(would[:5])}{', ...' if len(would) > 5 else ''}): "
                           "setup commits what it renders in the same run, so it renders only into a clean tree; "
                           "commit or discard those changes first (a settings.json equal to its "
-                          "settings.proposed.json is committed with the render)")
+                          "settings.proposed.json is committed with the render)" + self._no_commit_hint())
+
+    def _no_commit_hint(self):
+        """The way past a dirty-tree refusal that writes and commits nothing, named
+        in the refusal (su-85), where it applies: an existing repo, no --node."""
+        return ("; or pass --no-commit to write the render and commit nothing (its owner commits it "
+                "with its own work)") if not self.node else ""
 
     def _commit_render(self):
         """c_commit for an existing repo: commit exactly the files this run rendered
@@ -1562,7 +1568,8 @@ class Setup:
             rest = [d for d in dirty if d not in self._riders(dirty)]
             if rest:
                 return Result("commit", "needs-owner", f"a real run would be refused: the tree is not clean "
-                                                       f"({', '.join(rest[:10])}{', ...' if len(rest) > 10 else ''})")
+                                                       f"({', '.join(rest[:10])}{', ...' if len(rest) > 10 else ''})"
+                                                       + self._no_commit_hint())
             return Result("commit", "installed", f"would commit the {len(rendered)} file(s) it would render, "
                                                  "in this run")
         paths = list(rendered)

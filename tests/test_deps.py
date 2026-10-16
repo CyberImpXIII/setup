@@ -94,15 +94,17 @@ class Audit(Case):
         plant(top, "hooks")
         plant(top, "checks", source=False)
         plant(top, "docs", source=False)
+        plant(top, "research", source=False)
         findings, note = self.run_audit(tool)
         self.assertEqual(findings, [])
-        self.assertIn("3 dependencies against", note)
+        self.assertIn("4 dependencies against", note)
 
     def test_a_missing_dependency_is_a_finding(self):
         top = self.tmp / "ws"
         tool = self.tool_in(top)
         plant(top, "hooks")
         plant(top, "docs", source=False)
+        plant(top, "research", source=False)
         plant(top, "other")  # something discovered, so the audit runs
         findings, _ = self.run_audit(tool)
         self.assertEqual(len(findings), 1, findings)
@@ -114,6 +116,7 @@ class Audit(Case):
         plant(top, "hooks", source=False)
         plant(top, "checks", executable=False)
         plant(top, "docs", source=False)
+        plant(top, "research", source=False)
         findings, _ = self.run_audit(tool)
         self.assertEqual(len(findings), 2, findings)
         self.assertTrue(any("not a folder" in f for f in findings))
@@ -125,6 +128,7 @@ class Audit(Case):
         plant(top, "hooks")
         plant(top, "checks", source=False, runner=False)
         plant(top, "docs", source=False)
+        plant(top, "research", source=False)
         findings, _ = self.run_audit(tool)
         self.assertEqual(len(findings), 1, findings)
         self.assertIn("is not a file", findings[0])
@@ -135,6 +139,7 @@ class Audit(Case):
         plant(top, "hooks")
         plant(top, "checks", source=False)
         plant(top, "docs", source=False, reader=False)
+        plant(top, "research", source=False)
         findings, _ = self.run_audit(tool)
         self.assertEqual(len(findings), 1, findings)
         self.assertIn("(its reader) is not a file", findings[0])

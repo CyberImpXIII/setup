@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (74 open, 2 closed in todo-history.json; seal 30f4f1c2278e): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (81 open, 4 closed in todo-history.json; seal d05dde004c5f): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -76,6 +76,46 @@
   though the real run would make a local repo and print "local, no remote yet".
   Deliberate: it reports the target as it is now (dispatcher's brief, 2026-10-04).
   · added: 2026-10-15
+
+- **su-77 · cannot re-render the top-level .claude/ hook copies -- input: `tools/setup/setup /Users/Specter/D...**
+  reported from .claude to tools/setup in dispatch toolu_011LazyaDhEPC8yFGpKx8k3B, filed from the dispatch ledger by the delegation layer's report filer: cannot re-render the top-level .claude/ hook copies -- input: `tools/setup/setup /Users/Specter/Desktop/claudeTest --rebuild --only hooks --dry-run` -> "not a git work tree" -- expected: renders into .claude/.
+  · parent: tl-223
+  · added: 2026-10-16
+
+- **su-78 · other repos' .claude/lib/ledger.sh and test-store-guard.sh copies now drift and need a reinstall ...**
+  reported from tools/hooks to tools/setup in dispatch toolu_012AsDNG3r1uaCmkzk1wzHZx, filed from the dispatch ledger by the delegation layer's report filer: other repos' .claude/lib/ledger.sh and test-store-guard.sh copies now drift and need a reinstall (OWED). Earlier F3 layer-2 report still stands.
+  · parent: tl-224
+  · added: 2026-10-16
+
+- **su-79 · `--only parts --rebuild` cannot update a runner copy in a repo whose `.claude/settings.json` is J...**
+  reported from addon-bench to tools/setup in dispatch toolu_015nN2HPVFRy29Mgm4jujvfn, filed from the dispatch ledger by the delegation layer's report filer: `--only parts --rebuild` cannot update a runner copy in a repo whose `.claude/settings.json` is Jacob's uncommitted wiring-apply without committing that file, and it refuses any tree with other uncommitted work -- input: `tools/setup/setup addon-bench --only parts --rebuild --overwrite-uncommitted --dry-run` -- expected: a way to render the runner that leaves settings.json out of the commit.
+  · parent: tl-227
+  · added: 2026-10-16
+
+- **su-80 · no hook render can land in this repo. `setup tools/transcripts` rendered, then its own commit was...**
+  reported from tools/transcripts to tools/setup in dispatch toolu_01Munq7FZhSWnF48mx4aMgi7, filed from the dispatch ledger by the delegation layer's report filer: no hook render can land in this repo. `setup tools/transcripts` rendered, then its own commit was refused by this repo's pre-commit hook and it put everything back. `--only hooks --rebuild` refuses a dirty tree, although its help says it never commits. -- input: `tools/setup/setup tools/transcripts [--only hooks --rebuild]` -- expected: `--rebuild` writes without committing, as its help says.
+  · parent: tl-243
+  · added: 2026-10-16
+
+- **su-81 · .githooks/check-pass refuses every commit while the uncommitted .claude/settings.json is in the t...**
+  reported from tools/context-hygiene to tools/setup in dispatch toolu_01NWqt286g6ioVGc9Rz7AeoR, filed from the dispatch ledger by the delegation layer's report filer: .githooks/check-pass refuses every commit while the uncommitted .claude/settings.json is in the tree -- input: tools/context-hygiene, check passed on tree f606de85c194, staged tree 7db2b50d7982 -- expected: a commit of the store files to go through while settings.json stays uncommitted.
+  · parent: tl-245
+  · added: 2026-10-16
+
+- **su-82 · the installed copies of store-guard.sh, test-store-guard.sh, ledger.sh, prefer-recipes.sh and wri...**
+  reported from tools/hooks to tools/setup in dispatch toolu_01P2QUjhfZGL3aQ5foWPuX2W, filed from the dispatch ledger by the delegation layer's report filer: the installed copies of store-guard.sh, test-store-guard.sh, ledger.sh, prefer-recipes.sh and write-targets.sh no longer match the source in income, scripts, knowledge-base and tools/checks; the source changes were intended -- input: `tools/hooks/hooks copies` -- expected: re-render them from tools/hooks/source.
+  · parent: tl-247
+  · added: 2026-10-16
+
+- **su-83 · parts.py is now 1.1.0, so `tools/setup/devtools/parts.py` and the copies it rendered into repos (...**
+  reported from tools/checks to tools/setup in dispatch toolu_01UsoP3YSofAzhSbJhhJbU2p, filed from the dispatch ledger by the delegation layer's report filer: parts.py is now 1.1.0, so `tools/setup/devtools/parts.py` and the copies it rendered into repos (1.0.0) differ until setup re-renders them -- input: `cmp tools/setup/devtools/parts.py tools/checks/checkslib/parts.py` -- expected: setup re-renders.
+  · parent: tl-249
+  · added: 2026-10-16
+
+- **su-84 · check-pass hashes `git add --all` of the working tree, so a commit can never pass while another s...**
+  reported from tools/transcripts to tools/setup in dispatch toolu_01AMZayunWGyknYwA7iG5Jjn, filed from the dispatch ledger by the delegation layer's report filer: check-pass hashes `git add --all` of the working tree, so a commit can never pass while another session's unstaged change is in it -- input: transcripts tree with unstaged .claude/settings.json, commit of all other paths -- expected: a way to check the staged tree or name excluded paths.
+  · parent: tl-258
+  · added: 2026-10-16
 
 ## Open decisions
 
@@ -655,14 +695,6 @@
   this repo (`ThisRepo`, mutant `runner-copy-stale`). A checks gate would cover
   every repo: suggest it to checks.
   Copies rendered so far: this repo only. Other repos get it on their next `./setup`.
-  · added: 2026-10-15
-
-- **su-73 · PLAN-services §4 step 8.4: the ## Research id rules in setup plans (blocked on step 8.2)**
-  Dispatched 2026-10-15 (coordinator, relayed as Jacob's 2026-10-12 approval of PLAN-services §4). Not built: §4 step 8 is 'in this order' and step 8.2 (the research CLI, R2 shape, R6 depth field) is not done: tools/research holds only its scaffold (dev.sh, devtools/parts.py; no CLI, no rs- index). No plan in the workspace carries an rs- id, and the Decisions sections are prose, not rows. Building it now would mean inventing the resolver's interface (e.g. 'research show <id> --json' -> {state: open|answered, depth: quick|full}) and the Decisions-row grammar, with no live test possible: a seam that cannot be gated. Proposed when 8.2 lands: 'setup plans <dir> --research CLI' (as --steps takes --todo CLI); without it every rs- id is a note 'unchecked', never a pass; with it an unresolved id, and an rs- id cited under a plan's ## Decisions that is open or answered only at quick, FAIL (fixtures both ways, a fake research CLI, a live test against the real one, a mutant).
-  · work: code
-  · size: M
-  · files: setup, setuplib/plans.py
-  · done when: setup plans refuses a Decisions row resting on an rs- id answered only at quick, proven both ways against the real research CLI
   · added: 2026-10-15
 
 ## Unconfirmed suspicions

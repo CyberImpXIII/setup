@@ -35,7 +35,36 @@
         "title_from": "text",
         "sep": ""
       }
+    },
+    {
+      "id": "su-76",
+      "title": "su-74 and su-75 (my td-9 and td-36) are written to tools/setup/todo.json and still need committin...",
+      "kind": "bug",
+      "status": "done",
+      "evidence": "reported by todo to setup in dispatch toolu_01XA5khyNVQ1SDWM2TY221bv (todo: resume, commit, group namespace), filed from the dispatch ledger by .claude/lib/report-filer.sh: su-74 and su-75 (my td-9 and td-36) are written to tools/setup/todo.json and still need committing there. Also td-2: store-guard is not registered, and td-36: render drift, needs `--rebuild`.",
+      "probe": null,
+      "reported_to": null,
+      "parent": "tl-215",
+      "blocked_by": null,
+      "waits_on": null,
+      "repo": "setup",
+      "work": null,
+      "size": null,
+      "files": null,
+      "research": null,
+      "done_when": null,
+      "done_check": null,
+      "handoff": null,
+      "approved": null,
+      "dispatched": null,
+      "retire": null,
+      "tags": null,
+      "plan_pins": null,
+      "added": "2026-10-15",
+      "done": "2026-10-16",
+      "resolution": "su-74 and su-75 committed with this store (setup, 2026-10-16); td-2 and td-36 are su-75: the re-render needs Jacob's yes, not run",
+      "imported": null
     }
   ],
-  "seal": "817f3f24a68e7162"
+  "seal": "99702a758de09eac"
 }

@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (81 open, 4 closed in todo-history.json; seal d05dde004c5f): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (82 open, 4 closed in todo-history.json; seal e248e2cad682): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -797,8 +797,10 @@
 
 - **su-74 · devtools/mutate.py duplicates the setup repo's mutant runner**
   Copied from tools/setup/devtools/mutate.py on 2026-10-04 and extended with an edits list (a gate guarded in two places needs both broken). Two copies will drift. Candidate for a shared component that setup installs.
+  2026-10-17: merged into one source (f861939): devtools/mutate.py here now has the edits list; the new mutate component renders it into any repo with devtools/mutants.json (setup <repo> --only mutate --rebuild). Open until tools/todo's fork is replaced: a dry run there says 'rewrote devtools/mutate.py (runner 2.0.0)'. Not written, because the todo agent was mid-check; its owner runs it.
   · parent: td-9
   · work: tooling
+  · size: M
   · files: devtools/mutate.py
   · done when: one copy, installed by setup, with the edits list
   · added: 2026-10-15
@@ -806,7 +808,16 @@
 - **su-75 · checks gate: hooks-installed reports drift on four installed .claude/ files**
   ./dev.sh check, 2026-10-09 (commit after 77bce39): checks gate FAIL hooks-installed: extra-stores.sh (the installed hooks' lib folder), .claude/hooks/store-guard.sh and .claude/hooks/test-store-guard.sh 'drift; not covered by user scope (no shared hook of that name there)', .claude/hooks/test-no-inline-blobs.sh 'drift; not covered by user scope (not registered there)'. Last touched by 93532a8 (re-render of the shared hook copies from tools/hooks). Not this tool's files and not changed by td-22/td-27; reported to the hooks tool's owner through the dispatch report. Also live: ./dev.sh hooks FAIL 'store-guard.sh is not registered in .claude/settings.json' (td-2's remainder; the uncommitted settings.json now registers the other seven). 2026-10-12: the lib file's path is named without its folder here, because that folder in this store tripped the direction audit (audit, no-roster and two test_dev tests red).
   2026-10-15: of setup's Q6 render, test-no-inline-blobs.sh and lib/extra-stores.sh agree with source (hooks copies: ok) and are committed (c5f1886); store-guard.sh and test-store-guard.sh drift from hooks bdd932f and stay uncommitted. Also drift/missing at tools/todo: lib/ledger.sh, prefer-recipes.sh and its test, lib/write-targets.sh (drift); bin/commit.sh, git-funnel.sh and its test (missing). Needs a re-render by setup.
+  2026-10-17: setup <repo> --only hooks --rebuild --no-commit rendered emailTools, income, scripts, knowledge-base, tools/checks, tools/usage and tools/wizard (left uncommitted for each owner); hooks-installed passes in each. tools/transcripts was already green. setup's own .claude/lib/ledger.sh was committed (079db48). tools/todo was refused by the rebuild guard: its .claude/hooks/store-guard.sh and test-store-guard.sh hold uncommitted changes (the todo agent's renders work, ahead of tools/hooks' source). Open until those are settled and the render is rerun there.
   · parent: td-36
   · work: labour
+  · size: M
   · done when: tools/hooks' hooks copies shows no drift or missing row at tools/todo, and the checks gate's hooks-installed passes
   · added: 2026-10-15
+
+- **su-86 · To setup: check-pass refuses every commit while Jacob's uncommitted .claude/settings.json is in the tree**
+  2026-10-15 ~21:30: ./dev.sh check passed 24 of 24 and recorded tree f606de85c194, which includes the uncommitted .claude/settings.json change (made 20:45 by someone else; it now equals settings.proposed.json, so likely Jacob's wiring --apply -- unverified). git commit of TODO.md, todo.json, todo-history.json was refused by .githooks/pre-commit (check-pass match: staged tree 7db2b50d7982 != f606de85c194). Q6b says settings.json stays uncommitted and untouched, so no commit can pass here until it is committed, stashed, or check-pass leaves it out. The store edits stay staged, uncommitted.
+  · parent: ch-66
+  · work: code
+  · done when: check-pass (setup's githooks) lets a commit through when the only unstaged change is .claude/settings.json Jacob owns, or Jacob commits his settings change; the staged store edits here are then committed
+  · added: 2026-10-17

@@ -12,7 +12,7 @@ class Fixture(Case):
         self.assertEqual(code, 0)
         self.assertEqual(self.statuses(res), {
             "repo": "installed", "rules": "installed", "hooks": "installed",
-            "todo": "installed", "docs": "installed", "check": "installed", "parts": "installed", "services": "installed", "cli": "none",
+            "todo": "installed", "docs": "installed", "check": "installed", "parts": "installed", "mutate": "none", "services": "installed", "cli": "none",
             "data": "none", "params": "installed", "ignore": "installed",
             # the default hook source (the hooks dependency) registers git-stamp.sh and write-ledger.sh
             "githooks": "installed", "commit": "installed",

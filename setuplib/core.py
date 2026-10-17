@@ -45,6 +45,13 @@ def load_spec(path: Path = SPEC_PATH) -> dict:
     return json.loads(path.read_text())
 
 
+def runners(spec) -> list:
+    """The components that render one runner file from a committed source
+    (components.json `rendered_runner`): each is run by Setup._c_runner, and is
+    what --rebuild without --node may overwrite besides the hook copies."""
+    return [c["name"] for c in spec["components"] if c.get("rendered_runner")]
+
+
 def sha12(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:12]
 
@@ -270,6 +277,7 @@ class Setup:
         self.gh = gh
         self.spec = spec or load_spec()
         self.comp = {c["name"]: c for c in self.spec["components"]}
+        self.runners = runners(self.spec)
         # The hook source is the hooks dependency's (dependencies.json), never this
         # tool's own .claude/ (PLAN-repo-setup §7.12); --hooks-from overrides it.
         self.hooks_dep = self.comp["hooks"]["dependency"]
@@ -466,8 +474,8 @@ class Setup:
 
     def _rebuild_guard(self):
         """--rebuild without --node, before anything is written: refuse when a file the
-        hooks component would render into the rebuild scope, or the parts component's
-        runner copy, is on disk, differs from the source, and holds changes git does
+        hooks component would render into the rebuild scope, or a runner component's
+        copy (parts, mutate), is on disk, differs from the source, and holds changes git does
         not (staged, unstaged, untracked or ignored); only the components this run
         runs (--only) are read,
         since overwriting it would lose them (a byte-equal copy loses nothing). overwrite_uncommitted (--overwrite-uncommitted) lifts it. A file setup
@@ -476,9 +484,9 @@ class Setup:
         hooks line fails and overwrites nothing)."""
         if not self.hooks_rebuild or self.overwrite_uncommitted or self.is_new:
             return
-        # only what this run renders: --only hooks never reads the runner's copy, --only parts never the hooks'
+        # only what this run renders: --only hooks never reads a runner's copy, --only parts never the hooks'
         rels = (self._hook_rebuild_rels() if self.only in (None, "hooks") else []) + \
-            (self._parts_rebuild_rels() if self.only in (None, "parts") else [])
+            [r for n in self.runners if self.only in (None, n) for r in self._runner_rebuild_rels(n)]
         if not rels:
             return
         here, pre = self._git_where()
@@ -507,12 +515,12 @@ class Setup:
                 and cover(f["rel"])[0] is not True
                 and (self.target / f["rel"]).read_bytes() != f["src"].read_bytes()]  # equal: nothing to lose
 
-    def _parts_rebuild_rels(self):
+    def _runner_rebuild_rels(self, name):
         """[the runner copy] when it is on disk and differs from the committed source
-        byte for byte (c_parts would write it), else []. No source: [] (c_parts fails,
-        writing nothing); the source's own repo gets no copy."""
-        body, _, _, src, where, _ = self._parts_committed()
-        rel = self.comp["parts"]["file"]
+        byte for byte (_c_runner would write it), else []. No source: [] (the
+        component fails, writing nothing); the source's own repo gets no copy."""
+        body, _, _, src, where, _ = self._runner_committed(name)
+        rel = self.comp[name]["file"]
         dst = self.target / rel
         if body is None or self.target.resolve() == where or not dst.is_file():
             return []
@@ -791,24 +799,36 @@ class Setup:
         return Result("check", "unchanged", f"./{c['file']} present, executable, parses")
 
     def _parts_source(self):
-        """(the runner source file, its dependency's folder, None), or (None, None, why):
-        the parts entry's dependency (dependencies.json), resolved by walking up from
-        this tool, and its `runner` inside it. No dependency (a lone clone): why."""
-        name = self.comp["parts"]["dependency"]
+        return self._runner_source("parts")
+
+    def _runner_source(self, name):
+        """(the runner source file, the git work tree holding it, None), or (None,
+        None, why). An entry with a `dependency` (parts): that dependency
+        (dependencies.json), resolved by walking up from this tool, and its `runner`
+        inside it; no dependency (a lone clone): why. An entry with a `source`
+        (mutate): that file of this tool, in the work tree this tool sits in."""
+        c = self.comp[name]
+        if "source" in c:
+            where = _toplevel(TOOL_ROOT)
+            if where is None:
+                return None, None, f"{TOOL_ROOT} is in no git work tree"
+            return (TOOL_ROOT / c["source"]).resolve(), where, None
+        dep = c["dependency"]
         if self.deps is None:
             return None, None, self.dep_why
-        where, why = deps.resolve(name, deps=self.deps)
+        where, why = deps.resolve(dep, deps=self.deps)
         if where is None:
             return None, None, why
-        src, why = deps.runner(name, where, self.deps)
+        src, why = deps.runner(dep, where, self.deps)
         return src, where, why
 
     def render_source(self, component):
         """(the git work tree the component renders from, [paths in it that must be
         committed], None), or (None, None, why): what `setup fanout` names as the
         source commit. The rules block: this tool's template. The hooks: the hook
-        source (--hooks-from or the dependency's). The parts runner: its dependency,
-        rendered as HEAD holds it, so nothing more must be committed."""
+        source (--hooks-from or the dependency's). A runner (parts, mutate): the work
+        tree holding its source, rendered as HEAD holds it, so nothing more must be
+        committed."""
         if component == "rules":
             where, paths = _toplevel(TOOL_ROOT), [self.comp["rules"]["template"]]
             return where, paths, None if where else f"{TOOL_ROOT} is in no git work tree"
@@ -819,74 +839,86 @@ class Setup:
             if where is None:
                 return None, None, f"the hook source {self.hooks_from} is in no git work tree: no commit to name"
             return where, [self.hooks_from.resolve().relative_to(where).as_posix()], None
-        if component == "parts":
-            src, where, why = self._parts_source()
+        if component in self.runners:
+            src, where, why = self._runner_source(component)
             return (where.resolve(), [], None) if src is not None else (None, None, why)
         return None, None, f"{component} has no render source setup can name"
 
-    def _parts_committed(self):
+    def _runner_committed(self, name):
         """(body, mode, dirty, src, where, None), or (None, None, None, src, where, why):
         the runner as its repo's HEAD holds it (deps.committed), read once a run. The
         work tree's uncommitted changes to it (dirty) are its owner's work in
         progress: never rendered."""
-        if getattr(self, "_parts_cache", None) is None:
-            src, where, why = self._parts_source()
+        cache = self.__dict__.setdefault("_runner_cache", {})
+        if name not in cache:
+            src, where, why = self._runner_source(name)
             if src is None:
-                self._parts_cache = (None, None, None, None, None, why)
+                cache[name] = (None, None, None, None, None, why)
             else:
                 body, mode, dirty, why = deps.committed(where, src)
-                self._parts_cache = (body, mode, dirty, src, where, why)
-        return self._parts_cache
+                cache[name] = (body, mode, dirty, src, where, why)
+        return cache[name]
 
     def c_parts(self):
-        """The shared suite runner as a rendered copy (PLAN-small-tasks §7 step 2), at
-        the entry's `file`: absent, installed; byte-equal, unchanged; equal by meaning
-        (pymeaning: the syntax tree, docstrings included), rewritten from the source,
-        "header refreshed"; meaning differs, drift, byte-unchanged unless hooks_rebuild
-        (--rebuild without --node: _rebuild_guard has already refused a differing copy
-        with changes git does not hold). In the dependency's own repo, none: it runs
-        the source. The source is the runner as its repo's HEAD holds it, mode
-        included: uncommitted changes to it are named, never rendered. The copy is
-        never imported or run here."""
-        rel = self.comp["parts"]["file"]
-        body, mode, dirty, src, where, why = self._parts_committed()
+        """The shared suite runner (PLAN-small-tasks §7 step 2): _c_runner."""
+        return self._c_runner("parts")
+
+    def c_mutate(self):
+        """The one mutant runner, this tool's own: _c_runner, into a repo that keeps
+        the entry's `when` file (its mutants)."""
+        return self._c_runner("mutate")
+
+    def _c_runner(self, name):
+        """A runner as a rendered copy, at the entry's `file`: absent, installed (only
+        where the entry's `when` file, if it names one, is present); byte-equal,
+        unchanged; equal by meaning (pymeaning: the syntax tree, docstrings
+        included), rewritten from the source, "header refreshed"; meaning differs,
+        drift, byte-unchanged unless hooks_rebuild (--rebuild without --node:
+        _rebuild_guard has already refused a differing copy with changes git does
+        not hold). In the source's own repo, none: it runs the source. The source is
+        the runner as its repo's HEAD holds it, mode included: uncommitted changes
+        to it are named, never rendered. The copy is never imported or run here."""
+        rel, when = self.comp[name]["file"], self.comp[name].get("when")
+        dst = self.target / rel
+        if when and not dst.exists() and not (self.target / when).is_file():
+            return Result(name, "none", f"no {when} here, so no {rel}: it is installed only beside one")
+        body, mode, dirty, src, where, why = self._runner_committed(name)
         if src is None:
-            return Result("parts", "failed", f"no runner to render ({why}); nothing compared, nothing written")
+            return Result(name, "failed", f"no runner to render ({why}); nothing compared, nothing written")
         if self.stands_for.resolve() == where:  # a rebuild's render stands for the real path
-            return Result("parts", "none", f"this repo is the runner's source ({src.relative_to(where)}): "
-                                           "it runs that, no copy")
+            return Result(name, "none", f"this repo is the runner's source ({src.relative_to(where)}): "
+                                        "it runs that, no copy")
         if body is None:
-            return Result("parts", "failed", f"no runner to render ({why}); nothing compared, nothing written")
+            return Result(name, "failed", f"no runner to render ({why}); nothing compared, nothing written")
         want = pymeaning.meaning(body)
         if want is None:
-            return Result("parts", "failed", f"the source {src} does not parse at its HEAD; nothing compared, "
-                                             "nothing written")
+            return Result(name, "failed", f"the source {src} does not parse at its HEAD; nothing compared, "
+                                          "nothing written")
         wip = "; its uncommitted changes are its owner's, not rendered" if dirty else ""
         tag = f"{rel} (runner {pymeaning.version(body) or 'version unread'}, from {src} as committed{wip})"
-        dst = self.target / rel
         dry = " (dry run, not written)" if self.dry_run else ""
         if not dst.exists():
-            return self._parts_write(rel, body, mode, "installed", f"installed {tag}{dry}")
+            return self._runner_write(name, rel, body, mode, "installed", f"installed {tag}{dry}")
         if not dst.is_file():
-            return Result("parts", "drift", f"{rel} is not a file; not overwritten")
+            return Result(name, "drift", f"{rel} is not a file; not overwritten")
         if dst.read_bytes() == body:
-            return Result("parts", "unchanged", tag)
+            return Result(name, "unchanged", tag)
         if pymeaning.meaning(dst) == want:
-            return self._parts_write(rel, body, mode, "installed",
-                                     f"header refreshed (equal by meaning, rewritten from the source): {tag}{dry}")
+            return self._runner_write(name, rel, body, mode, "installed",
+                                      f"header refreshed (equal by meaning, rewritten from the source): {tag}{dry}")
         had = pymeaning.version(dst) or "version unread"
         if not self.hooks_rebuild:
-            return Result("parts", "drift", f"{rel}: its meaning differs from the source (copy {had}; source: "
-                                            f"{tag}): drift, not overwritten: `--rebuild` overwrites it")
-        return self._parts_write(rel, body, mode, "installed",
-                                 f"--rebuild rewrote {tag} (the copy, {had}, differed in meaning){dry}")
+            return Result(name, "drift", f"{rel}: its meaning differs from the source (copy {had}; source: "
+                                         f"{tag}): drift, not overwritten: `--rebuild` overwrites it")
+        return self._runner_write(name, rel, body, mode, "installed",
+                                  f"--rebuild rewrote {tag} (the copy, {had}, differed in meaning){dry}")
 
-    def _parts_write(self, rel, body, mode, status, detail):
+    def _runner_write(self, name, rel, body, mode, status, detail):
         try:
             self.w.write(rel, body, mode=mode)
         except OSError as e:
-            return Result("parts", "failed", f"{rel}: writing it failed ({e.__class__.__name__})")
-        return Result("parts", status, detail)
+            return Result(name, "failed", f"{rel}: writing it failed ({e.__class__.__name__})")
+        return Result(name, status, detail)
 
     # ---- the contract files (PLAN-routing-tree.md §14.8) ----------------------
 
@@ -1491,7 +1523,7 @@ class Setup:
         ok = {self.SETTINGS} if self._settings_rides(dirty) else set()
         if self.overwrite_uncommitted and self.hooks_rebuild:
             ok |= set(self._hook_rebuild_rels() if self.only in (None, "hooks") else [])
-            ok |= set(self._parts_rebuild_rels() if self.only in (None, "parts") else [])
+            ok |= {r for n in self.runners if self.only in (None, n) for r in self._runner_rebuild_rels(n)}
         return ok
 
     def _would_render(self):

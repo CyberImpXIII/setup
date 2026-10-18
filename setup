@@ -99,7 +99,17 @@
       id cited resolves (`<research cli> get <id> --json`, dependencies.json); one
       cited under `## Decisions` is answered at full depth (open or quick: FAIL).
       With ids cited, a `note  research:` line counts them; no research CLI (a lone
-      clone): `UNCHECKED research: ...`, exit 3, never ok. --steps instead reports each step of each plan not done, one line
+      clone): `UNCHECKED research: ...`, exit 3, never ok. In each plan not done
+      that carries a `## Practices` heading (setuplib/practices.py, PLAN-services
+      §3 A3): it names at least one registry id, one list item each starting
+      `- `<id>``, each once; each resolves in the practice registry (the checks
+      dependency's `registry`, its `rules[].id`); and each approved decision
+      (an item of a Decisions section carrying the word `approved`) names its
+      gate row, gate: `<id>` (resolved likewise), or says `prose: <why>`. A
+      `note  practices:` line counts the plans carrying the heading: the rule
+      that every plan not done carries it is held, never a failure. Ids named and
+      no readable registry: `UNCHECKED practices: ...`, exit 3, never ok.
+      --steps instead reports each step of each plan not done, one line
       `<status> <file> §<s> step <n>  <detail>`: open, closed, needs-yes,
       superseded, untracked (an owner, no tag), dangling (the tag does not
       resolve), unchecked (could not look it up: a store item without --todo, or
@@ -163,7 +173,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from setuplib import audit, core, facts, fanout, fsw, plans, rsids, steps  # noqa: E402
+from setuplib import audit, core, facts, fanout, fsw, plans, practices, rsids, steps  # noqa: E402
 
 SUBCOMMANDS = ["components", "plans", "audit", "fanout"]
 
@@ -225,21 +235,40 @@ def _live_plans(folder, instead=None):
 
 
 def _plans_findings(folder, instead=None):
-    """(findings, note, research note, unchecked) of the plans gate over folder:
-    audit.audit_plans, then the `## Research` id rules (setuplib/rsids.py) over the
-    plans not done. The research note is None when no plan cites an id; unchecked
-    names why ids could not be resolved (no research CLI), else None."""
+    """(findings, note, notes, unchecked) of the plans gate over folder:
+    audit.audit_plans, then the `## Research` id rules (setuplib/rsids.py) and the
+    `## Practices` rules (setuplib/practices.py) over the plans not done. notes:
+    [(label, text)] for the `note` lines (research only when a plan cites an id;
+    practices whenever a plan is not done, counting those without the heading while
+    that rule is held); unchecked: [why ids could not be resolved, one per rule,
+    `research: ...` or `practices: ...`], empty when every id cited could be."""
     findings, note = audit.audit_plans(folder, instead)
     named = [(p.name, t) for p, t in _live_plans(folder, instead)]
-    if not any(rsids.ID_RX.search(t) for _, t in named):
-        return findings, note, None, None
-    cli, why = rsids.service_cli()
-    found, unresolved, count = rsids.findings(named, cli)
-    rnote = (f"{count} citation(s) of rs- ids in {sum(1 for _, t in named if rsids.ID_RX.search(t))} "
-             f"plan(s), " + (f"resolved with {cli}" if cli else "not resolved"))
-    unchecked = (f"{len(unresolved)} id(s) cited ({', '.join(unresolved[:5])}"
-                 f"{', ...' if len(unresolved) > 5 else ''}), none resolved: {why}") if unresolved else None
-    return findings + found, note, rnote, unchecked
+    notes, unchecked = [], []
+    if any(rsids.ID_RX.search(t) for _, t in named):
+        cli, why = rsids.service_cli()
+        found, unresolved, count = rsids.findings(named, cli)
+        findings = findings + found
+        notes.append(("research", f"{count} citation(s) of rs- ids in "
+                                  f"{sum(1 for _, t in named if rsids.ID_RX.search(t))} plan(s), "
+                                  + (f"resolved with {cli}" if cli else "not resolved")))
+        if unresolved:
+            unchecked.append(f"research: {len(unresolved)} id(s) cited ({', '.join(unresolved[:5])}"
+                             f"{', ...' if len(unresolved) > 5 else ''}), none resolved: {why}")
+    if named:
+        # the registry is read only when a plan carries the heading: none does, nothing to resolve
+        ids, where = (practices.registry_ids() if any(practices.cited(t)[0] for _, t in named)
+                      else (None, None))
+        found, unresolved, without = practices.findings(named, ids)
+        findings = findings + found
+        held = "" if practices.REQUIRE_HEADING else " (the required-heading rule is held: never a failure)"
+        notes.append(("practices", f"{len(named) - len(without)} of {len(named)} plan(s) not done carry a "
+                                   f"`## Practices` heading{held}"
+                                   + (f"; ids resolved in {where}" if ids is not None else "")))
+        if unresolved:
+            unchecked.append(f"practices: {len(unresolved)} id(s) named ({', '.join(unresolved[:5])}"
+                             f"{', ...' if len(unresolved) > 5 else ''}), none resolved: {where}")
+    return findings, note, notes, unchecked
 
 
 def _cite(s):
@@ -267,19 +296,19 @@ def plans_gate(args):
         return facts_report(Path(a.dir), Path(a.root) if a.root else Path(a.dir), a.json)
     if a.steps:
         return steps_report(Path(a.dir), a.todo, a.cited_in, a.json)
-    findings, note, rnote, unchecked = _plans_findings(Path(a.dir))
+    findings, note, notes, unchecked = _plans_findings(Path(a.dir))
     if Path(a.dir).is_dir():  # G2's failing rule is held: the unplaceable steps are counted, never a failure
         found = [s for path, text in _live_plans(a.dir) for s in steps.parse(path.name, text)]
         bad = [_cite(s) for s in found if not s["placeable"]]
         first = f" ({', '.join(bad[:5])}{', ...' if len(bad) > 5 else ''})" if bad else ""
         print(f"  note  steps: {len(found)} steps, {len(bad)} unplaceable{first}; `setup plans {a.dir} --steps` "
               "lists them (G2's failing rule is held: never a failure)")
-    if rnote:
-        print(f"  note  research: {rnote}")
+    for label, text in notes:
+        print(f"  note  {label}: {text}")
     for f in findings:
         print(f"  FAIL  {f}")
-    if unchecked:  # never a pass: the ids are cited and nothing could say whether they resolve
-        print(f"  UNCHECKED  research: {unchecked}")
+    for u in unchecked:  # never a pass: the ids are cited and nothing could say whether they resolve
+        print(f"  UNCHECKED  {u}")
     if not findings and not unchecked:  # the ok line stays last: a caller reads the last line
         print(f"  ok    {note}: every plan not done has a Setup component heading")
     return 1 if findings else 3 if unchecked else 0
@@ -475,7 +504,7 @@ def _guarded_plan_write(action, a, change):
     if before:
         return refuse(f"`setup plans {folder}` is already red ({len(before)} finding(s)), first: {before[0]}")
     if unchecked:
-        return refuse(f"`setup plans {folder}` is not green: UNCHECKED research: {unchecked}")
+        return refuse(f"`setup plans {folder}` is not green: UNCHECKED {'; '.join(unchecked)}")
     done, why = change(name, text, new)
     if why:
         return refuse(why)
@@ -484,7 +513,7 @@ def _guarded_plan_write(action, a, change):
     if after:
         return refuse(f"the {action} would turn `setup plans {folder}` red, first: {after[0]}")
     if unchecked:
-        return refuse(f"after the {action}, `setup plans {folder}` would not be green: UNCHECKED research: {unchecked}")
+        return refuse(f"after the {action}, `setup plans {folder}` would not be green: UNCHECKED {'; '.join(unchecked)}")
     why = stale()
     if why:
         return refuse(why)

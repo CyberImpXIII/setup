@@ -44,6 +44,8 @@
   {"name": "test.plans", "run": "python3 -m unittest -v tests.test_plans", "files": ["tests/test_plans.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests"},
   {"name": "test.plugins", "run": "python3 -m unittest -v tests.test_plugins", "files": ["tests/test_plugins.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup, which reads its dependencies in the workspace"},
+  {"name": "test.practices", "run": "python3 -m unittest -v tests.test_practices", "files": ["tests/test_practices.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
+   "always": "reads the practice registry in the workspace (tools/checks' gates.json)"},
   {"name": "test.rebuild", "run": "python3 -m unittest -v tests.test_rebuild", "files": ["tests/test_rebuild.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup, which reads its dependencies in the workspace"},
   {"name": "test.record_pass", "run": "python3 -m unittest -v tests.test_record_pass", "files": ["tests/test_record_pass.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests"},

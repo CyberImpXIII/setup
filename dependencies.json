@@ -9,10 +9,11 @@
       "comparator": {"module": "hookslib.copies", "function": "meaning"}
     },
     "checks": {
-      "_used_by": "the parts component: the shared suite runner (<path>/<runner>), rendered byte for byte into each repo (components.json `parts`). --checks CLI still has no default (a run of the shared checks costs minutes)",
+      "_used_by": "the parts component: the shared suite runner (<path>/<runner>), rendered byte for byte into each repo (components.json `parts`); and `setup plans`: the practice registry (<path>/<registry>, its `rules[].id`, read only), where each id a `## Practices` section names, and each gate row an approved decision names, must resolve (setuplib/practices.py, PLAN-services §3 A1, A3). --checks CLI still has no default (a run of the shared checks costs minutes)",
       "path": "tools/checks",
       "cli": "checks",
-      "runner": "checkslib/parts.py"
+      "runner": "checkslib/parts.py",
+      "registry": "gates.json"
     },
     "docs": {
       "_used_by": "the docs component: the shared docs index that reads each repo's docs declaration. Its file name (<reader.module>.<reader.declaration>), its grammar (<reader.parse>(text, label), raising on a line it does not read) and its resolution (<reader.resolve>(repo name, repo dir, rows) -> (docs, failed)) are imported from <path>, never copied here. Without this dependency nothing reads a declaration, so none is written",

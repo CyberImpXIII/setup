@@ -14,16 +14,17 @@ from tests.helpers import ROOT, Case, commit_all, git_repo, workspace_cli
 DOC = json.loads((ROOT / deps.DEPS_FILE).read_text())
 
 
-def plant(top: Path, name, cli=True, source=True, executable=True, runner=True, reader=True):
+def plant(top: Path, name, cli=True, source=True, executable=True, runner=True, reader=True, registry=True):
     """A sibling repo at its declared path (top/tools/<name> when undeclared) with its
     CLI, source folder and (when dependencies.json declares one for it) its runner
-    file and its reader module (or not)."""
+    file, its registry file and its reader module (or not)."""
     d = DOC["dependencies"].get(name, {})
     repo = git_repo(top / d.get("path", f"tools/{name}"), commit=False)
-    declared = d.get("runner")
-    if runner and declared:
-        (repo / declared).parent.mkdir(parents=True, exist_ok=True)
-        (repo / declared).write_text("x = 1\n")
+    for key, want in (("runner", runner), ("registry", registry)):
+        declared = d.get(key)
+        if want and declared:
+            (repo / declared).parent.mkdir(parents=True, exist_ok=True)
+            (repo / declared).write_text("x = 1\n")
     if reader and d.get("reader"):
         mod = repo / (d["reader"]["module"].replace(".", "/") + ".py")
         mod.parent.mkdir(parents=True, exist_ok=True)
@@ -64,6 +65,7 @@ class Vocabulary(Case):
                     {"x": {"path": "/abs", "cli": "a"}},
                     {"x": {"path": "../up", "cli": "a"}},
                     {"x": {"path": "a", "cli": "a", "comparator": {"module": "m"}}},
+                    {"x": {"path": "a", "cli": "a", "registry": "../up.json"}},
                     {"x": {"path": "a", "cli": "a", "reader": {"module": "m", "parse": "p"}}},
                     {"x": {"path": "a", "cli": "a", "reader": {"module": "m", "declaration": "D", "parse": "p",
                                                                "resolve": "r", "extra": "e"}}},
@@ -132,6 +134,17 @@ class Audit(Case):
         findings, _ = self.run_audit(tool)
         self.assertEqual(len(findings), 1, findings)
         self.assertIn("is not a file", findings[0])
+
+    def test_a_missing_registry_is_a_finding(self):
+        top = self.tmp / "ws"
+        tool = self.tool_in(top)
+        plant(top, "hooks")
+        plant(top, "checks", source=False, registry=False)
+        plant(top, "docs", source=False)
+        plant(top, "research", source=False)
+        findings, _ = self.run_audit(tool)
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("gates.json is not a file", findings[0])
 
     def test_a_missing_reader_is_a_finding(self):
         top = self.tmp / "ws"

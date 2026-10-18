@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (82 open, 4 closed in todo-history.json; seal e248e2cad682): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (87 open, 4 closed in todo-history.json; seal 56cb44396007): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -697,6 +697,17 @@
   Copies rendered so far: this repo only. Other repos get it on their next `./setup`.
   · added: 2026-10-15
 
+- **su-91 · When does setup plans require a ## Practices heading in every plan not done (practices.REQUIRE_HEADING)?**
+  · status: waiting-jacob
+  · waits on: decision:PLAN-services.md §3
+  · pointer: PLAN-services.md §3
+  · hinges on: On 2026-10-18 none of the 36 live plans carried the heading (setup plans . : note practices: 0 of 36); turning the rule on makes the gate red, and a red gate refuses every setup plans edit/add, so every plan write stops until each plan has one
+  · recommend: after-backfill
+  · options: after-backfill = turn it on once the planner has added a ## Practices section to each live plan; dated = turn it on at a dated cut-over, plans not done by then fail
+  · work: decision
+  · files: setuplib/practices.py
+  · added: 2026-10-18
+
 ## Unconfirmed suspicions
 
 ## Reported to other owners
@@ -762,6 +773,34 @@
   · reported to: hub on 2026-10-04 (no counterpart yet)
   · added: 2026-10-15
 
+- **su-89 · Practice ids resolve against gates.json rules[].id; step 7.2 (tl-283) has not landed PRACTICES rows there yet**
+  setup plans resolves each ## Practices id and each approved decision's gate: row in tools/checks/gates.json rules[].id (dependencies.json checks.registry). If 7.2 puts practice rows under another key or file, every cited id fails as unresolved; checks to confirm the rows keep rules[].id, or tell setup
+  · reported to: checks on 2026-10-18 (no counterpart yet)
+  · files: setuplib/practices.py, dependencies.json
+  · added: 2026-10-18
+
+## Plan steps
+
+- **su-87 · `setup`**
+  made by todo sync-plans 2026-10-18 from PLAN-architecture.md §9 step 2:
+  **`setup`:** `setup plans` accepts a `## Fit` heading and requires it in a plan that creates a tool (§6).
+  · status: waiting-jacob
+  · waits on: decision:PLAN-architecture.md §6
+  · tags: plan:PLAN-architecture.md§9
+  · plan pins: PLAN-architecture.md§9 as of 2026-10-18 (sha256 cdbe8bcf590a)
+  · plan step: PLAN-architecture.md §9 step 2, hash bf0a50ee8143
+  · added: 2026-10-18
+
+- **su-88 · `setup`**
+  made by todo sync-plans 2026-10-18 from PLAN-hard-gates.md §7 step 2:
+  **`setup`:** the `git-hooks` component (`core.hooksPath`, `commit-msg`, `pre-commit` calling the repo's `./dev.sh check` stamp and `no-secrets`), the `commit-msg` hook stamping his own terminal commits (§8 answer 2), `needs-jacob` for the registrations. ~40k.
+  · status: waiting-jacob
+  · waits on: approval
+  · tags: plan:PLAN-hard-gates.md§7
+  · plan pins: PLAN-hard-gates.md§7 as of 2026-10-18 (sha256 d10974a2ca5d)
+  · plan step: PLAN-hard-gates.md §7 step 2, hash 2b5f6c4f0a6b
+  · added: 2026-10-18
+
 ## Notes
 
 - **su-64 · 2026-10-10, via the dispatcher (top TODO Q6 (b)):**
@@ -821,3 +860,8 @@
   · work: code
   · done when: check-pass (setup's githooks) lets a commit through when the only unstaged change is .claude/settings.json Jacob owns, or Jacob commits his settings change; the staged store edits here are then committed
   · added: 2026-10-17
+
+- **su-90 · transcripts and context-hygiene: .claude/settings.json equals settings.proposed.json but stays uncommitted**
+  2026-10-18: git commit --only -- .claude/settings.json refused by check-pass match in both (transcripts staged 4be496492c94 vs recorded ef042c539dc8; context-hygiene d02728449e98 vs d80d7b3b1d93): the record is git add --all of the whole tree and each holds other sessions' WIP. Nothing changed in either. Waits on su-84/su-86 (approved: null)
+  · blocked by: su-84
+  · added: 2026-10-18

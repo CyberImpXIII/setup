@@ -20,6 +20,8 @@
   {"name": "test.facts", "run": "python3 -m unittest -v tests.test_facts", "files": ["tests/test_facts.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests"},
   {"name": "test.fanout", "run": "python3 -m unittest -v tests.test_fanout", "files": ["tests/test_fanout.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup fanout, which renders the workspace's sources and runs tools/hooks' copies check"},
+  {"name": "test.fit", "run": "python3 -m unittest -v tests.test_fit", "files": ["tests/test_fit.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
+   "always": "runs ./setup, which reads its dependencies in the workspace"},
   {"name": "test.fixture", "run": "python3 -m unittest -v tests.test_fixture", "files": ["tests/test_fixture.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup, which reads its dependencies in the workspace"},
   {"name": "test.githooks", "run": "python3 -m unittest -v tests.test_githooks", "files": ["tests/test_githooks.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",

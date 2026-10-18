@@ -108,7 +108,11 @@
       gate row, gate: `<id>` (resolved likewise), or says `prose: <why>`. A
       `note  practices:` line counts the plans carrying the heading: the rule
       that every plan not done carries it is held, never a failure. Ids named and
-      no readable registry: `UNCHECKED practices: ...`, exit 3, never ok.
+      no readable registry: `UNCHECKED practices: ...`, exit 3, never ok. A
+      plan not done that creates a tool, declared in its header as
+      `> **Creates:** `<path>`` (setuplib/fit.py, PLAN-architecture §6),
+      carries a `## Fit` heading; a Fit section is never empty; a Creates line
+      names its paths in backticks. A `note  fit:` line counts both.
       --steps instead reports each step of each plan not done, one line
       `<status> <file> §<s> step <n>  <detail>`: open, closed, needs-yes,
       superseded, untracked (an owner, no tag), dangling (the tag does not
@@ -173,7 +177,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from setuplib import audit, core, facts, fanout, fsw, plans, practices, rsids, steps  # noqa: E402
+from setuplib import audit, core, facts, fanout, fit, fsw, plans, practices, rsids, steps  # noqa: E402
 
 SUBCOMMANDS = ["components", "plans", "audit", "fanout"]
 
@@ -237,7 +241,8 @@ def _live_plans(folder, instead=None):
 def _plans_findings(folder, instead=None):
     """(findings, note, notes, unchecked) of the plans gate over folder:
     audit.audit_plans, then the `## Research` id rules (setuplib/rsids.py) and the
-    `## Practices` rules (setuplib/practices.py) over the plans not done. notes:
+    `## Practices` rules (setuplib/practices.py) and the `## Fit` rule
+    (setuplib/fit.py) over the plans not done. notes:
     [(label, text)] for the `note` lines (research only when a plan cites an id;
     practices whenever a plan is not done, counting those without the heading while
     that rule is held); unchecked: [why ids could not be resolved, one per rule,
@@ -265,6 +270,10 @@ def _plans_findings(folder, instead=None):
         notes.append(("practices", f"{len(named) - len(without)} of {len(named)} plan(s) not done carry a "
                                    f"`## Practices` heading{held}"
                                    + (f"; ids resolved in {where}" if ids is not None else "")))
+        found, declaring, with_fit = fit.findings(named)
+        findings = findings + found
+        notes.append(("fit", f"{len(declaring)} plan(s) not done declare `**Creates:**`, "
+                             f"{len(with_fit)} carry a `## Fit` heading"))
         if unresolved:
             unchecked.append(f"practices: {len(unresolved)} id(s) named ({', '.join(unresolved[:5])}"
                              f"{', ...' if len(unresolved) > 5 else ''}), none resolved: {where}")

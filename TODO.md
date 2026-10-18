@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (87 open, 4 closed in todo-history.json; seal 56cb44396007): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (88 open, 4 closed in todo-history.json; seal b3d9d3d195a4): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -779,15 +779,19 @@
   · files: setuplib/practices.py, dependencies.json
   · added: 2026-10-18
 
+- **su-92 · Plans that create a tool must declare it in a Creates header line**
+  setup plans (setuplib/fit.py, PLAN-architecture §9 step 2) requires a ## Fit heading only in a plan not done that declares > **Creates:** `<path>` in its first 25 lines; which plans create a tool is never guessed from prose, so an undeclared one is not seen. On 2026-10-18: 0 of 36 live plans declare it. The plan template for a new tool should carry the line
+  · reported to: planner on 2026-10-18 (no counterpart yet)
+  · files: setuplib/fit.py
+  · added: 2026-10-18
+
 ## Plan steps
 
 - **su-87 · `setup`**
   made by todo sync-plans 2026-10-18 from PLAN-architecture.md §9 step 2:
-  **`setup`:** `setup plans` accepts a `## Fit` heading and requires it in a plan that creates a tool (§6).
-  · status: waiting-jacob
-  · waits on: decision:PLAN-architecture.md §6
+  **`setup`:** `setup plans` accepts a `## Fit` heading and requires it in a plan that creates a tool (§6; approved: Jacob 2026-10-18).
   · tags: plan:PLAN-architecture.md§9
-  · plan pins: PLAN-architecture.md§9 as of 2026-10-18 (sha256 cdbe8bcf590a)
+  · plan pins: PLAN-architecture.md§9 as of 2026-10-18 (sha256 85c972ffc177)
   · plan step: PLAN-architecture.md §9 step 2, hash bf0a50ee8143
   · added: 2026-10-18
 

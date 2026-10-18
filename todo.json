@@ -2,7 +2,7 @@
   "format": 2,
   "repo": "setup",
   "prefix": "su",
-  "next": 92,
+  "next": 93,
   "render_gate_from": "2026-10-22",
   "hand_edits": [],
   "items": [
@@ -2843,13 +2843,13 @@
       "id": "su-87",
       "title": "`setup`",
       "kind": "plan-step",
-      "status": "waiting-jacob",
-      "evidence": "made by todo sync-plans 2026-10-18 from PLAN-architecture.md §9 step 2:\n**`setup`:** `setup plans` accepts a `## Fit` heading and requires it in a plan that creates a tool (§6).",
+      "status": "open",
+      "evidence": "made by todo sync-plans 2026-10-18 from PLAN-architecture.md §9 step 2:\n**`setup`:** `setup plans` accepts a `## Fit` heading and requires it in a plan that creates a tool (§6; approved: Jacob 2026-10-18).",
       "probe": null,
       "reported_to": null,
       "parent": null,
       "blocked_by": null,
-      "waits_on": "decision:PLAN-architecture.md §6",
+      "waits_on": null,
       "pointer": null,
       "hinges_on": null,
       "recommend": null,
@@ -2873,7 +2873,7 @@
       "plan_pins": [
         {
           "plan": "PLAN-architecture.md§9",
-          "digest": "cdbe8bcf590a0682167172df48a5308dacf6c40929ac0955c6a92560d3737dde",
+          "digest": "85c972ffc17737bcfc1d0a8c724dfe4c3929461fe8ee5f2549ec17a3ff34e720",
           "date": "2026-10-18"
         }
       ],
@@ -3071,7 +3071,50 @@
       "done": null,
       "resolution": null,
       "imported": null
+    },
+    {
+      "id": "su-92",
+      "title": "Plans that create a tool must declare it in a Creates header line",
+      "kind": "report",
+      "status": "open",
+      "evidence": "setup plans (setuplib/fit.py, PLAN-architecture §9 step 2) requires a ## Fit heading only in a plan not done that declares > **Creates:** `<path>` in its first 25 lines; which plans create a tool is never guessed from prose, so an undeclared one is not seen. On 2026-10-18: 0 of 36 live plans declare it. The plan template for a new tool should carry the line",
+      "probe": null,
+      "reported_to": {
+        "repo": "planner",
+        "date": "2026-10-18",
+        "their_id": null
+      },
+      "parent": null,
+      "blocked_by": null,
+      "waits_on": null,
+      "pointer": null,
+      "hinges_on": null,
+      "recommend": null,
+      "options": null,
+      "chosen": null,
+      "jacob_words": null,
+      "repo": "setup",
+      "work": null,
+      "size": null,
+      "files": [
+        "setuplib/fit.py"
+      ],
+      "research": null,
+      "done_when": null,
+      "done_check": null,
+      "handoff": null,
+      "approved": null,
+      "dispatched": null,
+      "retire": null,
+      "tags": null,
+      "plan_pins": null,
+      "detector": null,
+      "plan_step": null,
+      "added": "2026-10-18",
+      "done": null,
+      "resolution": null,
+      "imported": null
     }
   ],
-  "seal": "9a4d51707642dcaa"
+  "seal": "c1b7d624d5721dce"
 }

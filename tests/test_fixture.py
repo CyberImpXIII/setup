@@ -8,7 +8,7 @@ from tests.helpers import DOCS_DECLARATION, HOOK_SOURCE, Case, git, hook_listing
 
 class Fixture(Case):
     def test_new_folder_is_scaffolded_and_committed(self):
-        code, res = self.run_json("fresh")
+        code, res = self.run_json("fresh", "--description", "A scaffolded fixture.")  # none: services needs-owner
         self.assertEqual(code, 0)
         self.assertEqual(self.statuses(res), {
             "repo": "installed", "rules": "installed", "hooks": "installed",

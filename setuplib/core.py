@@ -125,6 +125,34 @@ def _fill_doc(doc, values: dict):
     return _fill(doc, values) if isinstance(doc, str) else doc
 
 
+def declared_description(argv):
+    """The --description a node.json `rebuild` command passes (the node's declared input
+    to its own render), the last one as argparse takes it; None when it passes none, or
+    one that is not a description (description_why)."""
+    found = None
+    for i, a in enumerate(argv):
+        if a == "--description":
+            found = argv[i + 1] if i + 1 < len(argv) else None
+        elif a.startswith("--description="):
+            found = a.split("=", 1)[1]
+    return found if description_why(found) is None else None
+
+
+def description_why(value):
+    """None when value is a repo's description (PLAN-architecture §6 "Every tool
+    registered": one line, the stub), else why not. The one test, for --description
+    and for an existing services.json alike."""
+    if value is None:
+        return "absent"
+    if not isinstance(value, str):
+        return "not a string"
+    if not value.strip():
+        return "empty"
+    if "\n" in value or "\r" in value:
+        return "more than one line"
+    return None
+
+
 def _json_file(p: Path):
     """(document, None), or (None, why) for a file that is missing or does not parse."""
     try:
@@ -243,8 +271,16 @@ class Setup:
                  github: bool = False, private: bool = False, owner=None,
                  hooks_from=None, plugins_from=None, user_scope_from=None, dir_base=None, gh: str = "gh",
                  spec=None, node=False, rebuild=False, rebuild_dry=False, nest_in=None, stands_for=None,
-                 checks_cli=None, data_repo=None, only=None, hooks_rebuild=False, overwrite_uncommitted=False, no_commit=False):
+                 checks_cli=None, data_repo=None, only=None, hooks_rebuild=False, overwrite_uncommitted=False, no_commit=False,
+                 description=None):
         self.target = target
+        # --description: the one line written into a services.json this run creates
+        # (PLAN-architecture §9 step 10.2); never into an existing one, never a child's
+        self.description = description
+        # what a node's rebuild renders services.json with: --description, else the one its
+        # node.json `rebuild` command declares (c_node), so a child node rebuilt from its
+        # parent renders as that command would
+        self.render_description = description
         # --no-commit: an existing repo's render is written and left uncommitted, each path
         # named, for its owner to commit with its own work; a dirty tree is let through,
         # a path the run would write that holds uncommitted changes is not (_clean_guard)
@@ -923,17 +959,42 @@ class Setup:
     # ---- the contract files (PLAN-routing-tree.md §14.8) ----------------------
 
     def skeleton(self, name=None):
-        """The services.json setup writes for a repo called name (default: this one)."""
-        return _fill_doc(self.comp["services"]["skeleton"], {"name": name or self.name})
+        """The services.json setup writes for a repo called name (default: this one,
+        which alone carries --description: a child's is never guessed)."""
+        doc = _fill_doc(self.comp["services"]["skeleton"], {"name": name or self.name})
+        if name is None and self.description is not None:
+            items = list(doc.items())  # after the name, as a reader looks for it
+            doc = dict([items[0], (self.comp["services"]["description"], self.description), *items[1:]])
+        return doc
 
     def c_services(self):
+        """PLAN-routing-tree §14.8, and PLAN-architecture §9 step 10.2: the skeleton
+        when absent, with --description as its one-line `description`; an existing
+        file is the owner's, only read for that description (missing: drift)."""
         c = self.comp["services"]
-        if (self.target / c["file"]).exists():
-            return Result("services", "unchanged", f"{c['file']} present: the owner's, not read here "
-                                                   "(the shared services-valid gates it)")
-        self.w.write(c["file"], json.dumps(self.skeleton(), indent=2) + "\n")
-        return Result("services", "installed", f"{c['file']} skeleton: the name and its check entry only; "
-                                               "the owner adds write entries and tags")
+        f, key = c["file"], c["description"]
+        if (self.target / f).exists():
+            doc, why = _json_file(self.target / f)
+            if why is None and not isinstance(doc, dict):
+                why = "is not a JSON object"
+            if why:
+                return Result("services", "drift", f"{f} {why}: its `{key}` cannot be read; the owner's, never "
+                                                   "overwritten (the shared services-valid gates its shape)")
+            bad = description_why(doc.get(key))
+            unused = ("" if self.description is None else
+                      f"; --description not applied: it is written only into a {f} setup creates")
+            if bad:
+                return Result("services", "drift", f"{f} has no `{key}` ({bad}): the owner adds one line saying "
+                                                   f"what this repo is for; never written here{unused}")
+            return Result("services", "unchanged", f"{f} present, with its `{key}`: the owner's (the shared "
+                                                   f"services-valid gates the rest){unused}")
+        self.w.write(f, json.dumps(self.skeleton(), indent=2) + "\n")
+        if self.description is None:
+            return Result("services", "needs-owner", f"{f} skeleton written without a `{key}`: no --description "
+                                                     "given; the owner adds one line saying what this repo is for "
+                                                     "(a later run reports it missing as drift)")
+        return Result("services", "installed", f"{f} skeleton: the name, its `{key}` (from --description) and "
+                                               "its check entry; the owner adds write entries and tags")
 
     def c_cli(self):
         c = self.comp["cli"]
@@ -1702,6 +1763,8 @@ class Setup:
                  f"{sum(not k['ok'] for k in self.children)} with a failure or drift"]
         rs = "unchanged"
         if self.rebuild:
+            if self.description is None:  # the input node.json's own command gives its render
+                self.render_description = declared_description(cfg["rebuild"])
             rw = Writer(self.target, self.rebuild_dry)  # the rebuild's own writes; the setup pass is dry
             self.rebuild_lines = nodefile.rebuild(self.target, cfg, self._render, rw)
             rs = nodefile.overall(self.rebuild_lines, bool(rw.written))
@@ -1734,7 +1797,10 @@ class Setup:
         spec["components"] = [c for c in self.spec["components"] if c["name"] in keep]
         s = Setup(folder, label=str(folder), name=self.name, dry_run=False, hooks_from=self.hooks_from,
                   plugins_from=self.plugins_from, user_scope_from=self.user_scope_from,
-                  dir_base=folder, gh=self.gh, spec=spec, stands_for=self.target)
+                  dir_base=folder, gh=self.gh, spec=spec, stands_for=self.target,
+                  # an input, as the name is: --description, else node.json's `rebuild` argv.
+                  # Never read back from services.json, which the shared rendered-matches deletes first
+                  description=self.render_description)
         try:
             results = s.run()
         except Refused as e:

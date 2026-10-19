@@ -5,9 +5,12 @@ setup created already carries its settings.json, PLAN-repo-setup §7.9)."""
 from tests.helpers import Case, snapshot
 
 
+DESC = "An idempotence fixture."  # a repo created without one drifts on its next run (test_contract.Description)
+
+
 class Idempotent(Case):
     def test_second_run_writes_nothing(self):
-        self.run_json("fresh")
+        self.run_json("fresh", "--description", DESC)
         before = snapshot(self.tmp / "fresh")
         code, res = self.run_json("fresh")
         self.assertEqual(code, 0)
@@ -16,7 +19,7 @@ class Idempotent(Case):
         self.assertNotIn("drift", self.statuses(res).values())
 
     def test_settled_repo_is_all_unchanged(self):
-        self.run_json("fresh")
+        self.run_json("fresh", "--description", DESC)
         repo = self.tmp / "fresh"
         (repo / "dev.sh").write_text("#!/usr/bin/env bash\necho ok\n")
         code, res = self.run_json("fresh")

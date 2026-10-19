@@ -3,8 +3,14 @@
 
   setup <path> [--dry-run] [--github [--private] [--owner O]] [--name N] [--hooks-from DIR]
                [--plugins FILE] [--user-scope FILE] [--relative-to DIR] [--checks CLI] [--data-repo DIR]
-               [--only COMPONENT] [--no-commit] [--json]
+               [--only COMPONENT] [--no-commit] [--description TEXT] [--json]
       install every component in components.json; one line each, then a result line.
+      --description TEXT: one line saying what the repo is for, written as the
+      `description` of a services.json this run creates (PLAN-architecture §9
+      step 10.2); none given, the skeleton has none and the line is needs-owner.
+      An existing services.json is never written: one without a description is
+      drift, --description or not. Refused (exit 2) when empty or more than one
+      line, or with --only naming another component.
       --only COMPONENT: run that one component alone (a name `setup components`
       lists), on an existing repo only (a new folder is refused: nothing else
       would create the repo), never with --node; e.g. --only hooks installs the
@@ -646,6 +652,7 @@ def cmd_setup(argv):
     p.add_argument("--overwrite-uncommitted", action="store_true")
     p.add_argument("--only")
     p.add_argument("--no-commit", action="store_true")
+    p.add_argument("--description")
     p.add_argument("--json", action="store_true")
     try:
         a = p.parse_args(argv)
@@ -655,6 +662,15 @@ def cmd_setup(argv):
     if a.only is not None and a.only not in names:
         print(f"setup: --only {a.only}: not a component (one of: {', '.join(names)})", file=sys.stderr)
         return 2
+    if a.description is not None:
+        why = core.description_why(a.description)
+        if why:
+            print(f"setup: --description is {why}: it is one line saying what the repo is for", file=sys.stderr)
+            return 2
+        if a.only not in (None, "services"):
+            print(f"setup: --description is written by the services component: --only {a.only} runs none",
+                  file=sys.stderr)
+            return 2
     if a.only and a.node:
         print("setup: --only runs one component of one repo: not with --node", file=sys.stderr)
         return 2
@@ -692,7 +708,7 @@ def cmd_setup(argv):
                    node=a.node, rebuild=a.rebuild and a.node, rebuild_dry=rebuild_dry, checks_cli=a.checks,
                    data_repo=data_repo(a.data_repo, cwd), only=a.only,
                    hooks_rebuild=hooks_rebuild, overwrite_uncommitted=a.overwrite_uncommitted,
-                   no_commit=a.no_commit)
+                   no_commit=a.no_commit, description=a.description)
     try:
         results = s.run()
     except core.Refused as e:

@@ -1,5 +1,6 @@
 {
   "name": "setup",
+  "description": "Brings a repo or a new folder to the shared baseline (rules block, hooks, settings proposal, TODO, check stub, contract files) and gates plans.",
   "services": [
     {
       "service": "check",

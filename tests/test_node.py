@@ -24,6 +24,11 @@ SCAFFOLD = ["CLAUDE.md", "TODO.md", "dev.sh", "services.json", "checks.json", ".
 CHECKS_CLI = workspace_cli("checks")[1]
 REBUILD = [str(SETUP), ".", "--node", "--rebuild"]
 ID = ["-c", "user.email=t@example.invalid", "-c", "user.name=t"]
+# A repo's description (PLAN-architecture §9 step 10.2): a fixture node is created with
+# it and its node.json's rebuild carries it, as an input of the render (services.json
+# without one is drift on the next run; tests/test_contract.py Description holds that)
+DESC = "Turns plain notes into dated entries."
+NODE_REBUILD = [*REBUILD, "--description", DESC]
 
 
 def commit_all(repo, msg="node config"):
@@ -32,8 +37,18 @@ def commit_all(repo, msg="node config"):
     assert r.returncode == 0, r.stderr + r.stdout
 
 
+def describe(repo, text=DESC):
+    """The owner's step for a repo setup created without a description (a node's
+    child): add it to services.json and commit."""
+    doc = json.loads((repo / "services.json").read_text())
+    name, *rest = doc.items()  # after the name, where setup's render puts it
+    doc = dict([name, ("description", text), *rest])
+    (repo / "services.json").write_text(json.dumps(doc, indent=2) + "\n")
+    commit_all(repo, "described")
+
+
 def write_node(repo, children=(), generated=SCAFFOLD, record=(), commit=True, **extra):
-    doc = {"rebuild": REBUILD, "generated": list(generated), "record": list(record), **extra}
+    doc = {"rebuild": NODE_REBUILD, "generated": list(generated), "record": list(record), **extra}
     if children:
         doc["children"] = list(children)
     (repo / "node.json").write_text(json.dumps(doc, indent=2) + "\n")
@@ -57,8 +72,8 @@ def statuses(doc):
 
 class NodeCase(Case):
     def tree(self, top="top", *args):
-        """A node created by setup from nothing."""
-        code, _ = self.run_json(top, *args)
+        """A node created by setup from nothing, with its description."""
+        code, _ = self.run_json(top, "--description", DESC, *args)
         self.assertEqual(code, 0)
         return self.tmp / top
 
@@ -108,6 +123,8 @@ class Node(NodeCase):
             self.assertEqual(sorted(git(["ls-files"], repo).stdout.split()), sorted(SCAFFOLD))
             self.assertEqual((repo / "TODO.md").read_text().splitlines()[0], f"# {name} TODO")
         self.assertIn("2 created", node_line(doc)["detail"])
+        for name in ("alpha", "beta"):  # setup never guesses a child's description: its owner's step
+            describe(top / name)
         # the second level: alpha becomes a node of its own, and the top recurses into it
         write_node(top / "alpha", children=["gamma"], record=["node.json"])
         code, doc = self.run_doc("top", "--node")
@@ -117,11 +134,15 @@ class Node(NodeCase):
         self.assertEqual(gamma["path"], "top/alpha/gamma")
         self.assertEqual(git(["rev-parse", "--show-toplevel"], top / "alpha/gamma").stdout.strip(),
                          str(top / "alpha/gamma"))
-        # and a third run on the settled tree writes nothing, anywhere
+        # gamma's owner describes it, which changes alpha's registry proposal (the union)
+        describe(top / "alpha/gamma")
+        self.assertEqual(self.run_doc("top", "--node")[0], 0)
+        # and a run on the settled tree writes nothing, anywhere
         before = snapshot(top)
         code, doc = self.run_doc("top", "--node")
         self.assertEqual(code, 0)
-        self.assertEqual(snapshot(top), before)
+        after = snapshot(top)
+        self.assertEqual(sorted(p for p in {*before, *after} if before.get(p) != after.get(p)), [])
         self.assertNotIn("installed", statuses(doc))
 
     def test_bad_node_json_fails_and_creates_nothing(self):
@@ -216,7 +237,7 @@ class Node(NodeCase):
 
 class Rebuild(NodeCase):
     def rebuild(self, *args, top="top"):
-        code, doc = self.run_doc(top, "--node", "--rebuild", *args)
+        code, doc = self.run_doc(top, "--node", "--rebuild", "--description", DESC, *args)
         return code, doc, self.by_path(doc["rebuild"])
 
     def test_a_scaffold_regenerates_byte_for_byte_and_nothing_is_written(self):
@@ -364,7 +385,8 @@ class Rebuild(NodeCase):
         top = self.tree()
         write_node(top, children=["alpha"])
         self.run_doc("top", "--node")
-        write_node(top / "alpha")
+        describe(top / "alpha")
+        write_node(top / "alpha")  # its command declares the description it was given
         (top / "alpha/stray.txt").write_text("x\n")
         code, doc, lines = self.rebuild()
         self.assertEqual(code, 0)
@@ -373,6 +395,9 @@ class Rebuild(NodeCase):
         kid = self.by_path(alpha["rebuild"])
         self.assertEqual(kid["stray.txt"]["status"], "unaccounted")
         self.assertEqual(kid["TODO.md"]["status"], "regenerated")
+        # rendered with the description its own node.json declares, not the parent's flag's absence
+        self.assertEqual(kid["services.json"]["status"], "regenerated")
+        self.assertEqual(json.loads((top / "alpha/services.json").read_text())["description"], DESC)
 
     def test_an_absent_child_is_not_created_by_a_rebuild(self):
         top = self.tree()
@@ -426,8 +451,12 @@ class LiveChecks(NodeCase):
         # proposal setup renders, the union of the services.json files under the node
         write_node(top, children=["alpha", "beta"], record=["registry.json"], registry="registry.json")
         self.run_doc("top", "--node")
+        for name in ("alpha", "beta"):  # each owner's step; alpha's equals its node.json's --description
+            describe(top / name)
         write_node(top / "alpha", children=["gamma"], record=["registry.json"], registry="registry.json")
         self.run_doc("top", "--node")
+        describe(top / "alpha/gamma")
+        self.run_doc("top", "--node")  # the proposals again, now carrying the descriptions
         for node in (top, top / "alpha"):
             (node / "registry.proposed.json").replace(node / "registry.json")
             for args in (["add", "registry.json"], [*ID, "commit", "-q", "-m", "registry"]):

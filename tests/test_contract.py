@@ -1,7 +1,9 @@
 """PLAN-routing-tree.md §14.8: the contract files are setup components, each with a
 shared check beside it, and setup runs those checks itself as its last step.
 
-  services  services.json, the skeleton: the repo's name and its `check` entry
+  services  services.json, the skeleton: the repo's name, its --description (PLAN-
+            architecture §9 step 10.2; a missing one in an existing file is drift)
+            and its `check` entry
   cli       cli.json is never written (no skeleton passes its schema; see below)
   params    checks.json, the baseline: no parameter set, so every check's default
   registry  in a node run, registry.proposed.json: the union of the node's and its
@@ -14,12 +16,13 @@ run the shared checks CLI as a subprocess (never imported); the gates component'
 own cases (a missing gate, an error, no JSON) use tests/fake_checks.py."""
 import json
 import os
+import shutil
 import subprocess
 import unittest
 
 from setuplib import core
 from tests.helpers import ROOT, Case, git, git_repo, snapshot, workspace_cli
-from tests.test_node import ID, commit_all, write_node
+from tests.test_node import DESC, ID, REBUILD, commit_all, write_node
 
 CHECKS_CLI = workspace_cli("checks")[1]
 FAKE = ROOT / "tests" / "fake_checks.py"
@@ -27,18 +30,19 @@ SPEC = core.load_spec()
 GATES = next(c for c in SPEC["components"] if c["name"] == "gates")["contract"]
 
 
-def skeleton(name):
-    return {"name": name, "services": [{"service": "check", "run": "dev.sh", "verbs": ["check"]}]}
+def skeleton(name, description=None):
+    doc = {"name": name, "services": [{"service": "check", "run": "dev.sh", "verbs": ["check"]}]}
+    return doc if description is None else {"name": name, "description": description, "services": doc["services"]}
 
 
 def load(p):
     return json.loads(p.read_text())
 
 
-def name_registry(top, children=("alpha", "beta")):
+def name_registry(top, children=("alpha", "beta"), **extra):
     """Jacob's step: registry.json (already in place) named in node.json, both
     committed by name (never add -A over the nested child repos)."""
-    write_node(top, children=children, record=["registry.json"], registry="registry.json", commit=False)
+    write_node(top, children=children, record=["registry.json"], registry="registry.json", commit=False, **extra)
     for args in (["add", "node.json", "registry.json"], [*ID, "commit", "-q", "-m", "registry"]):
         r = git(args, top)
         assert r.returncode == 0, r.stderr + r.stdout
@@ -46,10 +50,10 @@ def name_registry(top, children=("alpha", "beta")):
 
 class Contract(Case):
     def test_a_new_repo_gets_the_services_skeleton_committed(self):
-        code, res = self.run_json("fresh")
+        code, res = self.run_json("fresh", "--description", DESC)
         self.assertEqual((code, res["services"]["status"]), (0, "installed"))
         repo = self.tmp / "fresh"
-        self.assertEqual(load(repo / "services.json"), skeleton("fresh"))
+        self.assertEqual(load(repo / "services.json"), skeleton("fresh", DESC))
         self.assertIn("services.json", git(["ls-files"], repo).stdout.split())
 
     def test_the_skeleton_takes_the_name_given(self):
@@ -58,7 +62,7 @@ class Contract(Case):
 
     def test_an_existing_services_json_is_the_owners(self):
         repo = git_repo(self.tmp / "r")
-        mine = '{"name": "r", "services": [], "tags": ["x"]}\n'
+        mine = '{"name": "r", "description": "mine", "services": [], "tags": ["x"]}\n'
         (repo / "services.json").write_text(mine)
         commit_all(repo, "the owner's services.json")
         _, res = self.run_json("r")
@@ -92,7 +96,7 @@ class Contract(Case):
     def test_a_dry_run_writes_no_contract_file(self):
         repo = git_repo(self.tmp / "r")
         before = snapshot(repo)
-        _, res = self.run_json("r", "--dry-run")
+        _, res = self.run_json("r", "--dry-run", "--description", DESC)
         self.assertEqual((res["services"]["status"], res["params"]["status"]), ("installed", "installed"))
         self.assertEqual(snapshot(repo), before)
 
@@ -102,9 +106,155 @@ class Contract(Case):
         self.assertEqual(r.returncode, 0)
 
 
+class Description(Case):
+    """PLAN-architecture §9 step 10.2: setup writes --description as the one-line
+    `description` of a services.json it creates, and reports one missing from an
+    existing services.json as drift, never writing it. Built against the plan's shape
+    (a top-level string) before tools/checks' schema has the field (step 10.1, tl-312);
+    LiveContract.test_the_shared_schema_takes_a_description holds the two together."""
+
+    def owners(self, text):
+        repo = git_repo(self.tmp / "r")
+        (repo / "services.json").write_text(text)
+        commit_all(repo, "the owner's services.json")
+        return repo
+
+    def test_the_description_given_is_written_after_the_name(self):
+        code, res = self.run_json("fresh", "--description", DESC)
+        self.assertEqual((code, res["services"]["status"]), (0, "installed"))
+        text = (self.tmp / "fresh/services.json").read_text()
+        self.assertEqual(list(json.loads(text)), ["name", "description", "services"])
+        self.assertEqual(json.loads(text)["description"], DESC)
+
+    def test_the_input_changes_the_output(self):
+        self.run_json("one", "--description", DESC)
+        self.run_json("two", "--description", "Something else entirely.")
+        self.assertNotEqual(load(self.tmp / "one/services.json")["description"],
+                            load(self.tmp / "two/services.json")["description"])
+
+    def test_none_given_writes_none_and_says_so(self):
+        code, res = self.run_json("fresh")
+        self.assertEqual((code, res["services"]["status"]), (0, "needs-owner"))
+        self.assertIn("--description", res["services"]["detail"])
+        self.assertEqual(load(self.tmp / "fresh/services.json"), skeleton("fresh"))
+
+    def test_a_repo_created_without_one_drifts_on_the_next_run(self):
+        self.run_json("fresh")
+        before = (self.tmp / "fresh/services.json").read_bytes()
+        code, res = self.run_json("fresh")
+        self.assertEqual((code, res["services"]["status"]), (1, "drift"))
+        self.assertEqual((self.tmp / "fresh/services.json").read_bytes(), before)
+
+    def test_a_repo_created_with_one_is_unchanged_on_the_next_run(self):
+        self.run_json("fresh", "--description", DESC)
+        _, res = self.run_json("fresh")
+        self.assertEqual(res["services"]["status"], "unchanged")
+
+    def test_a_missing_or_bad_one_in_an_existing_file_is_drift_and_never_written(self):
+        cases = [("absent", {}), ("empty", {"description": ""}), ("empty", {"description": "  "}),
+                 ("not a string", {"description": 5}), ("more than one line", {"description": "a\nb"})]
+        for why, extra in cases:
+            with self.subTest(why, extra=extra):
+                text = json.dumps({"name": "r", **extra, "services": []}) + "\n"
+                repo = self.owners(text)
+                code, res = self.run_json("r")
+                self.assertEqual((code, res["services"]["status"]), (1, "drift"))
+                self.assertIn(why, res["services"]["detail"])
+                self.assertEqual((repo / "services.json").read_text(), text)
+                shutil.rmtree(repo)
+
+    def test_description_is_never_applied_to_an_existing_file(self):
+        text = '{"name": "r", "services": []}\n'
+        repo = self.owners(text)
+        code, res = self.run_json("r", "--description", DESC)
+        self.assertEqual((code, res["services"]["status"]), (1, "drift"))
+        self.assertIn("--description not applied", res["services"]["detail"])
+        self.assertEqual((repo / "services.json").read_text(), text)
+
+    def test_the_owners_description_stands_over_the_one_given(self):
+        text = '{"name": "r", "description": "mine", "services": []}\n'
+        repo = self.owners(text)
+        code, res = self.run_json("r", "--description", DESC)
+        self.assertEqual(res["services"]["status"], "unchanged")
+        self.assertIn("--description not applied", res["services"]["detail"])
+        self.assertEqual((repo / "services.json").read_text(), text)
+
+    def test_a_file_that_does_not_parse_is_drift(self):
+        for text in ("{not json\n", "[]\n"):
+            with self.subTest(text):
+                repo = self.owners(text)
+                code, res = self.run_json("r")
+                self.assertEqual((code, res["services"]["status"]), (1, "drift"))
+                self.assertEqual((repo / "services.json").read_text(), text)
+                shutil.rmtree(repo)
+
+    def test_a_bad_description_is_refused_before_anything_is_written(self):
+        for args in (["--description", ""], ["--description", " "], ["--description", "a\nb"]):
+            with self.subTest(args):
+                r = self.run_setup("fresh", *args)
+                self.assertEqual(r.returncode, 2, r.stderr)
+                self.assertIn("--description", r.stderr)
+                self.assertFalse((self.tmp / "fresh").exists())
+
+    def test_with_only_another_component_it_is_refused(self):
+        repo = git_repo(self.tmp / "r")
+        before = snapshot(repo)
+        r = self.run_setup("r", "--only", "params", "--description", DESC)
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn("--only params", r.stderr)
+        self.assertEqual(snapshot(repo), before)
+        code, res = self.run_json("r", "--only", "services", "--description", DESC)
+        self.assertEqual(res["services"]["status"], "installed")
+        self.assertEqual(load(repo / "services.json")["description"], DESC)
+
+    def rebuild_line(self, top, *args):
+        r = self.run_setup(".", "--node", "--rebuild", "--json", *args, cwd=top)
+        self.assertIn(r.returncode, (0, 1), r.stderr)
+        (line,) = [x for x in json.loads(r.stdout)["rebuild"] if x["path"] == "services.json"]
+        return line["status"]
+
+    def test_a_node_rebuild_takes_the_description_as_an_input_never_from_the_file(self):
+        """The shared rendered-matches deletes each generated file before it runs
+        node.json's `rebuild`, so the description is an argument of that command."""
+        self.run_json("top", "--description", DESC)
+        top = self.tmp / "top"
+        write_node(top, rebuild=REBUILD)  # a node.json whose command declares none
+        self.assertEqual(self.rebuild_line(top, "--description", DESC), "regenerated")
+        self.assertEqual(self.rebuild_line(top, "--description", "Another line."), "drift")
+        git(["checkout", "--", "services.json"], top)
+        self.assertEqual(self.rebuild_line(top), "drift")  # not read back from the file it renders
+        git(["checkout", "--", "services.json"], top)
+        # without the flag, the input is the one node.json's own command declares (so a
+        # child node rebuilt from its parent renders as its command would)
+        for declared in ([*REBUILD, "--description", DESC], [*REBUILD, f"--description={DESC}"],
+                         [*REBUILD, "--description", "Another line.", "--description", DESC]):
+            with self.subTest(declared):
+                write_node(top, rebuild=declared)
+                self.assertEqual(self.rebuild_line(top), "regenerated")
+        for declared in ([*REBUILD, "--description", "Another line."], [*REBUILD, "--description"],
+                         [*REBUILD, "--description", "a\nb"]):
+            with self.subTest(declared):
+                write_node(top, rebuild=declared)
+                self.assertEqual(self.rebuild_line(top), "drift")
+                git(["checkout", "--", "services.json"], top)
+        write_node(top, rebuild=[*REBUILD, "--description", "Another line."])
+        self.assertEqual(self.rebuild_line(top, "--description", DESC), "regenerated")  # the flag wins
+
+    def test_a_node_childs_description_is_never_guessed(self):
+        self.run_json("top", "--description", DESC)
+        top = self.tmp / "top"
+        write_node(top, children=["alpha"])
+        r = self.run_setup("top", "--node", "--json", "--description", DESC)
+        self.assertIn(r.returncode, (0, 1), r.stderr)
+        (kid,) = json.loads(r.stdout)["children"]
+        self.assertEqual({x["component"]: x["status"] for x in kid["results"]}["services"], "needs-owner")
+        self.assertNotIn("description", load(top / "alpha/services.json"))
+        self.assertEqual(load(top / "services.json")["description"], DESC)
+
+
 class Registry(Case):
     def node(self, children=("alpha", "beta"), **extra):
-        self.run_json("top")
+        self.run_json("top", "--description", DESC)
         top = self.tmp / "top"
         write_node(top, children=children, **extra)
         return top
@@ -115,6 +265,17 @@ class Registry(Case):
         doc = json.loads(r.stdout)
         return r.returncode, {x["component"]: x for x in doc["results"]}
 
+    def describe(self, top, *children):
+        """Each child's owner adds the description setup never guesses for it."""
+        out = {}
+        for rel in children:
+            doc = load(top / rel / "services.json")
+            doc["description"] = f"{rel}, described by its owner"
+            (top / rel / "services.json").write_text(json.dumps(doc))
+            commit_all(top / rel, "described")
+            out[rel] = doc
+        return out
+
     def test_none_outside_a_node_run(self):
         _, res = self.run_json("fresh")
         self.assertEqual(res["registry"]["status"], "none")
@@ -123,18 +284,21 @@ class Registry(Case):
     def test_the_proposal_is_the_union_of_every_services_json(self):
         top = self.node()
         self.run_node()
-        alpha = load(top / "alpha/services.json")
+        rows = self.describe(top, "alpha", "beta")
+        alpha = rows["alpha"]
         alpha["tags"] = ["alpha-tag"]
         (top / "alpha/services.json").write_text(json.dumps(alpha))
         code, res = self.run_node()
         self.assertEqual((code, res["registry"]["status"]), (0, "needs-jacob"))
         self.assertEqual(load(top / "registry.proposed.json"), {"services": {
-            ".": skeleton("top"), "alpha": alpha, "beta": skeleton("beta")}})
+            ".": skeleton("top", DESC), "alpha": alpha, "beta": rows["beta"]}})
         self.assertIn("no `registry`", res["registry"]["detail"])
 
     def test_a_live_registry_equal_to_the_union_is_unchanged_and_not_proposed(self):
         top = self.node()
         self.run_node()
+        self.describe(top, "alpha", "beta")
+        self.run_node()  # the proposal, refreshed with the owners' descriptions
         (top / "registry.json").write_text((top / "registry.proposed.json").read_text())
         (top / "registry.proposed.json").unlink()
         name_registry(top)
@@ -144,7 +308,7 @@ class Registry(Case):
 
     def test_a_live_registry_that_differs_is_proposed_with_the_rows_named(self):
         top = self.node()
-        (top / "registry.json").write_text(json.dumps({"services": {".": skeleton("top"), "gone": {}}}))
+        (top / "registry.json").write_text(json.dumps({"services": {".": skeleton("top", DESC), "gone": {}}}))
         name_registry(top)
         code, res = self.run_node()
         self.assertEqual((code, res["registry"]["status"]), (0, "needs-jacob"))
@@ -317,6 +481,31 @@ class LiveContract(Case):
         self.assertEqual(self.checks_one("services-valid", repo)["status"], "ok")
         self.assertEqual(self.checks_one("accessor", repo)["status"], "ok")
 
+    def test_setup_and_the_shared_registered_check_read_a_description_alike(self):
+        """The seam of PLAN-architecture §9 steps 10.1 and 10.2: two readings of one
+        field, setup's (core.description_why: drift unless one line with words) and
+        the shared `registered` check's. Each case: setup unchanged iff checks ok, and
+        a description setup writes passes the shared schema."""
+        r = subprocess.run([str(CHECKS_CLI), "list", "--json"], capture_output=True, text=True, env=self.env)
+        self.assertIn("registered", {x["name"] for x in json.loads(r.stdout)["checks"]},
+                      "the shared checks have no `registered` (step 10.1): nothing to hold setup's reading to")
+        cases = [{"description": DESC}, {}, {"description": ""}, {"description": "  "},
+                 {"description": "a\nb"}, {"description": "a\rb"}, {"description": 5}]
+        for i, extra in enumerate(cases):
+            with self.subTest(extra=extra):
+                self.run_json(f"r{i}")  # a whole repo, so nothing but the description can fail the contract
+                repo = self.tmp / f"r{i}"
+                (repo / "services.json").write_text(json.dumps({**skeleton(repo.name), **extra}))
+                commit_all(repo, "the owner's services.json")
+                _, res = self.run_json(repo.name, "--only", "services")
+                mine = res["services"]["status"]
+                theirs = self.checks_one("registered", repo)["status"]
+                self.assertIn(mine, ("unchanged", "drift"))
+                self.assertEqual(mine == "unchanged", theirs == "ok", (mine, theirs))
+        self.run_json("fresh", "--description", DESC)
+        self.assertEqual(self.checks_one("services-valid", self.tmp / "fresh")["status"], "ok")
+        self.assertEqual(self.checks_one("registered", self.tmp / "fresh")["status"], "ok")
+
     def test_a_verb_the_check_command_does_not_implement_turns_the_line_red(self):
         self.run_json("fresh")
         repo = self.tmp / "fresh"
@@ -338,17 +527,23 @@ class LiveContract(Case):
         self.assertIn("accessor", res["gates"]["detail"])
 
     def test_a_node_tree_passes_once_jacob_applies_the_registry(self):
-        self.run_json("top")
+        self.run_json("top", "--description", DESC)
         top = self.tmp / "top"
-        write_node(top, children=["alpha", "beta"])
-        code, doc = self.node_run(top)
+        rebuild = [*REBUILD, "--description", DESC]  # the node's description, an input of its render
+        write_node(top, children=["alpha", "beta"], rebuild=rebuild)
+        self.node_run(top)
+        for rel in ("alpha", "beta"):  # each child's owner adds its description (setup never guesses one)
+            d = load(top / rel / "services.json")
+            (top / rel / "services.json").write_text(json.dumps({**d, "description": f"{rel}, by its owner"}))
+            commit_all(top / rel, "described")
+        code, doc = self.node_run(top)  # the proposal, refreshed with the descriptions
         self.assertEqual(code, 1)  # no registry yet: registry-matches is red, and says so
         top_res = {x["component"]: x for x in doc["results"]}
         self.assertEqual(top_res["registry"]["status"], "needs-jacob")
         self.assertEqual(top_res["gates"]["status"], "drift")
         self.assertIn("registry-matches", top_res["gates"]["detail"])
         os.replace(top / "registry.proposed.json", top / "registry.json")  # Jacob's step
-        name_registry(top)
+        name_registry(top, rebuild=rebuild)
         code, doc = self.node_run(top)
         self.assertEqual(code, 0, doc)
         top_res = {x["component"]: x for x in doc["results"]}

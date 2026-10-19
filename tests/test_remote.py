@@ -45,7 +45,7 @@ class Remote(Case):
         self.assertIn("is private, asked for public", res["remote"]["detail"])
 
     def test_existing_origin_is_unchanged(self):
-        self.run_json("fresh", "--github")
+        self.run_json("fresh", "--github", "--description", "A remote fixture.")  # none: drift on the rerun
         code, res = self.run_json("fresh", "--github")
         self.assertEqual((code, res["remote"]["status"]), (0, "unchanged"))
         self.assertEqual(sum(c.startswith("repo create") for c in self.calls()), 1)

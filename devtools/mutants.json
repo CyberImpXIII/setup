@@ -849,6 +849,9 @@
      "run": ["python3", "-m", "unittest", "tests.test_mutate.Runner.test_sigterm_mid_run_stops_the_commands_and_removes_the_copies"]},
     {"id": "runner-moved-string-applied", "gate": "mutate.py: a mutant whose string moved is STALE, never run",
      "file": "devtools/mutate.py", "old": "        if n != 1:\n            return m[\"id\"], \"STALE\"", "new": "        if False:\n            return m[\"id\"], \"STALE\"",
-     "run": ["python3", "-m", "unittest", "tests.test_mutate.Runner.test_a_string_that_moved_is_stale"]}
+     "run": ["python3", "-m", "unittest", "tests.test_mutate.Runner.test_a_string_that_moved_is_stale"]},
+    {"id": "devsh-arm-ignores-argument", "gate": "dev.sh: an arm that takes no argument refuses one (never runs the whole suite as one part)",
+     "file": "dev.sh", "old": "      exit 2\n    fi ;;", "new": "    fi ;;",
+     "run": ["python3", "-m", "unittest", "tests.test_vocab.DevSh.test_an_arm_without_arguments_refuses_one"]}
   ]
 }

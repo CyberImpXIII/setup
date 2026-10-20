@@ -59,6 +59,24 @@ class DevSh(Case):
         handlers = re.findall(r"^cmd_([a-z]+)\(\)", src, re.M)
         self.assertEqual(sorted(handlers), sorted(arms))
 
+    def test_an_arm_without_arguments_refuses_one(self):
+        """`./dev.sh test test.x` ran the whole suite while reading as one part
+        (2026-10-19): every arm that does not shift its arguments refuses one, exit 2,
+        naming check --only, and runs nothing. `files` first: it is the cheap arm, so
+        with the guard gone the case fails there without running the suite."""
+        src = (ROOT / "dev.sh").read_text()
+        dispatch = src[src.rindex('case "${1:-}" in'):]
+        bare = re.findall(r"^  ([a-z]+)\)\s+cmd_\w+ ;;", dispatch, re.M)
+        guard = re.search(r"^  ([a-z|]+)\)\n    if \[ \$# -gt 1 \]", src, re.M)
+        self.assertIsNotNone(guard, "the no-argument guard before the dispatch is gone")
+        self.assertEqual(sorted(guard.group(1).split("|")), sorted(bare))
+        for arm in sorted(bare, key=lambda a: a != "files"):
+            r = subprocess.run(["./dev.sh", arm, "extra"], cwd=ROOT, capture_output=True, text=True, timeout=120)
+            self.assertEqual(r.returncode, 2, f"{arm}: {r.stdout[-300:]}{r.stderr[-300:]}")
+            self.assertIn(f"dev.sh {arm} takes no arguments (given: extra)", r.stderr)
+            self.assertIn("./dev.sh check --only <part>", r.stderr)
+            self.assertEqual(r.stdout, "")
+
     def test_check_runs_every_module_and_every_gate_but_plans(self):
         """check.parts.json (what `./dev.sh check` runs): one part per test module, one
         per gate dev.sh dispatches but check, test and plans, and the runner takes it."""

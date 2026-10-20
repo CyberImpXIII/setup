@@ -8,7 +8,7 @@ usage() {
 ./dev.sh <command>
 
   check      the parts of check.parts.json (each test module, then each gate below but plans) via devtools/parts.py: [--resume | --only NAME...] [--json]; non-zero if any part fails
-  test       the unit tests (tests/), trimmed to the result unless something fails
+  test       the unit tests (tests/), all of them, trimmed to the result unless something fails (test, hooks, files, audit, self refuse an argument: one part is check --only NAME)
   hooks      the shared hook copies: present, executable, parse, their own tests pass (exit 3 there: UNCHECKED, gate exit 3), registered (PENDING: only in the proposal, for Jacob)
   files      the files the tool needs: present, executable where they must be, data parses
   audit      setup audit content, direction and deps (content and deps are UNCHECKED, so red, in a lone clone)
@@ -154,6 +154,16 @@ cmd_check() {
   .githooks/check-pass record "${args[@]}" >&2 || echo "check: green, but the pass was not recorded (see above)" >&2
   return $code
 }
+
+# The arms below that take no argument refuse one: `./dev.sh test test.x` once ran
+# the whole suite while reading as one part. One part alone: check --only.
+case "${1:-}" in
+  test|hooks|files|audit|self)
+    if [ $# -gt 1 ]; then
+      echo "dev.sh $1 takes no arguments (given: ${*:2}); one part alone: ./dev.sh check --only <part>" >&2
+      exit 2
+    fi ;;
+esac
 
 case "${1:-}" in
   check)   shift; cmd_check "$@" ;;

@@ -2431,7 +2431,11 @@
       "done_when": "tools/hooks' hooks copies shows no drift or missing row at tools/todo, and the checks gate's hooks-installed passes",
       "done_check": null,
       "handoff": null,
-      "approved": null,
+      "approved": {
+        "by": "jacob",
+        "date": "2026-10-20",
+        "source": "Jacob 2026-10-19 via auto-relay line 223 (origin jacob)"
+      },
       "dispatched": null,
       "retire": null,
       "tags": null,
@@ -3061,48 +3065,11 @@
       "imported": null
     },
     {
-      "id": "su-97",
-      "title": "devtools/parts.py in tools/usage has drifted from tools/checks' runner -- input: `./dev.sh test t...",
-      "kind": "bug",
-      "status": "open",
-      "evidence": "reported from tools/usage to tools/setup in dispatch toolu_01Lyc7Vdjk3mvA8UW3gyVGHj, filed from the dispatch ledger by the delegation layer's report filer: devtools/parts.py in tools/usage has drifted from tools/checks' runner -- input: `./dev.sh test test.parts` -- expected: a byte match after `setup tools/usage --only parts --rebuild`",
-      "probe": null,
-      "reported_to": null,
-      "parent": "tl-374",
-      "blocked_by": null,
-      "waits_on": null,
-      "pointer": null,
-      "hinges_on": null,
-      "recommend": null,
-      "options": null,
-      "chosen": null,
-      "jacob_words": null,
-      "repo": "setup",
-      "work": null,
-      "size": null,
-      "files": null,
-      "research": null,
-      "done_when": null,
-      "done_check": null,
-      "handoff": null,
-      "approved": null,
-      "dispatched": null,
-      "retire": null,
-      "tags": null,
-      "plan_pins": null,
-      "detector": null,
-      "plan_step": null,
-      "added": "2026-10-19",
-      "done": null,
-      "resolution": null,
-      "imported": null
-    },
-    {
       "id": "su-98",
       "title": "devtools/parts.py in each repo is still 1.3.0 and lacks --jobs/uses -- input: checks checkslib/pa...",
       "kind": "bug",
       "status": "open",
-      "evidence": "reported from tools/checks to tools/setup in dispatch toolu_01RTRCd7BG3nGNiNv96j65Qw, filed from the dispatch ledger by the delegation layer's report filer: devtools/parts.py in each repo is still 1.3.0 and lacks --jobs/uses -- input: checks checkslib/parts.py 1.4.0 (0be97db) -- expected: reinstalled through each repo's parts component.",
+      "evidence": "reported from tools/checks to tools/setup in dispatch toolu_01RTRCd7BG3nGNiNv96j65Qw, filed from the dispatch ledger by the delegation layer's report filer: devtools/parts.py in each repo is still 1.3.0 and lacks --jobs/uses -- input: checks checkslib/parts.py 1.4.0 (0be97db) -- expected: reinstalled through each repo's parts component.\n2026-10-20: ./setup fanout parts --root <top> --dry-run: 12 repos drift (copy 1.3.0 vs runner 1.4.0, checks 0be97db): addon-bench, applications, emailTools, income, scriptingTools/chronjobScheduler, scriptingTools/data-bridge, scripts, tools/hooks, tools/research, tools/todo, tools/transcripts, tools/wizard; usage rebuilt (su-99), setup rebuilt (49f2dc3). Fix: ./setup fanout parts --rebuild --agent setup commits into each owner's repo: needs each repo clean, so expect failed rows where trees are dirty",
       "probe": null,
       "reported_to": null,
       "parent": "tl-376",
@@ -3139,7 +3106,7 @@
       "title": "tools/usage parts.py drifted from checks' runner (--jobs): rebuild it",
       "kind": "bug",
       "status": "open",
-      "evidence": "usage's tl-355 (891ca15), relayed: tools/usage/devtools/parts.py has drifted from tools/checks' runner, which gained --jobs in checks 18489e8; ./dev.sh test test.parts in tools/usage fails. Neither file touched by usage, no rebuild run\n2026-10-19: setup's own copy had the same drift (1.3.0 vs runner 1.4.0); rebuilt in 49f2dc3. Every repo holding a devtools/parts.py copy likely drifts alike: ./setup <repo> --only parts --rebuild --dry-run names it",
+      "evidence": "usage's tl-355 (891ca15), relayed: tools/usage/devtools/parts.py has drifted from tools/checks' runner, which gained --jobs in checks 18489e8; ./dev.sh test test.parts in tools/usage fails. Neither file touched by usage, no rebuild run\n2026-10-19: setup's own copy had the same drift (1.3.0 vs runner 1.4.0); rebuilt in 49f2dc3. Every repo holding a devtools/parts.py copy likely drifts alike: ./setup <repo> --only parts --rebuild --dry-run names it\n2026-10-20: ./setup tools/usage --only parts --rebuild --no-commit (usage tree held others' uncommitted hooks/lib/settings/TODO edits, so a committing render is refused): parts installed, copy 1.3.0 -> runner 1.4.0 (checks 0be97db); devtools/parts.py byte-equal to checks HEAD:checkslib/parts.py (cmp); usage ./dev.sh test test.parts: ok, 1 of 1 passed",
       "probe": null,
       "reported_to": null,
       "parent": null,
@@ -3160,8 +3127,16 @@
       "research": null,
       "done_when": "setup tools/usage --only parts --rebuild run; ./dev.sh test test.parts in tools/usage passes (byte match); usage commits the render",
       "done_check": null,
-      "handoff": null,
-      "approved": null,
+      "handoff": {
+        "date": "2026-10-20",
+        "text": "done: render written uncommitted in tools/usage (devtools/parts.py, byte-equal to checks 0be97db), usage's test.parts passes; next: usage commits devtools/parts.py with its own work, then close this; verify: git -C tools/usage log -1 -- devtools/parts.py shows the commit and ./dev.sh test test.parts in tools/usage is ok",
+        "commit": "4292287"
+      },
+      "approved": {
+        "by": "jacob",
+        "date": "2026-10-20",
+        "source": "Jacob 2026-10-19 via auto-relay line 224 (origin jacob)"
+      },
       "dispatched": null,
       "retire": null,
       "tags": null,
@@ -3439,5 +3414,5 @@
       "imported": null
     }
   ],
-  "seal": "e252bc0545aba20f"
+  "seal": "83eb8d575bfd7eaa"
 }

@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (97 open, 9 closed in todo-history.json; seal 5167c974a555): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (96 open, 10 closed in todo-history.json; seal 68008173215a): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -122,23 +122,22 @@
   · parent: tl-359
   · added: 2026-10-19
 
-- **su-97 · devtools/parts.py in tools/usage has drifted from tools/checks' runner -- input: `./dev.sh test t...**
-  reported from tools/usage to tools/setup in dispatch toolu_01Lyc7Vdjk3mvA8UW3gyVGHj, filed from the dispatch ledger by the delegation layer's report filer: devtools/parts.py in tools/usage has drifted from tools/checks' runner -- input: `./dev.sh test test.parts` -- expected: a byte match after `setup tools/usage --only parts --rebuild`
-  · parent: tl-374
-  · added: 2026-10-19
-
 - **su-98 · devtools/parts.py in each repo is still 1.3.0 and lacks --jobs/uses -- input: checks checkslib/pa...**
   reported from tools/checks to tools/setup in dispatch toolu_01RTRCd7BG3nGNiNv96j65Qw, filed from the dispatch ledger by the delegation layer's report filer: devtools/parts.py in each repo is still 1.3.0 and lacks --jobs/uses -- input: checks checkslib/parts.py 1.4.0 (0be97db) -- expected: reinstalled through each repo's parts component.
+  2026-10-20: ./setup fanout parts --root <top> --dry-run: 12 repos drift (copy 1.3.0 vs runner 1.4.0, checks 0be97db): addon-bench, applications, emailTools, income, scriptingTools/chronjobScheduler, scriptingTools/data-bridge, scripts, tools/hooks, tools/research, tools/todo, tools/transcripts, tools/wizard; usage rebuilt (su-99), setup rebuilt (49f2dc3). Fix: ./setup fanout parts --rebuild --agent setup commits into each owner's repo: needs each repo clean, so expect failed rows where trees are dirty
   · parent: tl-376
   · added: 2026-10-19
 
 - **su-99 · tools/usage parts.py drifted from checks' runner (--jobs): rebuild it**
   usage's tl-355 (891ca15), relayed: tools/usage/devtools/parts.py has drifted from tools/checks' runner, which gained --jobs in checks 18489e8; ./dev.sh test test.parts in tools/usage fails. Neither file touched by usage, no rebuild run
   2026-10-19: setup's own copy had the same drift (1.3.0 vs runner 1.4.0); rebuilt in 49f2dc3. Every repo holding a devtools/parts.py copy likely drifts alike: ./setup <repo> --only parts --rebuild --dry-run names it
+  2026-10-20: ./setup tools/usage --only parts --rebuild --no-commit (usage tree held others' uncommitted hooks/lib/settings/TODO edits, so a committing render is refused): parts installed, copy 1.3.0 -> runner 1.4.0 (checks 0be97db); devtools/parts.py byte-equal to checks HEAD:checkslib/parts.py (cmp); usage ./dev.sh test test.parts: ok, 1 of 1 passed
   · work: code
   · size: S
   · files: tools/usage/devtools/parts.py
   · done when: setup tools/usage --only parts --rebuild run; ./dev.sh test test.parts in tools/usage passes (byte match); usage commits the render
+  · handoff: done: render written uncommitted in tools/usage (devtools/parts.py, byte-equal to checks 0be97db), usage's test.parts passes; next: usage commits devtools/parts.py with its own work, then close this; verify: git -C tools/usage log -1 -- devtools/parts.py shows the commit and ./dev.sh test test.parts in tools/usage is ok (2026-10-20, at 4292287)
+  · approved: jacob 2026-10-20: Jacob 2026-10-19 via auto-relay line 224 (origin jacob)
   · added: 2026-10-19
 
 - **su-103 · test.check-parts fails because data-bridge's runner copy is stale -- input: tools/setup/setup scr...**
@@ -861,6 +860,7 @@
   · work: labour
   · size: M
   · done when: tools/hooks' hooks copies shows no drift or missing row at tools/todo, and the checks gate's hooks-installed passes
+  · approved: jacob 2026-10-20: Jacob 2026-10-19 via auto-relay line 223 (origin jacob)
   · added: 2026-10-15
 
 - **su-86 · To setup: check-pass refuses every commit while Jacob's uncommitted .claude/settings.json is in the tree**

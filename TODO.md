@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (95 open, 11 closed in todo-history.json; seal d57b8c7982f1): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (95 open, 11 closed in todo-history.json; seal 09c82e23bb5d): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -872,6 +872,7 @@
   2026-10-15 ~21:30: ./dev.sh check passed 24 of 24 and recorded tree f606de85c194, which includes the uncommitted .claude/settings.json change (made 20:45 by someone else; it now equals settings.proposed.json, so likely Jacob's wiring --apply -- unverified). git commit of TODO.md, todo.json, todo-history.json was refused by .githooks/pre-commit (check-pass match: staged tree 7db2b50d7982 != f606de85c194). Q6b says settings.json stays uncommitted and untouched, so no commit can pass here until it is committed, stashed, or check-pass leaves it out. The store edits stay staged, uncommitted.
   · parent: ch-66
   · work: code
+  · size: M
   · done when: check-pass (setup's githooks) lets a commit through when the only unstaged change is .claude/settings.json Jacob owns, or Jacob commits his settings change; the staged store edits here are then committed
   · added: 2026-10-17
 
@@ -879,6 +880,7 @@
   From data-bridge (6.3/6.4). Probe: git -C scriptingTools/data-bridge diff .claude/settings.json. Expected: committed by setup, or reverted, with store-guard listed once.
   · parent: tl-306
   · work: code
+  · size: S
   · done when: diff clean; store-guard registered once
   · added: 2026-10-19
 
@@ -886,6 +888,7 @@
   From setup's own run (tl-285 session); noted, unapproved. Expected: check-pass match tolerates a partial commit of an owner-only file.
   · parent: tl-309
   · work: code
+  · size: M
   · done when: settings.json can be committed in both repos
   · added: 2026-10-19
 
@@ -893,6 +896,7 @@
   From hub (tl-316). Probe: tools/hub ./dev.sh check, 'checks' part. Expected: green after setup tools/hub --only hooks --rebuild. Same drift family as tl-278 (hooks) and tl-309.
   · parent: tl-320
   · work: code
+  · size: S
   · done when: hub checks part green
   · added: 2026-10-19
 

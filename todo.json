@@ -2760,7 +2760,7 @@
       "jacob_words": null,
       "repo": "setup",
       "work": "code",
-      "size": null,
+      "size": "M",
       "files": null,
       "research": null,
       "done_when": "check-pass (setup's githooks) lets a commit through when the only unstaged change is .claude/settings.json Jacob owns, or Jacob commits his settings change; the staged store edits here are then committed",
@@ -2935,7 +2935,7 @@
       "jacob_words": null,
       "repo": "setup",
       "work": "code",
-      "size": null,
+      "size": "S",
       "files": null,
       "research": null,
       "done_when": "diff clean; store-guard registered once",
@@ -2972,7 +2972,7 @@
       "jacob_words": null,
       "repo": "setup",
       "work": "code",
-      "size": null,
+      "size": "M",
       "files": null,
       "research": null,
       "done_when": "settings.json can be committed in both repos",
@@ -3009,7 +3009,7 @@
       "jacob_words": null,
       "repo": "setup",
       "work": "code",
-      "size": null,
+      "size": "S",
       "files": null,
       "research": null,
       "done_when": "hub checks part green",
@@ -3381,5 +3381,5 @@
       "imported": null
     }
   ],
-  "seal": "d250fa255c4143e2"
+  "seal": "4c539446c8b02be3"
 }

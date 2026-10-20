@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (87 open, 5 closed in todo-history.json; seal 2a188e48f2ed): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (97 open, 9 closed in todo-history.json; seal 5167c974a555): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -116,6 +116,45 @@
   reported from tools/transcripts to tools/setup in dispatch toolu_01AMZayunWGyknYwA7iG5Jjn, filed from the dispatch ledger by the delegation layer's report filer: check-pass hashes `git add --all` of the working tree, so a commit can never pass while another session's unstaged change is in it -- input: transcripts tree with unstaged .claude/settings.json, commit of all other paths -- expected: a way to check the staged tree or name excluded paths.
   · parent: tl-258
   · added: 2026-10-16
+
+- **su-96 · practice ids live in gates.json `practices.rows[].id`; `rules[].id` holds the CLAUDE.md section r...**
+  reported from tools/checks to tools/setup in dispatch toolu_018yA82V2Y591W3oYWd3ofnY, filed from the dispatch ledger by the delegation layer's report filer: practice ids live in gates.json `practices.rows[].id`; `rules[].id` holds the CLAUDE.md section rows -- input: setuplib/practices.py resolving `## Practices` ids -- expected: resolve against practices.rows[].id (settles su-89; tl-307 closed). Also: checks holds a copy of todo's sqlstore.py until step 10.2.
+  · parent: tl-359
+  · added: 2026-10-19
+
+- **su-97 · devtools/parts.py in tools/usage has drifted from tools/checks' runner -- input: `./dev.sh test t...**
+  reported from tools/usage to tools/setup in dispatch toolu_01Lyc7Vdjk3mvA8UW3gyVGHj, filed from the dispatch ledger by the delegation layer's report filer: devtools/parts.py in tools/usage has drifted from tools/checks' runner -- input: `./dev.sh test test.parts` -- expected: a byte match after `setup tools/usage --only parts --rebuild`
+  · parent: tl-374
+  · added: 2026-10-19
+
+- **su-98 · devtools/parts.py in each repo is still 1.3.0 and lacks --jobs/uses -- input: checks checkslib/pa...**
+  reported from tools/checks to tools/setup in dispatch toolu_01RTRCd7BG3nGNiNv96j65Qw, filed from the dispatch ledger by the delegation layer's report filer: devtools/parts.py in each repo is still 1.3.0 and lacks --jobs/uses -- input: checks checkslib/parts.py 1.4.0 (0be97db) -- expected: reinstalled through each repo's parts component.
+  · parent: tl-376
+  · added: 2026-10-19
+
+- **su-99 · tools/usage parts.py drifted from checks' runner (--jobs): rebuild it**
+  usage's tl-355 (891ca15), relayed: tools/usage/devtools/parts.py has drifted from tools/checks' runner, which gained --jobs in checks 18489e8; ./dev.sh test test.parts in tools/usage fails. Neither file touched by usage, no rebuild run
+  2026-10-19: setup's own copy had the same drift (1.3.0 vs runner 1.4.0); rebuilt in 49f2dc3. Every repo holding a devtools/parts.py copy likely drifts alike: ./setup <repo> --only parts --rebuild --dry-run names it
+  · work: code
+  · size: S
+  · files: tools/usage/devtools/parts.py
+  · done when: setup tools/usage --only parts --rebuild run; ./dev.sh test test.parts in tools/usage passes (byte match); usage commits the render
+  · added: 2026-10-19
+
+- **su-103 · test.check-parts fails because data-bridge's runner copy is stale -- input: tools/setup/setup scr...**
+  reported from scriptingTools/data-bridge to tools/setup in dispatch toolu_01UiXvDCuZKQYpX69dGvS88M, filed from the dispatch ledger by the delegation layer's report filer: test.check-parts fails because data-bridge's runner copy is stale -- input: tools/setup/setup scriptingTools/data-bridge --only parts --dry-run prints "parts drift devtools/parts.py ... copy 1.3.0; source ... runner 1.4.0" (tools/checks 0be97db, 2026-10-19) -- expected: setup re-renders devtools/parts.py (--rebuild), then the part passes.
+  · parent: tl-436
+  · added: 2026-10-19
+
+- **su-104 · data-bridge's `devtools/parts.py` drifted from its source (copy 1.3.0, source runner 1.4.0), whic...**
+  reported from scriptingTools/data-bridge to tools/setup in dispatch toolu_01Ft7TAeCFbJUzMfkHvWZB5K, filed from the dispatch ledger by the delegation layer's report filer: data-bridge's `devtools/parts.py` drifted from its source (copy 1.3.0, source runner 1.4.0), which fails `test.check-parts` at line 393 -- input: `tools/setup/setup scriptingTools/data-bridge --only parts --dry-run` -- expected: `parts unchanged`.
+  · parent: tl-451
+  · added: 2026-10-19
+
+- **su-106 · the commit-msg hook (core.hooksPath) is set in only 4 of 20 repos, and 618 of 978 commits since 2...**
+  reported from tools/research to tools/setup in dispatch toolu_01UN1CyFQG8Z7QD9MeEmRrBq, filed from the dispatch ledger by the delegation layer's report filer: the commit-msg hook (core.hooksPath) is set in only 4 of 20 repos, and 618 of 978 commits since 2026-10-01 have no Agent trailer -- input: git -C <repo> config core.hooksPath -- expected: .githooks in all 20 (G5)
+  · parent: tl-475
+  · added: 2026-10-20
 
 ## Open decisions
 
@@ -502,18 +541,6 @@
   dependency decision as above.
   · added: 2026-10-15
 
-- **su-42 · td-9 (tools/todo: `devtools/mutate.py` duplicated from here), decided 2026-10-04: the runner moves to tools/checks, not into a setup component.**
-  A
-  component would install one copy per repo, the eight-copies problem again; the
-  procedure belongs in one place and each repo's `devtools/mutants.json` is the
-  data. Shape: `checks mutants [PATH]` running PATH's mutants.json in throwaway
-  copies, with todo's additions (the `edits` list, the read-only chmod). Then
-  this repo and todo call it from `dev.sh check` and delete their copies, add
-  beside then delete. Until then this copy is the original and todo's the
-  extended one; neither is changed (no fork, no third copy). Needs the
-  dependency decision above for setup's own `dev.sh` to call it. Reported below.
-  · added: 2026-10-15
-
 - **su-43 · Hook copies here are a ninth copy.**
   `tools/setup` is now in site-scrapers'
   `check-hooks.sh` DECLARED (seen 2026-10-04), and `hooks copies` in tools/hooks
@@ -697,18 +724,13 @@
   Copies rendered so far: this repo only. Other repos get it on their next `./setup`.
   · added: 2026-10-15
 
-- **su-91 · When does setup plans require a ## Practices heading in every plan not done (practices.REQUIRE_HEADING)?**
-  · status: waiting-jacob
-  · waits on: decision:PLAN-services.md §3
-  · pointer: PLAN-services.md §3
-  · hinges on: On 2026-10-18 none of the 36 live plans carried the heading (setup plans . : note practices: 0 of 36); turning the rule on makes the gate red, and a red gate refuses every setup plans edit/add, so every plan write stops until each plan has one
-  · recommend: after-backfill
-  · options: after-backfill = turn it on once the planner has added a ## Practices section to each live plan; dated = turn it on at a dated cut-over, plans not done by then fail
-  · work: decision
-  · files: setuplib/practices.py
-  · added: 2026-10-18
-
 ## Unconfirmed suspicions
+
+- **su-101 · test_two_level_tree flaked once under a parallel check run**
+  2026-10-19: tests.test_node.Node.test_two_level_tree_from_an_empty_folder failed once (second --node run exit 1, 9.8s) while a full ./dev.sh check ran in parallel; five reruns alone passed. Cause unknown; the failing component was not captured
+  · probe: python3 -m unittest tests.test_node.Node.test_two_level_tree_from_an_empty_folder, repeated
+  · files: tests/test_node.py
+  · added: 2026-10-19
 
 ## Reported to other owners
 
@@ -775,6 +797,7 @@
 
 - **su-89 · Practice ids resolve against gates.json rules[].id; step 7.2 (tl-283) has not landed PRACTICES rows there yet**
   setup plans resolves each ## Practices id and each approved decision's gate: row in tools/checks/gates.json rules[].id (dependencies.json checks.registry). If 7.2 puts practice rows under another key or file, every cited id fails as unresolved; checks to confirm the rows keep rules[].id, or tell setup
+  2026-10-19 checks' tl-321 report (checks 18489e8, relayed by the coordinator): practice ids live at gates.json practices.rows[].id; rules[].id holds the CLAUDE.md section rows. So setuplib/practices.py must resolve ## Practices ids against practices.rows[].id, not rules[].id
   · reported to: checks on 2026-10-18 (no counterpart yet)
   · files: setuplib/practices.py, dependencies.json
   · added: 2026-10-18
@@ -830,16 +853,6 @@
   proposal is under Open decisions.
   · added: 2026-10-15
 
-- **su-74 · devtools/mutate.py duplicates the setup repo's mutant runner**
-  Copied from tools/setup/devtools/mutate.py on 2026-10-04 and extended with an edits list (a gate guarded in two places needs both broken). Two copies will drift. Candidate for a shared component that setup installs.
-  2026-10-17: merged into one source (f861939): devtools/mutate.py here now has the edits list; the new mutate component renders it into any repo with devtools/mutants.json (setup <repo> --only mutate --rebuild). Open until tools/todo's fork is replaced: a dry run there says 'rewrote devtools/mutate.py (runner 2.0.0)'. Not written, because the todo agent was mid-check; its owner runs it.
-  · parent: td-9
-  · work: tooling
-  · size: M
-  · files: devtools/mutate.py
-  · done when: one copy, installed by setup, with the edits list
-  · added: 2026-10-15
-
 - **su-75 · checks gate: hooks-installed reports drift on four installed .claude/ files**
   ./dev.sh check, 2026-10-09 (commit after 77bce39): checks gate FAIL hooks-installed: extra-stores.sh (the installed hooks' lib folder), .claude/hooks/store-guard.sh and .claude/hooks/test-store-guard.sh 'drift; not covered by user scope (no shared hook of that name there)', .claude/hooks/test-no-inline-blobs.sh 'drift; not covered by user scope (not registered there)'. Last touched by 93532a8 (re-render of the shared hook copies from tools/hooks). Not this tool's files and not changed by td-22/td-27; reported to the hooks tool's owner through the dispatch report. Also live: ./dev.sh hooks FAIL 'store-guard.sh is not registered in .claude/settings.json' (td-2's remainder; the uncommitted settings.json now registers the other seven). 2026-10-12: the lib file's path is named without its folder here, because that folder in this store tripped the direction audit (audit, no-roster and two test_dev tests red).
   2026-10-15: of setup's Q6 render, test-no-inline-blobs.sh and lib/extra-stores.sh agree with source (hooks copies: ok) and are committed (c5f1886); store-guard.sh and test-store-guard.sh drift from hooks bdd932f and stay uncommitted. Also drift/missing at tools/todo: lib/ledger.sh, prefer-recipes.sh and its test, lib/write-targets.sh (drift); bin/commit.sh, git-funnel.sh and its test (missing). Needs a re-render by setup.
@@ -857,7 +870,40 @@
   · done when: check-pass (setup's githooks) lets a commit through when the only unstaged change is .claude/settings.json Jacob owns, or Jacob commits his settings change; the staged store edits here are then committed
   · added: 2026-10-17
 
-- **su-90 · transcripts and context-hygiene: .claude/settings.json equals settings.proposed.json but stays uncommitted**
-  2026-10-18: git commit --only -- .claude/settings.json refused by check-pass match in both (transcripts staged 4be496492c94 vs recorded ef042c539dc8; context-hygiene d02728449e98 vs d80d7b3b1d93): the record is git add --all of the whole tree and each holds other sessions' WIP. Nothing changed in either. Waits on su-84/su-86 (approved: null)
-  · blocked by: su-84
-  · added: 2026-10-18
+- **su-93 · To setup: data-bridge/.claude/settings.json has an uncommitted render adding git-funnel.sh and two store-guard.sh entries**
+  From data-bridge (6.3/6.4). Probe: git -C scriptingTools/data-bridge diff .claude/settings.json. Expected: committed by setup, or reverted, with store-guard listed once.
+  · parent: tl-306
+  · work: code
+  · done when: diff clean; store-guard registered once
+  · added: 2026-10-19
+
+- **su-94 · To setup: check-pass refuses a partial commit of an owner-only file (settings.json) in transcripts and context-hygiene because their trees hold other sessions' WIP (su-84/su-86)**
+  From setup's own run (tl-285 session); noted, unapproved. Expected: check-pass match tolerates a partial commit of an owner-only file.
+  · parent: tl-309
+  · work: code
+  · done when: settings.json can be committed in both repos
+  · added: 2026-10-19
+
+- **su-95 · To setup: tools/hub fails hooks-installed: ledger.sh, store-guard.sh, test-store-guard.sh drift from the hooks source (not covered by user scope)**
+  From hub (tl-316). Probe: tools/hub ./dev.sh check, 'checks' part. Expected: green after setup tools/hub --only hooks --rebuild. Same drift family as tl-278 (hooks) and tl-309.
+  · parent: tl-320
+  · work: code
+  · done when: hub checks part green
+  · added: 2026-10-19
+
+- **su-100 · checks' sqlstore.py copy waits on a 'step 10.2' that does not cover it**
+  checks' tl-321 report says checks holds a copy of todo's sqlstore.py (held equal by a test) until 'your step 10.2 settles where the shared copy lives'. PLAN-architecture §9 step 10.2 (tl-313, services.json description) says nothing about sqlstore and no PLAN names it: the reference resolves to no step. Ask the coordinator which step owns the shared copy's location
+  · added: 2026-10-19
+
+- **su-102 · Workspace repos show services drift until step 10.3 adds their descriptions**
+  Since tl-313 an existing services.json without a description is services drift (exit 1) on ./setup <repo> (not with --only another component). Every workspace repo lacks one until step 10.3 drafts them; the shared checks read the same absence as a lag (registered), setup as drift, per PLAN-architecture §9 step 10.2's wording
+  · done when: step 10.3's drafts applied in each repo; ./setup <repo> --dry-run shows services unchanged
+  · added: 2026-10-19
+
+- **su-105 · mutate copies have no push path: not in fanout or the node render list**
+  2026-10-19 (su-74 closing): tools/todo/devtools/mutate.py is the render (70de727, byte-equal; setup todo --only mutate --dry-run: unchanged). Nothing keeps it so: a later change to devtools/mutate.py here reaches todo only when someone runs setup there. mutate is in neither fanout.declared_by (rules, hooks, parts) nor the node render list, and CLAUDE.md's row points at TODO.md for that while no item said it. Candidate: fanout.declared_by mutate = {file: devtools/mutants.json}, the usage line and tests/test_fanout.py's component-to-render check. Not done under su-74: its done-when was met without it
+  · work: tooling
+  · size: S
+  · files: components.json, setuplib/fanout.py, CLAUDE.md
+  · done when: setup fanout mutate --dry-run names tools/todo, or a recorded reason it never should
+  · added: 2026-10-19

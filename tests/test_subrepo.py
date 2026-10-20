@@ -91,6 +91,7 @@ class SubRepo(Case):
         r = self.run_setup("ws", "--only", "hooks")
         self.assertEqual(r.returncode, 2, r.stdout)
         self.assertIn(".claude/settings.json", r.stderr)
+        self.assertNotIn("is committed with the render", r.stderr, "the refusal promises a ride that never happens here")
         self.assertEqual(snapshot(self.ws), before)
 
     def test_plugins_at_the_top_is_refused_and_nothing_written(self):

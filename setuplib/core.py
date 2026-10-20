@@ -1645,8 +1645,9 @@ class Setup:
             raise Refused(f"the tree is not clean ({', '.join(rest[:10])}{more}) and this run would render "
                           f"{len(would)} file(s) ({', '.join(would[:5])}{', ...' if len(would) > 5 else ''}): "
                           "setup commits what it renders in the same run, so it renders only into a clean tree; "
-                          "commit or discard those changes first (a settings.json equal to its "
-                          "settings.proposed.json is committed with the render)" + self._no_commit_hint())
+                          "commit or discard those changes first"
+                          + ("" if self.git_sub else " (a settings.json equal to its settings.proposed.json "
+                             "is committed with the render)") + self._no_commit_hint())
 
     def _no_commit_hint(self):
         """The way past a dirty-tree refusal that writes and commits nothing, named

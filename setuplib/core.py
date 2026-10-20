@@ -484,13 +484,18 @@ class Setup:
             notes.append("user scope covers none of these hooks")
         for why, names in unknown.items():
             notes.append(f"user scope could not tell ({why}): treated as not covered for {', '.join(names)}")
-        extra, p_statuses, p_notes = self._plugin_wants()
-        names = [Path(f["rel"]).name for f in files if f["main"]]
-        st, note = self._settings([n for n in names if n not in covered], extra, drop=covered)
-        statuses += [st, *p_statuses]
-        if note:
-            notes.append(note)
-        notes += p_notes
+        if self.git_sub:  # the workspace top: its settings.json has its own source (components.json sub_repo)
+            sr = self.comp["hooks"]["sub_repo"]
+            statuses.append(sr["status"])
+            notes.append(sr["note"] + (f"; {sr['stale']}" if (self.target / self.PROPOSAL).exists() else ""))
+        else:
+            extra, p_statuses, p_notes = self._plugin_wants()
+            names = [Path(f["rel"]).name for f in files if f["main"]]
+            st, note = self._settings([n for n in names if n not in covered], extra, drop=covered)
+            statuses += [st, *p_statuses]
+            if note:
+                notes.append(note)
+            notes += p_notes
         head = (f"{n_new} installed, {len(refreshed)} header refreshed, {n_same} unchanged of {len(files)}, "
                 f"against {self.hooks_from} ({how}; compared {by})")
         return Result("hooks", worst(statuses), "; ".join([head, *notes]))
@@ -1515,6 +1520,10 @@ class Setup:
         # the workspace top: not a repo, its hooks folder's parent is (`--only hooks` only)
         sub = self.comp["hooks"]["rebuild"]["scope_root"]
         if self.only == "hooks" and sub_repo(self.target, sub):
+            if self.plugins_from is not None:
+                raise Refused(f"--plugins proposes plug-in registrations, and {self.label}'s {sub}/ is its own repo "
+                              "whose settings.json has a source of its own: setup writes no proposal there "
+                              "(components.json hooks.sub_repo)")
             self.git_sub = self.w.git_sub = sub
             self.is_new, self._existed_empty = False, False
         else:
@@ -1571,8 +1580,9 @@ class Setup:
     def _settings_rides(self, dirty):
         """True when settings.json is among the dirty paths and is byte for byte its
         proposal (Jacob 2026-10-12, PLAN-architecture §11: then it is committed with
-        the render); any other settings difference stays Jacob's."""
-        if self.SETTINGS not in dirty:
+        the render); any other settings difference stays Jacob's. Never at the workspace
+        top (git_sub): its settings.json has a source of its own (components.json sub_repo)."""
+        if self.git_sub or self.SETTINGS not in dirty:
             return False
         live, prop = self.target / self.SETTINGS, self.target / self.PROPOSAL
         return live.is_file() and prop.is_file() and live.read_bytes() == prop.read_bytes()

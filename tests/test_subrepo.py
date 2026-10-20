@@ -1,7 +1,9 @@
 """The workspace top: a folder that is no git work tree, whose .claude/ is its own
 local repo. `--only hooks` renders the hook copies there and commits them in that
 repo, paths relative to it; every other run is refused as before, and the clean-tree
-rule (PLAN-architecture §11 S2) and --rebuild's guard read that repo."""
+rule (PLAN-architecture §11 S2) and --rebuild's guard read that repo. No settings
+proposal is written there, settings.json never rides the commit, and --plugins is
+refused (components.json hooks.sub_repo; PLAN-services §3 F3 step 3 (a))."""
 from tests.helpers import Case, commit_all, git, git_repo, hook_listing, snapshot
 
 
@@ -49,6 +51,56 @@ class SubRepo(Case):
         r = self.run_setup("ws", "--only", "hooks")
         self.assertEqual(r.returncode, 2, r.stdout)
         self.assertIn(".claude/scratch.txt", r.stderr)
+        self.assertEqual(snapshot(self.ws), before)
+
+    PROPOSAL = "settings.proposed.json"
+
+    def test_no_settings_proposal_at_the_top_where_a_repo_gets_one(self):
+        """su-77/su-40: the top's settings.json has a source of its own, so the hooks line
+        is needs-harness and nothing is proposed; the same run on a plain repo, its
+        settings lacking the same registrations, writes the proposal (the counterfactual)."""
+        plain = git_repo(self.tmp / "plain")
+        code, res = self.run_json("plain", "--only", "hooks")
+        self.assertTrue((plain / ".claude" / self.PROPOSAL).is_file(), res["hooks"]["detail"])
+        self.assertEqual(res["hooks"]["status"], "needs-jacob", res["hooks"]["detail"])
+        code, res = self.run_json("ws", "--only", "hooks")
+        self.assertEqual(code, 0, res)
+        self.assertFalse((self.repo / self.PROPOSAL).exists(), "a proposal was written at the top")
+        self.assertFalse((self.repo / "settings.json").exists(), "settings.json was written at the top")
+        self.assertEqual(res["hooks"]["status"], "needs-harness", res["hooks"]["detail"])
+        self.assertIn("no settings proposal written", res["hooks"]["detail"])
+        self.assertNotIn("left as found", res["hooks"]["detail"])
+        self.assertEqual(res["commit"]["status"], "installed", res["commit"]["detail"])
+
+    def test_a_proposal_from_an_earlier_run_is_named_and_left_as_found(self):
+        (self.repo / self.PROPOSAL).write_text('{"from": "an earlier run"}\n')
+        code, res = self.run_json("ws", "--only", "hooks", "--dry-run")
+        self.assertEqual(code, 0, res)
+        self.assertIn("left as found", res["hooks"]["detail"])
+        self.assertEqual((self.repo / self.PROPOSAL).read_text(), '{"from": "an earlier run"}\n')
+
+    def test_settings_equal_to_a_proposal_never_rides_the_commit_at_the_top(self):
+        """In a repo, settings.json byte for byte its proposal is committed with the
+        render; at the top it is not setup's to commit: the dirty tree is refused."""
+        (self.repo / "settings.json").write_text("{}\n")
+        commit_all(self.repo, "settings")
+        body = '{"hooks": {}}\n'
+        (self.repo / "settings.json").write_text(body)
+        (self.repo / self.PROPOSAL).write_text(body)
+        before = snapshot(self.ws)
+        r = self.run_setup("ws", "--only", "hooks")
+        self.assertEqual(r.returncode, 2, r.stdout)
+        self.assertIn(".claude/settings.json", r.stderr)
+        self.assertEqual(snapshot(self.ws), before)
+
+    def test_plugins_at_the_top_is_refused_and_nothing_written(self):
+        reg = self.tmp / "plugins.json"
+        reg.write_text('{"root": "%s", "ok": true, "plugins": []}\n' % self.ws)
+        before = snapshot(self.ws)
+        r = self.run_setup("ws", "--only", "hooks", "--plugins", str(reg))
+        self.assertEqual(r.returncode, 2, r.stdout)
+        self.assertIn("--plugins", r.stderr)
+        self.assertIn("writes no proposal there", r.stderr)
         self.assertEqual(snapshot(self.ws), before)
 
     def test_rebuild_guard_reads_the_claude_repo(self):

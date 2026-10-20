@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (96 open, 10 closed in todo-history.json; seal 1109e0fe1e88): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (95 open, 11 closed in todo-history.json; seal d57b8c7982f1): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -903,12 +903,4 @@
 - **su-102 · Workspace repos show services drift until step 10.3 adds their descriptions**
   Since tl-313 an existing services.json without a description is services drift (exit 1) on ./setup <repo> (not with --only another component). Every workspace repo lacks one until step 10.3 drafts them; the shared checks read the same absence as a lag (registered), setup as drift, per PLAN-architecture §9 step 10.2's wording
   · done when: step 10.3's drafts applied in each repo; ./setup <repo> --dry-run shows services unchanged
-  · added: 2026-10-19
-
-- **su-105 · mutate copies have no push path: not in fanout or the node render list**
-  2026-10-19 (su-74 closing): tools/todo/devtools/mutate.py is the render (70de727, byte-equal; setup todo --only mutate --dry-run: unchanged). Nothing keeps it so: a later change to devtools/mutate.py here reaches todo only when someone runs setup there. mutate is in neither fanout.declared_by (rules, hooks, parts) nor the node render list, and CLAUDE.md's row points at TODO.md for that while no item said it. Candidate: fanout.declared_by mutate = {file: devtools/mutants.json}, the usage line and tests/test_fanout.py's component-to-render check. Not done under su-74: its done-when was met without it
-  · work: tooling
-  · size: S
-  · files: components.json, setuplib/fanout.py, CLAUDE.md
-  · done when: setup fanout mutate --dry-run names tools/todo, or a recorded reason it never should
   · added: 2026-10-19

@@ -3344,47 +3344,6 @@
       "imported": null
     },
     {
-      "id": "su-105",
-      "title": "mutate copies have no push path: not in fanout or the node render list",
-      "kind": "note",
-      "status": "open",
-      "evidence": "2026-10-19 (su-74 closing): tools/todo/devtools/mutate.py is the render (70de727, byte-equal; setup todo --only mutate --dry-run: unchanged). Nothing keeps it so: a later change to devtools/mutate.py here reaches todo only when someone runs setup there. mutate is in neither fanout.declared_by (rules, hooks, parts) nor the node render list, and CLAUDE.md's row points at TODO.md for that while no item said it. Candidate: fanout.declared_by mutate = {file: devtools/mutants.json}, the usage line and tests/test_fanout.py's component-to-render check. Not done under su-74: its done-when was met without it",
-      "probe": null,
-      "reported_to": null,
-      "parent": null,
-      "blocked_by": null,
-      "waits_on": null,
-      "pointer": null,
-      "hinges_on": null,
-      "recommend": null,
-      "options": null,
-      "chosen": null,
-      "jacob_words": null,
-      "repo": "setup",
-      "work": "tooling",
-      "size": "S",
-      "files": [
-        "components.json",
-        "setuplib/fanout.py",
-        "CLAUDE.md"
-      ],
-      "research": null,
-      "done_when": "setup fanout mutate --dry-run names tools/todo, or a recorded reason it never should",
-      "done_check": null,
-      "handoff": null,
-      "approved": null,
-      "dispatched": null,
-      "retire": null,
-      "tags": null,
-      "plan_pins": null,
-      "detector": null,
-      "plan_step": null,
-      "added": "2026-10-19",
-      "done": null,
-      "resolution": null,
-      "imported": null
-    },
-    {
       "id": "su-106",
       "title": "the commit-msg hook (core.hooksPath) is set in only 4 of 20 repos, and 618 of 978 commits since 2...",
       "kind": "bug",
@@ -3422,5 +3381,5 @@
       "imported": null
     }
   ],
-  "seal": "9ed163c22b3e32aa"
+  "seal": "d250fa255c4143e2"
 }

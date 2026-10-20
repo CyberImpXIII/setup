@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (96 open, 10 closed in todo-history.json; seal 68008173215a): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (96 open, 10 closed in todo-history.json; seal 1109e0fe1e88): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -125,7 +125,12 @@
 - **su-98 · devtools/parts.py in each repo is still 1.3.0 and lacks --jobs/uses -- input: checks checkslib/pa...**
   reported from tools/checks to tools/setup in dispatch toolu_01RTRCd7BG3nGNiNv96j65Qw, filed from the dispatch ledger by the delegation layer's report filer: devtools/parts.py in each repo is still 1.3.0 and lacks --jobs/uses -- input: checks checkslib/parts.py 1.4.0 (0be97db) -- expected: reinstalled through each repo's parts component.
   2026-10-20: ./setup fanout parts --root <top> --dry-run: 12 repos drift (copy 1.3.0 vs runner 1.4.0, checks 0be97db): addon-bench, applications, emailTools, income, scriptingTools/chronjobScheduler, scriptingTools/data-bridge, scripts, tools/hooks, tools/research, tools/todo, tools/transcripts, tools/wizard; usage rebuilt (su-99), setup rebuilt (49f2dc3). Fix: ./setup fanout parts --rebuild --agent setup commits into each owner's repo: needs each repo clean, so expect failed rows where trees are dirty
+  2026-10-20 (tl-488): ./setup fanout parts --repos tools/research tools/transcripts --rebuild --agent setup: committed research 8e79242, transcripts 09a6a57 (each cmp-equal to checks HEAD 0be97db checkslib/parts.py; each ./dev.sh test test.parts ok; neither has a remote, nothing pushed). The other 10 refused by fanout as not clean, owners' uncommitted edits, never swept in: addon-bench, applications, chronjobScheduler, data-bridge, tools/hooks (.claude/settings.json, TODO.md); emailTools, income, scripts (+ .claude/hooks and .claude/lib copies; income todo.json); tools/todo (README.md, devtools/mutants.json, tests/test_practices.py, todo stores); tools/wizard (staged tl-455 work: tests/helpers.py, wizards/architecture.json, .claude/lib/ledger.sh).
   · parent: tl-376
+  · done when: ./setup fanout parts --root ../.. --dry-run lists no repo as drift (copy 1.3.0): each of the 10 remaining repos rebuilt by ./setup fanout parts --repos <repo> --root ../.. --rebuild --agent setup once its owner has committed or cleared its tree
+  · done check: ./setup fanout parts --root ../.. --dry-run
+  · handoff: done: research and transcripts rebuilt and committed (no remote). next: the 10 dirty repos, each once its tree is clean; verify: ./setup fanout parts --root ../.. --rebuild --dry-run shows would-commit for a clean one, failed 'tree is not clean' for one still dirty (2026-10-20, at 6cfe660)
+  · approved: jacob 2026-10-20: Jacob 2026-10-20 typed: 2) yes (fan-out of the 1.4.0 runner copy to the 12 repos)
   · added: 2026-10-19
 
 - **su-99 · tools/usage parts.py drifted from checks' runner (--jobs): rebuild it**

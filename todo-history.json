@@ -655,7 +655,48 @@
       "done": "2026-10-20",
       "resolution": "usage committed the render itself: 7e22666; tools/usage/devtools/parts.py cmp-equal to checks HEAD 0be97db; fanout dry run 2026-10-20 reports usage unchanged (tl-499)",
       "imported": null
+    },
+    {
+      "id": "su-108",
+      "title": "harness: the top .claude/ tree is dirty (settings.json, settings.json.bak), so setup's top hooks render cannot commit",
+      "kind": "report",
+      "status": "done",
+      "evidence": "2026-10-20, after 17f8091/bb46ba4: `tools/setup/setup /Users/Specter/Desktop/claudeTest --rebuild --only hooks` -> exit 2, refused, nothing written: the .claude/ repo holds a modified settings.json (248 lines over its last commit 9cd567d of 2026-10-02; byte-equal to the settings.proposed.json an earlier setup run wrote there, now named in the hooks line and left as found) and an untracked settings.json.bak (2026-10-03). Setup never commits settings.json at the top (wiring.json's file), so it will not ride. The dry run renders 26 files (git-funnel.sh, bin/commit.sh among them) with no error.",
+      "probe": null,
+      "reported_to": {
+        "repo": ".claude",
+        "date": "2026-10-20",
+        "their_id": null
+      },
+      "parent": "tl-492",
+      "blocked_by": null,
+      "waits_on": null,
+      "pointer": null,
+      "hinges_on": null,
+      "recommend": null,
+      "options": null,
+      "chosen": null,
+      "jacob_words": null,
+      "repo": "setup",
+      "work": "code",
+      "size": "S",
+      "files": null,
+      "research": null,
+      "done_when": "the .claude/ tree is clean and the real top run commits its render inside .claude/",
+      "done_check": null,
+      "handoff": null,
+      "approved": null,
+      "dispatched": null,
+      "retire": null,
+      "tags": null,
+      "plan_pins": null,
+      "detector": null,
+      "plan_step": null,
+      "added": "2026-10-20",
+      "done": "2026-10-20",
+      "resolution": "harness committed the top .claude/ tree clean (ff59fc3, settings.json = the applied wiring); setup /Users/Specter/Desktop/claudeTest --rebuild --only hooks then exit 0 and committed 8002b3b in .claude/ ('setup: render 26 file(s) into claudeTest', git-funnel.sh and bin/commit.sh among them); the rendered hooks' 11 tests exit 0; a second dry run: 28 unchanged of 28, nothing to commit",
+      "imported": null
     }
   ],
-  "seal": "de6758304c4b22cb"
+  "seal": "714e75a61ad8d0f8"
 }

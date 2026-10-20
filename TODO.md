@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (91 open, 17 closed in todo-history.json; seal c70af43a7a4b): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (90 open, 18 closed in todo-history.json; seal e6da9ffce3d1): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -779,15 +779,6 @@
   · reported to: planner on 2026-10-18 (no counterpart yet)
   · files: setuplib/fit.py
   · added: 2026-10-18
-
-- **su-108 · harness: the top .claude/ tree is dirty (settings.json, settings.json.bak), so setup's top hooks render cannot commit**
-  2026-10-20, after 17f8091/bb46ba4: `tools/setup/setup /Users/Specter/Desktop/claudeTest --rebuild --only hooks` -> exit 2, refused, nothing written: the .claude/ repo holds a modified settings.json (248 lines over its last commit 9cd567d of 2026-10-02; byte-equal to the settings.proposed.json an earlier setup run wrote there, now named in the hooks line and left as found) and an untracked settings.json.bak (2026-10-03). Setup never commits settings.json at the top (wiring.json's file), so it will not ride. The dry run renders 26 files (git-funnel.sh, bin/commit.sh among them) with no error.
-  · reported to: .claude on 2026-10-20 (relayed by hand; never pairs)
-  · parent: tl-492
-  · work: code
-  · size: S
-  · done when: the .claude/ tree is clean and the real top run commits its render inside .claude/
-  · added: 2026-10-20
 
 ## Plan steps
 

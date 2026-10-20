@@ -61,7 +61,7 @@
      "entry": {"name": "{name}", "dir": "{dir}", "repo": "{repo}", "start_here": "{dir}/CLAUDE.md", "precommit": "./dev.sh check"}},
     {"name": "server", "installs": "nothing: the group-server entry has no defined shape yet (group servers are not built)", "needs": "harness"},
     {"name": "node",   "installs": "with --node only (PLAN-repo-setup §7.5, §7.10): each child node.json lists, set up in turn, created as a repo nested in this one when absent, a child with its own node.json recursing, never with --github; with --rebuild, every file node.json lists as generated, rendered again in place (the setup pass is then a dry run), one line per file (rebuild_statuses); never a record, never a generated file with uncommitted changes",
-     "_render": "the components a --rebuild renders afresh, as a new repo in a throwaway folder, for the node's path and name",
+     "_render": "the components a --rebuild renders afresh, as a new repo in a throwaway folder, for the node's path and name. Not mutate: it renders only beside its `when` file, the owner's mutants, which a new repo never holds, so the throwaway would render nothing (none); its copies are pushed by `setup fanout mutate` instead (tests/test_fanout.py Spec holds every runner left out here to a `when`)",
      "render": ["repo", "rules", "hooks", "todo", "docs", "check", "parts", "services", "params", "ignore", "githooks"]},
     {"name": "registry", "installs": "in a node run only, once its children are set up: registry.proposed.json, the union of the node's and each child's services.json keyed by path (`.` for the node), for Jacob to apply to the registry node.json names (as the settings proposal); nothing when it already equals that union. Only the registry's `services` is rendered: its roles and owners have no defined shape here", "file": "registry.proposed.json", "needs": "jacob"},
     {"name": "gates",  "installs": "nothing: with --checks CLI only, and last, once everything is rendered (never in a dry run or a rebuild): `CLI list`, then `CLI run <path>`, then `CLI one <gate> <path>` for each contract gate below that `run` left out (one that applies only under a role, as the audit's), in sequence; their results are this line (a fail is drift, an error or a fault failed, unchecked named). A contract gate not in the list, or reporting nothing, fails the line by name: unchecked, never a pass",
@@ -69,11 +69,12 @@
      "contract": ["check-json", "accessor", "services-valid", "registry-matches", "rendered-matches"]}
   ],
   "fanout": {
-    "_comment": "setup fanout <component> (PLAN-workspace-audit §3.2 option 2, Jacob's yes of 2026-10-13): the components it renders, each into every repo that declares it (`file` present there and, when given, holding `contains`); any other component is refused. The check runs in the repo after the render, the commit only after it passes. tests/test_fanout.py holds `contains` to what the rules component writes, and each component here to one setup renders.",
+    "_comment": "setup fanout <component> (PLAN-workspace-audit §3.2 option 2, Jacob's yes of 2026-10-13): the components it renders, each into every repo that declares it (`file` present there and, when given, holding `contains`); any other component is refused. The check runs in the repo after the render, the commit only after it passes. tests/test_fanout.py holds `contains` to what the rules component writes, each component here to one setup renders, every rendered runner (`rendered_runner`) to an entry here (its push path), and a runner that renders only beside a `when` file to being declared by that file.",
     "declared_by": {
       "rules": {"file": "CLAUDE.md", "contains": "<!-- shared:rules@"},
       "hooks": {"file": ".claude/hooks"},
-      "parts": {"file": "devtools/parts.py"}
+      "parts": {"file": "devtools/parts.py"},
+      "mutate": {"file": "devtools/mutants.json"}
     },
     "check": ["./dev.sh", "check"],
     "check_timeout": 3600,

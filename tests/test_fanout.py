@@ -270,6 +270,43 @@ class Parts(Base):
         self.assertEqual((code, doc["repos"][0]["status"]), (0, "unchanged"), doc)
 
 
+class Mutate(Base):
+    """The mutant runner (su-105): declared by the repo's mutants file, rendered as
+    this tool's HEAD holds it, the commit named; a repo with no mutants file is not
+    rendered into."""
+
+    def test_declared_by_the_mutants_file_installed_drift_rebuilt_unchanged(self):
+        where = core._toplevel(ROOT)
+        if where is None:
+            self.skipTest("this tool is in no git work tree: mutate has no source to name")
+        src = git_show(where, (ROOT / "devtools" / "mutate.py").resolve().relative_to(where.resolve()).as_posix())
+        fresh = self.repo("m", declare=False)
+        (fresh / "devtools").mkdir()
+        (fresh / "devtools" / "mutants.json").write_text('{"mutants": []}\n')
+        commit_all(fresh, "the owner's mutants")
+        old = self.repo("o", declare=False)
+        (old / "devtools").mkdir()
+        (old / "devtools" / "mutants.json").write_text('{"mutants": []}\n')
+        (old / "devtools" / "mutate.py").write_text("print('an old mutant runner')\n")
+        commit_all(old, "an old runner")
+        self.repo("plain", declare=False)
+        code, doc = self.fan_json("--repos", "m", "o", "plain", "--dry-run", component="mutate")
+        by = {r["path"]: r for r in doc["repos"]}
+        self.assertEqual({k: v["status"] for k, v in by.items()},
+                         {"m": "would-commit", "o": "failed", "plain": "undeclared"}, doc)
+        self.assertEqual(by["m"]["written"], ["devtools/mutate.py"])
+        self.assertIn("--rebuild overwrites a drifted copy", by["o"]["detail"])
+        code, doc = self.fan_json("--repos", "m", "o", "--rebuild", component="mutate")
+        self.assertEqual((code, [r["status"] for r in doc["repos"]]), (0, ["committed", "committed"]), doc)
+        head = git(["rev-parse", "HEAD"], where).stdout.strip()
+        self.assertEqual(doc["source"]["commit"], head)
+        for r in (fresh, old):
+            self.assertIn(f"source commit: {head}", git(["log", "-1", "--format=%B"], r).stdout)
+            self.assertEqual((r / "devtools" / "mutate.py").read_bytes(), src, "the runner as HEAD holds it")
+        code, doc = self.fan_json("--repos", "m", "o", component="mutate")
+        self.assertEqual((code, [r["status"] for r in doc["repos"]]), (0, ["unchanged", "unchanged"]), doc)
+
+
 def rel_in(where):
     """The runner's path in its repo, as setup resolves it."""
     s = core.Setup(ROOT, label=".", name="probe", dry_run=True)
@@ -317,6 +354,12 @@ class Spec(Case):
         new = self.tmp / "new"
         comps = {c["name"]: c for c in core.load_spec()["components"]}
         for name, d in FO["declared_by"].items():
+            if comps[name].get("when"):
+                # rendered only beside its `when` file, the owner's: declared by that
+                # file, setup's own condition, never by a file a new repo would hold
+                self.assertEqual(d["file"], comps[name]["when"], name)
+                self.assertFalse((new / comps[name]["file"]).exists(), f"{name}: rendered with no {d['file']}")
+                continue
             if name == "parts" and not (new / d["file"]).exists():
                 self.assertIsNone(fanout_parts_source(), "parts rendered nothing while its source resolves")
                 continue
@@ -324,6 +367,31 @@ class Spec(Case):
             if "contains" in d:
                 self.assertIn(d["contains"], (new / d["file"]).read_text())
         self.assertEqual(FO["declared_by"]["parts"]["file"], comps["parts"]["file"])
+
+    def test_every_rendered_runner_has_a_push_path(self):
+        """su-105: a runner copy with no push path is kept in step only when someone
+        happens to run setup in that repo. Each rendered runner is a fanout component;
+        one the node render list leaves out renders only beside a `when` file (which
+        a node rebuild's new repo never holds), so the list could regenerate nothing."""
+        spec = core.load_spec()
+        comps = {c["name"]: c for c in spec["components"]}
+        node = comps["node"]["render"]
+        runners = core.runners(spec)
+        self.assertIn("mutate", runners)
+        for name in runners:
+            self.assertIn(name, FO["declared_by"], f"{name}: a rendered runner no fanout pushes")
+            if name not in node:
+                self.assertTrue(comps[name].get("when"), f"{name}: left out of the node render list with no `when`")
+
+    def test_the_usage_and_claude_md_name_exactly_the_components(self):
+        want = set(FO["declared_by"])
+        usage = self.run_setup("--help").stdout
+        m = re.search(r"`fanout`: ([a-z, ]+)\)", usage)
+        self.assertIsNotNone(m, "the usage names no fanout components")
+        self.assertEqual(set(m.group(1).split(", ")), want, "setup --help")
+        m = re.search(r"`\./setup fanout <([a-z\\|]+)>", (ROOT / "CLAUDE.md").read_text())
+        self.assertIsNotNone(m, "CLAUDE.md's fanout row names no components")
+        self.assertEqual(set(m.group(1).split("\\|")), want, "CLAUDE.md")
 
     def test_statuses_documented_equal_emitted(self):
         text = (ROOT / "setuplib" / "fanout.py").read_text()

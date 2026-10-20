@@ -75,7 +75,7 @@
   setup fanout <component> [--repos PATH...] [--root DIR] [--rebuild] [--hooks-from DIR]
                [--agent NAME] [--check-timeout S] [--dry-run] [--json]
       one shared change into every repo that declares the component (components.json
-      `fanout`: rules, hooks, parts), each git work tree under DIR (default: the
+      `fanout`: rules, hooks, parts, mutate), each git work tree under DIR (default: the
       working folder) or each --repos PATH; one after another, each step its own
       process. Per repo: `setup <repo> --only <component> --dry-run` (a copy it
       would keep as drift, or a refusal: failed, nothing written; nothing to

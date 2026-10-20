@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (95 open, 11 closed in todo-history.json; seal 09c82e23bb5d): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (95 open, 13 closed in todo-history.json; seal 31d3ac6dc8a9): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -77,11 +77,6 @@
   Deliberate: it reports the target as it is now (dispatcher's brief, 2026-10-04).
   · added: 2026-10-15
 
-- **su-77 · cannot re-render the top-level .claude/ hook copies -- input: `tools/setup/setup /Users/Specter/D...**
-  reported from .claude to tools/setup in dispatch toolu_011LazyaDhEPC8yFGpKx8k3B, filed from the dispatch ledger by the delegation layer's report filer: cannot re-render the top-level .claude/ hook copies -- input: `tools/setup/setup /Users/Specter/Desktop/claudeTest --rebuild --only hooks --dry-run` -> "not a git work tree" -- expected: renders into .claude/.
-  · parent: tl-223
-  · added: 2026-10-16
-
 - **su-78 · other repos' .claude/lib/ledger.sh and test-store-guard.sh copies now drift and need a reinstall ...**
   reported from tools/hooks to tools/setup in dispatch toolu_012AsDNG3r1uaCmkzk1wzHZx, filed from the dispatch ledger by the delegation layer's report filer: other repos' .claude/lib/ledger.sh and test-store-guard.sh copies now drift and need a reinstall (OWED). Earlier F3 layer-2 report still stands.
   · parent: tl-224
@@ -158,6 +153,11 @@
 - **su-106 · the commit-msg hook (core.hooksPath) is set in only 4 of 20 repos, and 618 of 978 commits since 2...**
   reported from tools/research to tools/setup in dispatch toolu_01UN1CyFQG8Z7QD9MeEmRrBq, filed from the dispatch ledger by the delegation layer's report filer: the commit-msg hook (core.hooksPath) is set in only 4 of 20 repos, and 618 of 978 commits since 2026-10-01 have no Agent trailer -- input: git -C <repo> config core.hooksPath -- expected: .githooks in all 20 (G5)
   · parent: tl-475
+  · added: 2026-10-20
+
+- **su-107 · an unedited older render is called `drift` and is replaced only with `--rebuild`; 10 repos fail `...**
+  reported from scriptingTools/data-bridge to tools/setup in dispatch toolu_01EzoxpRduj6yVXXYQKCrQHJ, filed from the dispatch ledger by the delegation layer's report filer: an unedited older render is called `drift` and is replaced only with `--rebuild`; 10 repos fail `fanout parts` this way -- input: `./setup scriptingTools/data-bridge --only parts --dry-run` -- expected: reported as outdated and re-rendered by the fanout (unverified: may be intended policy).
+  · parent: tl-497
   · added: 2026-10-20
 
 ## Open decisions
@@ -527,17 +527,6 @@
   registration if one is ever needed (none is today: kb-pointers is `repos:.`).
   · added: 2026-10-15
 
-- **su-40 · kb-pointers cannot be proposed today: the workspace top is not a git repo, and setup refuses it**
-  (run 2026-10-04 from the top: `setup . --dry-run --plugins
-  <(...)` -> "refused: ... is not empty, and is not a git work tree"). kb-pointers is
-  `repos:.`, the top only. The `--plugins` machinery is proven with the live registry
-  re-rooted at a scratch repo (the proposal held exactly its `registration`). Needs a
-  decision, not built: a settings-only mode for a non-repo folder (only the hooks
-  component, the proposal written, nothing else), or the dispatcher/harness writes
-  the top's proposal from `hooks plugins --json` directly. Hinges on whether setup
-  should ever touch a folder that is not a repo.
-  · added: 2026-10-15
-
 - **su-41 · `--plugins` has no default.**
   The workspace run is `./setup . --plugins <(cd
   tools/hooks && ./hooks plugins --json)` from the top; without the flag the hooks line
@@ -811,6 +800,15 @@
   · reported to: planner on 2026-10-18 (no counterpart yet)
   · files: setuplib/fit.py
   · added: 2026-10-18
+
+- **su-108 · harness: the top .claude/ tree is dirty (settings.json, settings.json.bak), so setup's top hooks render cannot commit**
+  2026-10-20, after 17f8091/bb46ba4: `tools/setup/setup /Users/Specter/Desktop/claudeTest --rebuild --only hooks` -> exit 2, refused, nothing written: the .claude/ repo holds a modified settings.json (248 lines over its last commit 9cd567d of 2026-10-02; byte-equal to the settings.proposed.json an earlier setup run wrote there, now named in the hooks line and left as found) and an untracked settings.json.bak (2026-10-03). Setup never commits settings.json at the top (wiring.json's file), so it will not ride. The dry run renders 26 files (git-funnel.sh, bin/commit.sh among them) with no error.
+  · reported to: .claude on 2026-10-20 (relayed by hand; never pairs)
+  · parent: tl-492
+  · work: code
+  · size: S
+  · done when: the .claude/ tree is clean and the real top run commits its render inside .claude/
+  · added: 2026-10-20
 
 ## Plan steps
 

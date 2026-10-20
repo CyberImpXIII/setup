@@ -501,7 +501,40 @@
       "done": "2026-10-20",
       "resolution": "17f8091 + bb46ba4: --only hooks renders into the top's .claude/ (sub-repo mode, c4f052e) and now writes no settings proposal there, never commits settings.json, refuses --plugins. Dry run on the real top: exit 0, hooks needs-harness, 26 files incl. .claude/hooks/git-funnel.sh and .claude/bin/commit.sh, no proposal written. The real run is refused (exit 2, nothing written) by the harness's dirty .claude/ tree: tracked as its own report item under tl-492.",
       "imported": null
+    },
+    {
+      "id": "su-75",
+      "title": "checks gate: hooks-installed reports drift on four installed .claude/ files",
+      "kind": "note",
+      "status": "done",
+      "evidence": "./dev.sh check, 2026-10-09 (commit after 77bce39): checks gate FAIL hooks-installed: extra-stores.sh (the installed hooks' lib folder), .claude/hooks/store-guard.sh and .claude/hooks/test-store-guard.sh 'drift; not covered by user scope (no shared hook of that name there)', .claude/hooks/test-no-inline-blobs.sh 'drift; not covered by user scope (not registered there)'. Last touched by 93532a8 (re-render of the shared hook copies from tools/hooks). Not this tool's files and not changed by td-22/td-27; reported to the hooks tool's owner through the dispatch report. Also live: ./dev.sh hooks FAIL 'store-guard.sh is not registered in .claude/settings.json' (td-2's remainder; the uncommitted settings.json now registers the other seven). 2026-10-12: the lib file's path is named without its folder here, because that folder in this store tripped the direction audit (audit, no-roster and two test_dev tests red).\n2026-10-15: of setup's Q6 render, test-no-inline-blobs.sh and lib/extra-stores.sh agree with source (hooks copies: ok) and are committed (c5f1886); store-guard.sh and test-store-guard.sh drift from hooks bdd932f and stay uncommitted. Also drift/missing at tools/todo: lib/ledger.sh, prefer-recipes.sh and its test, lib/write-targets.sh (drift); bin/commit.sh, git-funnel.sh and its test (missing). Needs a re-render by setup.\n2026-10-17: setup <repo> --only hooks --rebuild --no-commit rendered emailTools, income, scripts, knowledge-base, tools/checks, tools/usage and tools/wizard (left uncommitted for each owner); hooks-installed passes in each. tools/transcripts was already green. setup's own .claude/lib/ledger.sh was committed (079db48). tools/todo was refused by the rebuild guard: its .claude/hooks/store-guard.sh and test-store-guard.sh hold uncommitted changes (the todo agent's renders work, ahead of tools/hooks' source). Open until those are settled and the render is rerun there.",
+      "probe": null,
+      "reported_to": null,
+      "parent": "td-36",
+      "blocked_by": null,
+      "waits_on": null,
+      "repo": "setup",
+      "work": "labour",
+      "size": "M",
+      "files": null,
+      "research": null,
+      "done_when": "tools/hooks' hooks copies shows no drift or missing row at tools/todo, and the checks gate's hooks-installed passes",
+      "done_check": null,
+      "handoff": null,
+      "approved": {
+        "by": "jacob",
+        "date": "2026-10-20",
+        "source": "Jacob 2026-10-19 via auto-relay line 223 (origin jacob)"
+      },
+      "dispatched": null,
+      "retire": null,
+      "tags": null,
+      "plan_pins": null,
+      "added": "2026-10-15",
+      "done": "2026-10-20",
+      "resolution": "Settled before this session: tools/todo commit 8ac938c (2026-10-17, setup --only hooks --rebuild from tools/hooks source) after fa1d3a2 settled the todo agent's store-guard copies. Verified 2026-10-20: tools/hooks 'hooks copies <top> --gate tools/todo' -> 'gate tools/todo: ok'; tools/checks 'checks one hooks-installed' -> ok at tools/todo and at tools/setup; 'setup tools/todo --only hooks --dry-run' -> 28 unchanged of 28, nothing to render. Drift remaining elsewhere (applications, chronjobScheduler, data-bridge, site-scrapers) is other items (su-78, su-82, su-93).",
+      "imported": null
     }
   ],
-  "seal": "1c535f2521e90c9f"
+  "seal": "7dbf1e540b04f3d4"
 }

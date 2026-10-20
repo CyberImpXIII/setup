@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (95 open, 13 closed in todo-history.json; seal 31d3ac6dc8a9): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (94 open, 14 closed in todo-history.json; seal aaf3b67743a2): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -853,17 +853,6 @@
   2026-10-04, via the dispatcher, to the planner: the check component and §9 (1)
   both need setup to name a sibling tool, which its content audit forbids; the
   proposal is under Open decisions.
-  · added: 2026-10-15
-
-- **su-75 · checks gate: hooks-installed reports drift on four installed .claude/ files**
-  ./dev.sh check, 2026-10-09 (commit after 77bce39): checks gate FAIL hooks-installed: extra-stores.sh (the installed hooks' lib folder), .claude/hooks/store-guard.sh and .claude/hooks/test-store-guard.sh 'drift; not covered by user scope (no shared hook of that name there)', .claude/hooks/test-no-inline-blobs.sh 'drift; not covered by user scope (not registered there)'. Last touched by 93532a8 (re-render of the shared hook copies from tools/hooks). Not this tool's files and not changed by td-22/td-27; reported to the hooks tool's owner through the dispatch report. Also live: ./dev.sh hooks FAIL 'store-guard.sh is not registered in .claude/settings.json' (td-2's remainder; the uncommitted settings.json now registers the other seven). 2026-10-12: the lib file's path is named without its folder here, because that folder in this store tripped the direction audit (audit, no-roster and two test_dev tests red).
-  2026-10-15: of setup's Q6 render, test-no-inline-blobs.sh and lib/extra-stores.sh agree with source (hooks copies: ok) and are committed (c5f1886); store-guard.sh and test-store-guard.sh drift from hooks bdd932f and stay uncommitted. Also drift/missing at tools/todo: lib/ledger.sh, prefer-recipes.sh and its test, lib/write-targets.sh (drift); bin/commit.sh, git-funnel.sh and its test (missing). Needs a re-render by setup.
-  2026-10-17: setup <repo> --only hooks --rebuild --no-commit rendered emailTools, income, scripts, knowledge-base, tools/checks, tools/usage and tools/wizard (left uncommitted for each owner); hooks-installed passes in each. tools/transcripts was already green. setup's own .claude/lib/ledger.sh was committed (079db48). tools/todo was refused by the rebuild guard: its .claude/hooks/store-guard.sh and test-store-guard.sh hold uncommitted changes (the todo agent's renders work, ahead of tools/hooks' source). Open until those are settled and the render is rerun there.
-  · parent: td-36
-  · work: labour
-  · size: M
-  · done when: tools/hooks' hooks copies shows no drift or missing row at tools/todo, and the checks gate's hooks-installed passes
-  · approved: jacob 2026-10-20: Jacob 2026-10-19 via auto-relay line 223 (origin jacob)
   · added: 2026-10-15
 
 - **su-86 · To setup: check-pass refuses every commit while Jacob's uncommitted .claude/settings.json is in the tree**

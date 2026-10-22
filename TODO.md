@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (90 open, 18 closed in todo-history.json; seal e6da9ffce3d1): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (93 open, 20 closed in todo-history.json; seal ba5c8af66e40): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -138,6 +138,22 @@
   reported from scriptingTools/data-bridge to tools/setup in dispatch toolu_01EzoxpRduj6yVXXYQKCrQHJ, filed from the dispatch ledger by the delegation layer's report filer: an unedited older render is called `drift` and is replaced only with `--rebuild`; 10 repos fail `fanout parts` this way -- input: `./setup scriptingTools/data-bridge --only parts --dry-run` -- expected: reported as outdated and re-rendered by the fanout (unverified: may be intended policy).
   · parent: tl-497
   · added: 2026-10-20
+
+- **su-110 · emailTools devtools/parts.py is stale (1.3.0 vs 1.4.0), and cfc946e is unpushed alongside uncommi...**
+  reported from emailTools to tools/setup in dispatch toolu_01JSTDoEP9cPktEn3mYvnnTh, filed from the dispatch ledger by the delegation layer's report filer: emailTools devtools/parts.py is stale (1.3.0 vs 1.4.0), and cfc946e is unpushed alongside uncommitted .claude edits -- input: cd emailTools && ./dev.sh check -- expected: 12 of 12; the fix the test names: tools/setup/setup emailTools --only parts --rebuild
+  · parent: tl-526
+  · added: 2026-10-20
+
+- **su-111 · `funnel.push` is unset in every repo, so commit.sh never pushes and git-funnel blocks a typed pus...**
+  reported from emailTools to tools/setup in dispatch toolu_01SEZwfH6rtrMr5Zv3qg9M9w, filed from the dispatch ledger by the delegation layer's report filer: `funnel.push` is unset in every repo, so commit.sh never pushes and git-funnel blocks a typed push -- input: `commit.sh -C emailTools ...` -> "not pushed (no push record: git config funnel.push is not true)" -- expected: setup writes funnel.push=true for repos with an origin, or a sanctioned push path.
+  · parent: tl-558
+  · added: 2026-10-22
+
+- **su-113 · no component writes funnel.push, though commit.sh's header says setup writes it (su-111); I set i...**
+  reported from .claude to tools/setup in dispatch toolu_01HTzYPfevgjPGcvpYwvU7K7, filed from the dispatch ledger by the delegation layer's report filer: no component writes funnel.push, though commit.sh's header says setup writes it (su-111); I set it by hand in hub and todo -- input: bash .claude/lib/push-records.sh scan . -- expected: true for repos that push, false for checks/usage (PLAN-services.md §3 F3)
+  · parent: tl-570
+  · handoff: 2026-10-22 su-112: set git config funnel.push=true by hand in tools/setup's own clone too (it pushes to origin); still no component writes it. Also seen: core.hooksPath is unset in tools/setup's clone, so its commit-msg/pre-commit gates did not run on c7aa781 (no check: trailer) -- unverified whether intended (2026-10-22, at c7aa781)
+  · added: 2026-10-22
 
 ## Open decisions
 

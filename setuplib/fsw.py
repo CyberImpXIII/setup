@@ -156,13 +156,15 @@ class Writer:
                 return err
         return None
 
-    def git_config(self, key: str, value: str):
+    def git_config(self, key: str, value: str, defer: bool = True):
         """`git config --local key value` in the repo (the githooks component:
-        core.hooksPath, and the checks CLI its pre-commit runs). None, or why it failed.
-        With defer_config it is only recorded, for apply_config."""
+        core.hooksPath, and the checks CLI its pre-commit runs; the push component:
+        the push record). None, or why it failed. With defer_config it is only
+        recorded, for apply_config, unless defer is False (a key that gates no commit,
+        written by a component that runs after the commit)."""
         if self.dry_run:
             return None
-        if self.defer_config:
+        if self.defer_config and defer:
             self.pending_config.append((key, value))
             return None
         return self._set_config(key, value)

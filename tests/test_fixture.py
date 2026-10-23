@@ -16,7 +16,7 @@ class Fixture(Case):
             "data": "none", "params": "installed", "ignore": "installed",
             # the default hook source (the hooks dependency) registers git-stamp.sh and write-ledger.sh
             "githooks": "installed", "commit": "installed",
-            "remote": "none", "agent": "needs-harness", "server": "needs-harness",
+            "remote": "none", "push": "none", "agent": "needs-harness", "server": "needs-harness",
             "node": "none", "registry": "none", "gates": "none"})
         repo = self.tmp / "fresh"
         self.assertEqual(git(["rev-parse", "--show-toplevel"], repo).stdout.strip(), str(repo))

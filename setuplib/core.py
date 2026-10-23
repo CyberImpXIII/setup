@@ -1489,6 +1489,62 @@ class Setup:
         self.repo_slug = slug
         return Result("remote", "installed", f"created github.com/{slug} ({vis}), pushed {branch} {head[:7]}")
 
+    # ---- the push record (PLAN-services.md §3 F3, verb step 5) -----------------
+
+    def c_push(self):
+        """The record commit.sh reads before it pushes (git config funnel.push), set
+        from the repo's own registration (services.json `push`: the store,
+        PLAN-architecture §13), never from a list here and never guessed: a
+        registration without the field writes nothing. Only where an origin exists
+        (or, in a dry run, where c_remote would create one). Written at once: it gates
+        no commit, and this runs after the render's commit."""
+        c = self.comp["push"]
+        key, field, f = c["config"], c["field"], self.comp["services"]["file"]
+        origin = self.target.exists() and _git(["remote", "get-url", c["remote"]], self.target).returncode == 0
+        if not origin and not (self.dry_run and self.repo_slug):
+            return Result("push", "none", f"no {c['remote']}: commit.sh pushes nowhere, no {key} record written")
+        have = self._push_record(key)
+        now = f"{key} is {have}" if have != "unset" else f"{key} is unset (commit.sh does not push)"
+        registration = self.target / f
+        if registration.exists():
+            doc, why = _json_file(registration)
+            if why is None and not isinstance(doc, dict):
+                why = "is not a JSON object"
+            if why:
+                return Result("push", "drift", f"{f} {why}: its `{field}` cannot be read, nothing written; {now}")
+        elif any(rel == f for rel, _ in self.w.written):
+            doc = self.skeleton()  # a dry run's skeleton, not on disk yet
+        else:
+            return Result("push", "needs-owner", f"no {f}: the push record has no source here, nothing written; "
+                                                 f"{now}")
+        want = doc.get(field)
+        if field not in doc:
+            return Result("push", "needs-owner", f"{f} declares no `{field}` (true: commit.sh pushes to "
+                                                 f"{c['remote']}; false: it never does; a repo that must not push "
+                                                 f"is Jacob's call): nothing written; {now}")
+        if not isinstance(want, bool):
+            return Result("push", "drift", f"{f} `{field}` is {json.dumps(want)}, not true or false: nothing "
+                                           f"written; {now}")
+        want = "true" if want else "false"
+        if have == want:
+            return Result("push", "unchanged", f"{key} = {want}, as {f} `{field}` says")
+        err = self.w.git_config(key, want, defer=False)
+        if err:
+            return Result("push", "failed", f"{key} = {want} from {f} `{field}`: {err}")
+        return Result("push", "installed", f"{'would set' if self.dry_run else 'set'} {key} = {want} from {f} "
+                                           f"`{field}` (was {have})")
+
+    def _push_record(self, key):
+        """The push record as commit.sh reads it (git's own boolean reading, every
+        scope): true, false, unset, or invalid (git cannot read it as a boolean)."""
+        if not self.target.exists():
+            return "unset"
+        r = _git(["config", "--get", "--bool", key], self.target)
+        if r.returncode == 1 and not r.stdout.strip():
+            return "unset"
+        v = r.stdout.strip()
+        return v if r.returncode == 0 and v in ("true", "false") else "invalid"
+
     def c_agent(self):
         c = self.comp["agent"]
         if self.repo_slug:

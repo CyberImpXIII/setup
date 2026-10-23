@@ -777,7 +777,48 @@
       "done": "2026-10-22",
       "resolution": "render committed c7aa781 via .claude/bin/commit.sh (its full ./dev.sh check passed at load ~6; dry run before: hooks 28 unchanged of 28); this todo store (su-109 closed, su-110..113 filed) committed after it; funnel.push was unset so c7aa781 did not push: set funnel.push=true in this clone, the store commit pushes both",
       "imported": null
+    },
+    {
+      "id": "su-113",
+      "title": "no component writes funnel.push, though commit.sh's header says setup writes it (su-111); I set i...",
+      "kind": "bug",
+      "status": "done",
+      "evidence": "reported from .claude to tools/setup in dispatch toolu_01HTzYPfevgjPGcvpYwvU7K7, filed from the dispatch ledger by the delegation layer's report filer: no component writes funnel.push, though commit.sh's header says setup writes it (su-111); I set it by hand in hub and todo -- input: bash .claude/lib/push-records.sh scan . -- expected: true for repos that push, false for checks/usage (PLAN-services.md §3 F3)",
+      "probe": null,
+      "reported_to": null,
+      "parent": "tl-570",
+      "blocked_by": null,
+      "waits_on": null,
+      "pointer": null,
+      "hinges_on": null,
+      "recommend": null,
+      "options": null,
+      "chosen": null,
+      "jacob_words": null,
+      "repo": "setup",
+      "work": null,
+      "size": null,
+      "files": null,
+      "research": null,
+      "done_when": null,
+      "done_check": null,
+      "handoff": {
+        "date": "2026-10-22",
+        "text": "2026-10-22 su-112: set git config funnel.push=true by hand in tools/setup's own clone too (it pushes to origin); still no component writes it. Also seen: core.hooksPath is unset in tools/setup's clone, so its commit-msg/pre-commit gates did not run on c7aa781 (no check: trailer) -- unverified whether intended",
+        "commit": "c7aa781"
+      },
+      "approved": null,
+      "dispatched": null,
+      "retire": null,
+      "tags": null,
+      "plan_pins": null,
+      "detector": null,
+      "plan_step": null,
+      "added": "2026-10-22",
+      "done": "2026-10-22",
+      "resolution": "fixed by 2015390: the push component writes git config funnel.push from services.json `push`. Evidence: tests/test_push.py (true, false, no origin, field absent, drift, dry run, new repo) and test_fixture's status map (push: none), both inside the commit's ./dev.sh check (exit 0). Recording the field waits on checks' schema: su-117. The core.hooksPath note is not addressed here.",
+      "imported": null
     }
   ],
-  "seal": "dd305312b470a91a"
+  "seal": "2d70c2d6ee4b1209"
 }

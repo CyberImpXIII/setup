@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (93 open, 20 closed in todo-history.json; seal ba5c8af66e40): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (96 open, 21 closed in todo-history.json; seal 8397ff2d1d36): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -149,10 +149,28 @@
   · parent: tl-558
   · added: 2026-10-22
 
-- **su-113 · no component writes funnel.push, though commit.sh's header says setup writes it (su-111); I set i...**
-  reported from .claude to tools/setup in dispatch toolu_01HTzYPfevgjPGcvpYwvU7K7, filed from the dispatch ledger by the delegation layer's report filer: no component writes funnel.push, though commit.sh's header says setup writes it (su-111); I set it by hand in hub and todo -- input: bash .claude/lib/push-records.sh scan . -- expected: true for repos that push, false for checks/usage (PLAN-services.md §3 F3)
+- **su-114 · chronjobScheduler has no funnel.push record, so commit.sh never pushes and the hook blocks a raw ...**
+  reported from scriptingTools/chronjobScheduler to tools/setup in dispatch toolu_015sxuVPq4STrfadTnx5wNVs, filed from the dispatch ledger by the delegation layer's report filer: chronjobScheduler has no funnel.push record, so commit.sh never pushes and the hook blocks a raw push -- input: commit.sh -C scriptingTools/chronjobScheduler ... -- expected: commits reach origin
+  · parent: tl-574
+  · added: 2026-10-22
+
+- **su-115 · addon-bench has no push record (`git config --bool funnel.push` unset), so commit.sh never pushes...**
+  reported from addon-bench to tools/setup in dispatch toolu_01U4Wct8vnsomxxg3oGrrnUr, filed from the dispatch ledger by the delegation layer's report filer: addon-bench has no push record (`git config --bool funnel.push` unset), so commit.sh never pushes and 8a06525 sits ahead 1 of origin/master -- input: cd addon-bench && git config funnel.push -- expected: true (the remote origin exists)
+  · parent: tl-583
+  · added: 2026-10-22
+
+- **su-116 · tools/checks has no `git config funnel.push` record, so commit.sh never pushes and 51cbafb, fdc62...**
+  reported from tools/checks to tools/setup in dispatch toolu_01DNYWHyzimCzvnSdgBcuu4U, filed from the dispatch ledger by the delegation layer's report filer: tools/checks has no `git config funnel.push` record, so commit.sh never pushes and 51cbafb, fdc629f, 9525576 sit unpushed -- input: `commit.sh -C tools/checks "<msg>" checkslib/sqlstore.py` -- expected: pushed to origin/main.
+  · parent: tl-593
+  · added: 2026-10-22
+
+- **su-117 · services.json `push` is refused by the shared schema, so the push component reports needs-owner everywhere**
+  checks' services.schema.json has additionalProperties false: a scratch repo with services.json {"name":"r","push":true,...} gives 'FAIL services-valid: services.json: schema: $: unknown key `push`' (checks one services-valid). So no repo can record the push decision that the push component (2015390) reads, and the skeleton leaves it out. Today every live repo with an origin reports needs-owner (dry run: emailTools, usage, checks, hub, site-scrapers).
   · parent: tl-570
-  · handoff: 2026-10-22 su-112: set git config funnel.push=true by hand in tools/setup's own clone too (it pushes to origin); still no component writes it. Also seen: core.hooksPath is unset in tools/setup's clone, so its commit-msg/pre-commit gates did not run on c7aa781 (no check: trailer) -- unverified whether intended (2026-10-22, at c7aa781)
+  · work: code
+  · size: S
+  · files: services.json
+  · done when: checks accepts an optional boolean push; the skeleton services.json carries it; each repo's owner records push (usage and checks false, per PLAN-services §3 F3 step 5) and ./setup <repo> --only push reports installed or unchanged
   · added: 2026-10-22
 
 ## Open decisions

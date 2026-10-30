@@ -1384,8 +1384,11 @@ class Setup:
         silently switch off."""
         why = []
         text = _read(self.target / c["check_file"]) or ""
-        if c["record"] not in text or self.comp["check"]["stub_marker"] in text:
-            why.append(f"./{c['check_file']} does not run `{c['record']}` when its check passes "
+        runner_records = any("parts.py" in line and c["record_runner"] in line.split() for line in text.splitlines()
+                             if not line.lstrip().startswith("#"))
+        if not (c["record"] in text or runner_records) or self.comp["check"]["stub_marker"] in text:
+            why.append(f"./{c['check_file']} does not run `{c['record']}` (or `parts.py run ... {c['record_runner']}`) "
+                       "when its check passes "
                        "(the pre-commit would refuse every commit)")
         checks = os.path.abspath(self.checks_cli) if self.checks_cli else self._config(c["config"])
         if not checks or not os.access(checks, os.X_OK):

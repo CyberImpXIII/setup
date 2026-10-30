@@ -136,6 +136,17 @@ class Install(Base):
         repo, src = self.ready_repo(dev="#!/usr/bin/env bash\necho checked\n")
         self.unready(repo, src, "needs-owner", f"does not run `{SPEC['record']}`")
 
+    def test_a_check_whose_runner_records_its_pass_is_ready(self):
+        # remediation ra-2.5: the shared runner records the pass (`parts.py run ... --record`)
+        repo, src = self.ready_repo(dev='#!/usr/bin/env bash\ncmd_check() { exec python3 devtools/parts.py run '
+                                        '"${CHECK_PARTS:-check.parts.json}" --record "$@"; }\n')
+        _, res = self.setup("r", src)
+        self.assertEqual(res["githooks"]["status"], "installed", res["githooks"])
+        # a comment naming the flag, or the flag on another command, is not a recording runner
+        repo, src = self.ready_repo(name="r2", dev='#!/usr/bin/env bash\n# parts.py run --record one day\n'
+                                                  'cmd_check() { python3 devtools/parts.py run x.json; ls --record; }\n')
+        self.unready(repo, src, "needs-owner", "does not run")
+
     def test_no_checks_cli_leaves_them_off(self):
         repo, src = self.ready_repo()
         self.unready(repo, src, "needs-owner", "no runnable checks CLI", checks=False)

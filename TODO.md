@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (96 open, 21 closed in todo-history.json; seal 8397ff2d1d36): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (102 open, 21 closed in todo-history.json; seal c19105c59bdc): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -13,6 +13,7 @@
   comparator read the work tree. Fix: render from `git archive HEAD <source>` into
   a throwaway folder and pass that as `--source`, or refuse while
   `git status -- <source>` in the hooks repo is not empty.
+  2026-10-23 (tl-601): a full ./dev.sh check here went 31 of 45, 12 test parts, self and mutants red, every one on 'hooks list --json --source ... exited 1: lib/browser-drivers.sh: no test': another session's uncommitted, untracked files in tools/hooks/source (browser-drivers.sh 14:55, its test added 15:05). Counterfactual: the same listing exits 0 at 15:1x once the test file exists, setup's tree unchanged throughout. The scaffold setup tools/tab-digest committed at 14:54:07, before every one of those edits' mtimes, so it holds hooks' committed state (its prefer-recipes.sh equals hooks HEAD by non-comment lines; no 'browser driven through Bash' registration).
   · added: 2026-10-15
 
 - **su-2 · plans `--facts` grammar collides with prose mappings**
@@ -172,6 +173,26 @@
   · files: services.json
   · done when: checks accepts an optional boolean push; the skeleton services.json carries it; each repo's owner records push (usage and checks false, per PLAN-services §3 F3 step 5) and ./setup <repo> --only push reports installed or unchanged
   · added: 2026-10-22
+
+- **su-118 · commit.sh does not push because `git config funnel.push` is unset, so 700aafb, 3458fd7 and c54553...**
+  reported from emailTools to tools/setup in dispatch toolu_01Jp4vUxgyWQ3r1EbCfDee4Z, filed from the dispatch ledger by the delegation layer's report filer: commit.sh does not push because `git config funnel.push` is unset, so 700aafb, 3458fd7 and c545539 are local only -- input: `.claude/bin/commit.sh` in emailTools -- expected: a sanctioned push path
+  · parent: tl-618
+  · added: 2026-10-23
+
+- **su-119 · re-render every copy of prefer-recipes.sh, test-prefer-recipes.sh, the new lib browser-drivers.sh...**
+  reported from tools/hooks to tools/setup in dispatch toolu_01NEFfK5YJcieSwXMmoYfuKt, filed from the dispatch ledger by the delegation layer's report filer: re-render every copy of prefer-recipes.sh, test-prefer-recipes.sh, the new lib browser-drivers.sh and the Bash registration in each settings.proposed.json (tl-562) -- input: tools/hooks source at 34d6cfd -- expected: hooks copies shows no DRIFT/MISSING for them
+  · parent: tl-630
+  · added: 2026-10-23
+
+- **su-122 · tools/hooks has no push record, so nothing committed through the verb reaches origin -- input: gi...**
+  reported from tools/hooks to tools/setup in dispatch toolu_013Bac7MbeDv4uZR9VTvAvbs, filed from the dispatch ledger by the delegation layer's report filer: tools/hooks has no push record, so nothing committed through the verb reaches origin -- input: git -C tools/hooks config --bool funnel.push -- expected: true (then `tools/hooks/dev.sh commit --push`); also re-render bin/commit.sh, git-funnel.sh and test-git-funnel.sh everywhere (until then an installed verb answers --push with usage).
+  · parent: tl-636
+  · added: 2026-10-23
+
+- **su-123 · tools/research `./dev.sh check` red on shared:hooks-installed (5 drifted copies, browser-drivers....**
+  reported from tools/research to tools/setup in dispatch toolu_01H5EKRE2f8fWyHowujRQh7J, filed from the dispatch ledger by the delegation layer's report filer: tools/research `./dev.sh check` red on shared:hooks-installed (5 drifted copies, browser-drivers.sh missing) after tools/hooks 34d6cfd and 774780d -- input: cd tools/research && ./dev.sh check -- expected: `./setup tools/research --only hooks --rebuild` re-renders them, then I commit rs-31 and close tl-627.
+  · parent: tl-639
+  · added: 2026-10-23
 
 ## Open decisions
 
@@ -737,6 +758,18 @@
   · probe: python3 -m unittest tests.test_node.Node.test_two_level_tree_from_an_empty_folder, repeated
   · files: tests/test_node.py
   · added: 2026-10-19
+
+- **su-120 · unverified: the own-copy gate and the commit funnel deadlock on every source change -- input: edi...**
+  reported from tools/hooks to tools/setup in dispatch toolu_01NEFfK5YJcieSwXMmoYfuKt, filed from the dispatch ledger by the delegation layer's report filer: unverified: the own-copy gate and the commit funnel deadlock on every source change -- input: edit any installed source file in tools/hooks, then run commit.sh -- expected: a path to commit without hand-copying into .claude/
+  · probe: edit any installed source file in tools/hooks, then run commit.sh
+  · parent: tl-631
+  · added: 2026-10-23
+
+- **su-121 · unverified: hook files rendered into site-scrapers/.claude/hooks (ask-first, store-guard and othe...**
+  reported from site-scrapers to tools/setup in dispatch toolu_012WkVPPdMzGarGAizJcPN1z, filed from the dispatch ledger by the delegation layer's report filer: unverified: hook files rendered into site-scrapers/.claude/hooks (ask-first, store-guard and others) are not wired in settings.json, so test/hooks.test.js fails on HEAD -- input: `node --test --test-name-pattern="every hook is wired" test/hooks.test.js` on a git-archive HEAD copy -- expected: wired, or the test treats settings.proposed.json as "not applied yet" the way check-hooks.sh does.
+  · probe: `node --test --test-name-pattern="every hook is wired" test/hooks.test.js` on a git-archive HEAD copy
+  · parent: tl-632
+  · added: 2026-10-23
 
 ## Reported to other owners
 

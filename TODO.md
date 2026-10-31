@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (102 open, 21 closed in todo-history.json; seal c19105c59bdc): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (103 open, 21 closed in todo-history.json; seal 80df00eead58): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -932,3 +932,10 @@
   Since tl-313 an existing services.json without a description is services drift (exit 1) on ./setup <repo> (not with --only another component). Every workspace repo lacks one until step 10.3 drafts them; the shared checks read the same absence as a lag (registered), setup as drift, per PLAN-architecture §9 step 10.2's wording
   · done when: step 10.3's drafts applied in each repo; ./setup <repo> --dry-run shows services unchanged
   · added: 2026-10-19
+
+- **su-124 · setup plans: a verb for a plan's unnumbered preamble, so no plan text is edited by hand**
+  setup plans edit and add address numbered sections only (setuplib/plans.py:5-8). The planner's memory lets the preamble be hand-edited until a verb exists (interim item in this store, ra-7.2). Wanted: a verb that replaces the text before the first numbered heading, with the same --digest guard.
+  · parent: tl-650
+  · work: code
+  · files: setuplib/plans.py
+  · added: 2026-10-31

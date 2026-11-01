@@ -10,6 +10,6 @@
     "dispatches\\.jsonl",
     "resolve-owner"
   ],
-  "roster_names": ["harness", "deep-work", "dispatcher", "planner", "email-tools", "job-import-scripts", "cron-scheduler"],
+  "roster_names": ["harness", "deep-work", "dispatcher", "planner"],
   "allowed_phrases": ["needs-harness", "needs harness", "\"needs\": \"harness\""]
 }

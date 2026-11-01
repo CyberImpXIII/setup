@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (103 open, 21 closed in todo-history.json; seal 80df00eead58): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (104 open, 21 closed in todo-history.json; seal b07ace22035f): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -938,4 +938,11 @@
   · parent: tl-650
   · work: code
   · files: setuplib/plans.py
+  · added: 2026-10-31
+
+- **su-125 · To tools/setup: code that reads todo.json or todo-history.json directly will break when todo moves to todo.db (td-60..62); read through the todo CLI or the todo.*.jsonl exports**
+  From todo (tl-268). Probe: tools/todo/todo -C /Users/Specter/Desktop/claudeTest migrate --readers (95 lines in 30 files). Expected: readers go through the CLI or exports before the switch.
+  · parent: tl-299
+  · work: code
+  · done when: no direct read of todo.json/todo-history.json remains in this repo, or the todo CLI/export is used instead
   · added: 2026-10-31

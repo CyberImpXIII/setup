@@ -26,11 +26,19 @@ refuses every `setup plans edit` and `add`, so turning it on before they carry i
 would stop every plan write. While held, the plans without it are counted in a
 note, never failed, and the decision rule applies only where the heading is.
 
-The registry is the one A1 names: the `registry` file of the dependency
-DEPENDENCY names in dependencies.json, its `rules[].id`. It is read, never written. An id cited
-when the registry cannot be read is unchecked, never a pass."""
+The registry is the practice rows (PLAN-O27, external audit ra-5.1, Jacob 2026-10-31:
+"practices only"), read through their one reader, the checks dependency's CLI:
+`checks practices --rows --json`, each row's `id`. It is read, never written. An id cited
+when the registry cannot be read is unchecked, never a pass.
+
+INTERIM (PLAN-O27 §4 steps 1-3, ra-5.2 "warning"): until the plans are re-pointed, an id
+that is no practice row but is a gate row (the checks dependency's `registry` file,
+`rules[].id`) is a warning naming the practice row to cite instead (REPOINT), never a
+failure, so no plan write is refused mid-crossover. Step 3 removes gate_ids, REPOINT and
+warnings() with the `registry` key."""
 import json
 import re
+import subprocess
 
 from setuplib import deps, plans, rsids
 
@@ -43,11 +51,58 @@ APPROVED_RX = re.compile(r"\bapproved\b", re.I)
 DEPENDENCY = "checks"  # its key in dependencies.json; its `registry` names the file
 REQUIRE_HEADING = False  # held: see the module docstring; Jacob says when it turns on
 KINDS = ("missing", "no-ids", "listed-twice", "unresolved", "no-gate-row")
+ROWS_ARGS = ("practices", "--rows", "--json")
+WAIT = 60
+# INTERIM (removed with step 3): each gate row the plans cite -> the practice row that holds it,
+# from that row's `sources` (`gates:<repo>#<id>`; external audit phase6/o27-repoint.tsv, 2026-10-30)
+REPOINT = {"blocked-guard": "no-bot-bypass", "bot-detection-attended": "no-bot-bypass",
+           "check-fails": "seam-gated", "check-pass": "precommit-green", "hook-copies": "hooks-one-source",
+           "never-commit-secrets": "credentials-runtime", "no-add-all": "stage-own-paths",
+           "no-duplication": "no-duplicate-procedure", "no-secrets-write": "credentials-runtime",
+           "parallelism": "never-silent", "primary-guard": "primary-context", "push-gate": "commit-push-master",
+           "repeats": "repeat-becomes-verb", "seams-documented": "help-matches", "todo-valid": "keep-todo",
+           "two-windows": "two-windows-cap", "wrong-answer": "null-over-guess"}
 
 
 def registry_ids(tool_root=None):
-    """(the set of registry ids, where it was read), or (None, why): the checks
-    dependency's `registry` file, its `rules`, each row's `id`."""
+    """(the set of practice row ids, where they were read), or (None, why): the checks
+    dependency's CLI, `checks practices --rows --json`, each row's `id`."""
+    kw = {} if tool_root is None else {"tool_root": tool_root}
+    d, why = deps.load(**kw)
+    if why:
+        return None, why
+    where, why = deps.resolve(DEPENDENCY, deps=d, **kw)
+    if where is None:
+        return None, why
+    cli = deps.cli(DEPENDENCY, where, d)
+    if cli is None:
+        return None, f"{where}: no executable `{d[DEPENDENCY]['cli']}`"
+    run = f"`{cli.name} {' '.join(ROWS_ARGS)}`"
+    try:
+        r = subprocess.run([str(cli), *ROWS_ARGS], capture_output=True, text=True, timeout=WAIT,
+                           stdin=subprocess.DEVNULL)
+    except subprocess.TimeoutExpired:
+        return None, f"{run} gave no answer in {WAIT}s"
+    except OSError as e:
+        return None, f"{run} could not run ({e.strerror or e})"
+    if r.returncode != 0:
+        return None, f"{run}: " + (r.stderr.strip().splitlines() or [f"exit {r.returncode}"])[-1]
+    try:
+        doc = json.loads(r.stdout)
+    except ValueError:
+        return None, f"{run} printed no JSON"
+    rows = doc.get("rows") if isinstance(doc, dict) else None
+    if not isinstance(rows, list) or not rows:
+        return None, f"{run} printed no `rows` list"
+    ids = {r["id"] for r in rows if isinstance(r, dict) and isinstance(r.get("id"), str) and r["id"]}
+    if not ids:
+        return None, f"{run}: no row carries an id"
+    return ids, f"{run} ({cli})"
+
+
+def gate_ids(tool_root=None):
+    """INTERIM (PLAN-O27 step 3 removes it): (the set of gate row ids, where), or (None,
+    why): the checks dependency's `registry` file, its `rules`, each row's `id`."""
     kw = {} if tool_root is None else {"tool_root": tool_root}
     d, why = deps.load(**kw)
     if why:
@@ -135,10 +190,11 @@ def cited(text):
     return bool(spans), named, decisions, findings
 
 
-def findings(named_texts, ids, require_heading=REQUIRE_HEADING):
+def findings(named_texts, ids, require_heading=REQUIRE_HEADING, gates=None):
     """(findings, unchecked, without): findings ["<file>:<line>: <kind>: <why>"] over
     [(file name, text)] of the plans not done; unchecked, the ids not resolved for
-    want of a registry (ids None); without, the plans that carry no heading."""
+    want of a registry (ids None); without, the plans that carry no heading. An id
+    that is no practice row but is one of `gates` is left to warnings() (INTERIM)."""
     out, unchecked, without = [], set(), []
     for name, text in named_texts:
         has, named, decisions, grammar = cited(text)
@@ -151,6 +207,23 @@ def findings(named_texts, ids, require_heading=REQUIRE_HEADING):
         for n, rid in named + [(n, g) for n, g in decisions if g]:
             if ids is None:
                 unchecked.add(rid)
-            elif rid not in ids:
+            elif rid not in ids and not (gates and rid in gates):
                 out.append(f"{name}:{n}: unresolved: `{rid}` is no id of the practice registry")
     return out, sorted(unchecked), without
+
+
+def warnings(named_texts, ids, gates):
+    """INTERIM (PLAN-O27 step 3 removes it): ["<file>:<line>: gate row `<id>`: cite the
+    practice row `<row>`"] for each id named that is a gate row and no practice row."""
+    if ids is None or not gates:
+        return []
+    out = []
+    for name, text in named_texts:
+        has, named, decisions, _ = cited(text)
+        if not has:
+            continue
+        for n, rid in named + [(n, g) for n, g in decisions if g]:
+            if rid not in ids and rid in gates:
+                out.append(f"{name}:{n}: gate row `{rid}`: cite the practice row `{REPOINT.get(rid, '?')}` "
+                           "(PLAN-O27: a `## Practices` section names practice rows)")
+    return out

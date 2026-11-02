@@ -221,7 +221,7 @@
      "file": "setup", "old": "    after, _, _, unchecked = _plans_findings(folder, {name: out})", "new": "    (after, _), unchecked = audit.audit_plans(folder, {name: out}), None",
      "run": ["python3", "-m", "unittest", "tests.test_research_ids.ResearchIds.test_plans_edit_is_refused_when_it_would_rest_a_decision_on_a_quick_answer"]},
     {"id": "practices-unresolved", "gate": "plans: an id a `## Practices` section names, or an approved decision's gate row, that the registry lacks fails (A3)",
-     "file": "setuplib/practices.py", "old": "            elif rid not in ids:", "new": "            elif False:",
+     "file": "setuplib/practices.py", "old": "            elif rid not in ids and not (gates and rid in gates):", "new": "            elif False:",
      "run": ["python3", "-m", "unittest", "tests.test_practices.Grammar.test_an_id_that_resolves_passes_and_one_that_does_not_fails"]},
     {"id": "practices-no-ids", "gate": "plans: a `## Practices` section naming no registry id fails",
      "file": "setuplib/practices.py", "old": "        if not mine:", "new": "        if False:",
@@ -239,7 +239,7 @@
      "file": "setuplib/practices.py", "old": "    rows = doc.get(\"rules\")", "new": "    rows = doc.get(\"gates\")",
      "run": ["python3", "-m", "unittest", "tests.test_practices.Registry.test_the_rule_ids_are_read"]},
     {"id": "practices-wired", "gate": "plans: the `## Practices` findings reach the gate's FAIL lines",
-     "file": "setup", "old": "        found, unresolved, without = practices.findings(named, ids)\n        findings = findings + found\n", "new": "        found, unresolved, without = practices.findings(named, ids)\n",
+     "file": "setup", "old": "        found, unresolved, without = practices.findings(named, ids, gates=gates)\n        findings = findings + found\n", "new": "        found, unresolved, without = practices.findings(named, ids, gates=gates)\n",
      "run": ["python3", "-m", "unittest", "tests.test_practices.Live"]},
     {"id": "fit-required", "gate": "plans: a plan declaring `**Creates:**` with no `## Fit` heading fails (PLAN-architecture §6)",
      "file": "setuplib/fit.py", "old": "            if not fit:", "new": "            if False:",
@@ -888,6 +888,12 @@
      "run": ["python3", "-m", "unittest", "tests.test_push.Push.test_a_record_git_reads_as_the_same_boolean_is_unchanged"]},
     {"id": "push-deferred-past-commit", "gate": "push: a full run's record lands (it runs after the commit that applies deferred config)",
      "file": "setuplib/core.py", "old": "self.w.git_config(key, want, defer=False)", "new": "self.w.git_config(key, want)",
-     "run": ["python3", "-m", "unittest", "tests.test_push.Push.test_a_full_run_sets_it_after_the_render_commit"]}
+     "run": ["python3", "-m", "unittest", "tests.test_push.Push.test_a_full_run_sets_it_after_the_render_commit"]},
+    {"id": "practices-rows-not-read", "gate": "plans: the practice registry is the rows `checks practices --rows --json` prints (PLAN-O27)",
+     "file": "setuplib/practices.py", "old": "    rows = doc.get(\"rows\") if isinstance(doc, dict) else None", "new": "    rows = doc.get(\"rules\") if isinstance(doc, dict) else None",
+     "run": ["python3", "-m", "unittest", "tests.test_practices.Registry.test_the_practice_row_ids_are_read_through_the_cli"]},
+    {"id": "practices-gate-row-silent", "gate": "plans: a gate row cited is a note naming the practice row to cite (PLAN-O27, interim)",
+     "file": "setuplib/practices.py", "old": "            if rid not in ids and rid in gates:", "new": "            if False:",
+     "run": ["python3", "-m", "unittest", "tests.test_practices.Grammar.test_a_gate_row_is_a_warning_naming_its_practice_row_and_never_a_finding"]}
   ]
 }

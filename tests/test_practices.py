@@ -11,9 +11,7 @@ in the gate and in `plans edit`. The live class runs the real gate against the
 real registry (skipped, with the reason, when the workspace has none).
 
 The registry is the practice rows, read through the checks CLI (`checks practices
---rows --json`; PLAN-O27). INTERIM until the plans are re-pointed: an id that is a gate
-row (the `registry` file's `rules[].id`) and no practice row is a warning naming the row
-to cite, never a finding."""
+--rows --json`; PLAN-O27)."""
 import json
 import re
 import shutil
@@ -112,19 +110,6 @@ class Grammar(unittest.TestCase):
             got |= set(kinds(run(text, require=True)[0]))
         self.assertEqual(got, set(practices.KINDS))
 
-    def test_a_gate_row_is_a_warning_naming_its_practice_row_and_never_a_finding(self):
-        text = plan("- `root-seams`: x\n- `wrong-answer`: y\n- `nowhere`: z")
-        found = practices.findings([("PLAN-p.md", text)], {"root-seams"}, gates={"wrong-answer"})[0]
-        self.assertEqual(kinds(found), ["unresolved"])
-        self.assertIn("`nowhere`", found[0])
-        self.assertEqual(practices.warnings([("PLAN-p.md", text)], {"root-seams"}, {"wrong-answer"}),
-                         ["PLAN-p.md:12: gate row `wrong-answer`: cite the practice row `null-over-guess` "
-                          "(PLAN-O27: a `## Practices` section names practice rows)"])
-        # without the gate rows it is unresolved, as any id outside the registry
-        self.assertEqual(kinds(practices.findings([("PLAN-p.md", text)], {"root-seams"})[0]),
-                         ["unresolved", "unresolved"])
-        self.assertEqual(practices.warnings([("PLAN-p.md", text)], None, {"wrong-answer"}), [])
-
     def test_without_a_registry_every_id_is_unchecked_and_none_is_a_finding(self):
         found, unchecked, _ = run(plan("- `root-seams`: x", "- D1, approved. gate: `wrong-answer`"), ids=None)
         self.assertEqual((found, unchecked), ([], ["root-seams", "wrong-answer"]))
@@ -134,17 +119,14 @@ class Grammar(unittest.TestCase):
 
 class Registry(Case):
     """registry_ids asks the checks dependency's CLI for the practice rows (`checks
-    practices --rows --json`), a fake one here; gate_ids (INTERIM) reads its `registry`
-    file's `rules[].id`."""
+    practices --rows --json`), a fake one here."""
 
-    def tool_with(self, gates=None, cli=None):
+    def tool_with(self, cli=None):
         tool = self.tmp / "ws" / "tools" / "setup"
         tool.mkdir(parents=True)
         shutil.copy(ROOT / deps.DEPS_FILE, tool / deps.DEPS_FILE)
         d = json.loads((ROOT / deps.DEPS_FILE).read_text())["dependencies"]["checks"]
         checks = git_repo(self.tmp / "ws" / d["path"], commit=False)
-        if gates is not None:
-            (checks / d["registry"]).write_text(gates if isinstance(gates, str) else json.dumps(gates))
         if cli is not None:
             f = checks / d["cli"]
             f.write_text("#!/bin/sh\n" + cli + "\n")
@@ -173,22 +155,6 @@ class Registry(Case):
                 ids, got = practices.registry_ids(self.tool_with(cli=cli))
                 self.assertIsNone(ids)
                 self.assertIn(why, got)
-
-    def test_the_rule_ids_are_read(self):
-        tool = self.tool_with({"rules": [{"id": "a-b"}, {"id": "c"}, {"no": "id"}]})
-        ids, where = practices.gate_ids(tool)
-        self.assertEqual(ids, {"a-b", "c"})
-        self.assertTrue(where.endswith("gates.json"), where)
-
-    def test_an_unreadable_registry_gives_none_and_why(self):
-        for gates, why in ((None, "is not a file"), ("{", "unreadable"), ({"rules": []}, "no `rules` list"),
-                           ({"rules": [{"x": 1}]}, "carries an id")):
-            with self.subTest(gates=gates):
-                shutil.rmtree(self.tmp / "ws", ignore_errors=True)
-                ids, got = practices.gate_ids(self.tool_with(gates))
-                self.assertIsNone(ids)
-                self.assertIn(why, got)
-
 
 class LoneClone(Case):
     """No checks dependency: ids named are UNCHECKED, exit 3, never ok, and `plans
@@ -244,12 +210,3 @@ class Live(Case):
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn(f"FAIL  PLAN-p.md:11: unresolved: `{rid}-not-a-row` is no id of the practice registry",
                       r.stdout)
-
-    def test_a_gate_row_cited_is_a_note_naming_its_row_and_the_gate_stays_green(self):
-        gates, _ = practices.gate_ids()
-        rid = next(g for g in sorted(practices.REPOINT) if g in (gates or ()) and g not in LIVE_IDS)
-        r = self.gate(plan(f"- `{rid}`: held here"))
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn(f"  note  practices: PLAN-p.md:11: gate row `{rid}`: cite the practice row "
-                      f"`{practices.REPOINT[rid]}`", r.stdout)
-        self.assertIn(practices.REPOINT[rid], LIVE_IDS)

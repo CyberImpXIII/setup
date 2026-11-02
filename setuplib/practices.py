@@ -30,12 +30,7 @@ The registry is the practice rows (PLAN-O27, external audit ra-5.1, Jacob 2026-1
 "practices only"), read through their one reader, the checks dependency's CLI:
 `checks practices --rows --json`, each row's `id`. It is read, never written. An id cited
 when the registry cannot be read is unchecked, never a pass.
-
-INTERIM (PLAN-O27 §4 steps 1-3, ra-5.2 "warning"): until the plans are re-pointed, an id
-that is no practice row but is a gate row (the checks dependency's `registry` file,
-`rules[].id`) is a warning naming the practice row to cite instead (REPOINT), never a
-failure, so no plan write is refused mid-crossover. Step 3 removes gate_ids, REPOINT and
-warnings() with the `registry` key."""
+"""
 import json
 import re
 import subprocess
@@ -53,15 +48,6 @@ REQUIRE_HEADING = False  # held: see the module docstring; Jacob says when it tu
 KINDS = ("missing", "no-ids", "listed-twice", "unresolved", "no-gate-row")
 ROWS_ARGS = ("practices", "--rows", "--json")
 WAIT = 60
-# INTERIM (removed with step 3): each gate row the plans cite -> the practice row that holds it,
-# from that row's `sources` (`gates:<repo>#<id>`; external audit phase6/o27-repoint.tsv, 2026-10-30)
-REPOINT = {"blocked-guard": "no-bot-bypass", "bot-detection-attended": "no-bot-bypass",
-           "check-fails": "seam-gated", "check-pass": "precommit-green", "hook-copies": "hooks-one-source",
-           "never-commit-secrets": "credentials-runtime", "no-add-all": "stage-own-paths",
-           "no-duplication": "no-duplicate-procedure", "no-secrets-write": "credentials-runtime",
-           "parallelism": "never-silent", "primary-guard": "primary-context", "push-gate": "commit-push-master",
-           "repeats": "repeat-becomes-verb", "seams-documented": "help-matches", "todo-valid": "keep-todo",
-           "two-windows": "two-windows-cap", "wrong-answer": "null-over-guess"}
 
 
 def registry_ids(tool_root=None):
@@ -99,31 +85,6 @@ def registry_ids(tool_root=None):
         return None, f"{run}: no row carries an id"
     return ids, f"{run} ({cli})"
 
-
-def gate_ids(tool_root=None):
-    """INTERIM (PLAN-O27 step 3 removes it): (the set of gate row ids, where), or (None,
-    why): the checks dependency's `registry` file, its `rules`, each row's `id`."""
-    kw = {} if tool_root is None else {"tool_root": tool_root}
-    d, why = deps.load(**kw)
-    if why:
-        return None, why
-    where, why = deps.resolve(DEPENDENCY, deps=d, **kw)
-    if where is None:
-        return None, why
-    path, why = deps.registry(DEPENDENCY, where, d)
-    if path is None:
-        return None, why
-    try:
-        doc = json.loads(path.read_text())
-    except (OSError, ValueError) as e:
-        return None, f"{path} unreadable ({e.__class__.__name__})"
-    rows = doc.get("rules") if isinstance(doc, dict) else None
-    if not isinstance(rows, list) or not rows:
-        return None, f"{path} has no `rules` list"
-    ids = {r["id"] for r in rows if isinstance(r, dict) and isinstance(r.get("id"), str) and r["id"]}
-    if not ids:
-        return None, f"{path}: no row of `rules` carries an id"
-    return ids, str(path)
 
 
 def _items(lines, start, end, live):
@@ -190,11 +151,10 @@ def cited(text):
     return bool(spans), named, decisions, findings
 
 
-def findings(named_texts, ids, require_heading=REQUIRE_HEADING, gates=None):
+def findings(named_texts, ids, require_heading=REQUIRE_HEADING):
     """(findings, unchecked, without): findings ["<file>:<line>: <kind>: <why>"] over
     [(file name, text)] of the plans not done; unchecked, the ids not resolved for
-    want of a registry (ids None); without, the plans that carry no heading. An id
-    that is no practice row but is one of `gates` is left to warnings() (INTERIM)."""
+    want of a registry (ids None); without, the plans that carry no heading."""
     out, unchecked, without = [], set(), []
     for name, text in named_texts:
         has, named, decisions, grammar = cited(text)
@@ -207,23 +167,6 @@ def findings(named_texts, ids, require_heading=REQUIRE_HEADING, gates=None):
         for n, rid in named + [(n, g) for n, g in decisions if g]:
             if ids is None:
                 unchecked.add(rid)
-            elif rid not in ids and not (gates and rid in gates):
+            elif rid not in ids:
                 out.append(f"{name}:{n}: unresolved: `{rid}` is no id of the practice registry")
     return out, sorted(unchecked), without
-
-
-def warnings(named_texts, ids, gates):
-    """INTERIM (PLAN-O27 step 3 removes it): ["<file>:<line>: gate row `<id>`: cite the
-    practice row `<row>`"] for each id named that is a gate row and no practice row."""
-    if ids is None or not gates:
-        return []
-    out = []
-    for name, text in named_texts:
-        has, named, decisions, _ = cited(text)
-        if not has:
-            continue
-        for n, rid in named + [(n, g) for n, g in decisions if g]:
-            if rid not in ids and rid in gates:
-                out.append(f"{name}:{n}: gate row `{rid}`: cite the practice row `{REPOINT.get(rid, '?')}` "
-                           "(PLAN-O27: a `## Practices` section names practice rows)")
-    return out

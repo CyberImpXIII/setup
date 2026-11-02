@@ -113,10 +113,7 @@
       that carries a `## Practices` heading (setuplib/practices.py, PLAN-services
       §3 A3): it names at least one registry id, one list item each starting
       `- `<id>``, each once; each resolves in the practice registry (the checks
-      dependency's CLI, `checks practices --rows --json`); an id that is a gate
-      row (the checks dependency's `registry`, `rules[].id`) and no practice row
-      is a `note  practices:` line naming the row to cite, while the plans are
-      re-pointed (PLAN-O27, interim); and each approved decision
+      dependency's CLI, `checks practices --rows --json`); and each approved decision
       (an item of a Decisions section carrying the word `approved`) names its
       gate row, gate: `<id>` (resolved likewise), or says `prose: <why>`. A
       `note  practices:` line counts the plans carrying the heading: the rule
@@ -277,10 +274,8 @@ def _plans_findings(folder, instead=None):
         # the registry is read only when a plan carries the heading: none does, nothing to resolve
         ids, where = (practices.registry_ids() if any(practices.cited(t)[0] for _, t in named)
                       else (None, None))
-        gates = practices.gate_ids()[0] if ids is not None else None   # INTERIM, PLAN-O27 step 3 removes it
-        found, unresolved, without = practices.findings(named, ids, gates=gates)
+        found, unresolved, without = practices.findings(named, ids)
         findings = findings + found
-        notes.extend(("practices", w) for w in practices.warnings(named, ids, gates))
         held = "" if practices.REQUIRE_HEADING else " (the required-heading rule is held: never a failure)"
         notes.append(("practices", f"{len(named) - len(without)} of {len(named)} plan(s) not done carry a "
                                    f"`## Practices` heading{held}"

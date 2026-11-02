@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (104 open, 21 closed in todo-history.json; seal 0c4d8698abe6): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (102 open, 23 closed in todo-history.json; seal cd45b2944296): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -112,11 +112,6 @@
   reported from tools/transcripts to tools/setup in dispatch toolu_01AMZayunWGyknYwA7iG5Jjn, filed from the dispatch ledger by the delegation layer's report filer: check-pass hashes `git add --all` of the working tree, so a commit can never pass while another session's unstaged change is in it -- input: transcripts tree with unstaged .claude/settings.json, commit of all other paths -- expected: a way to check the staged tree or name excluded paths.
   · parent: tl-258
   · added: 2026-10-16
-
-- **su-96 · practice ids live in gates.json `practices.rows[].id`; `rules[].id` holds the CLAUDE.md section r...**
-  reported from tools/checks to tools/setup in dispatch toolu_018yA82V2Y591W3oYWd3ofnY, filed from the dispatch ledger by the delegation layer's report filer: practice ids live in gates.json `practices.rows[].id`; `rules[].id` holds the CLAUDE.md section rows -- input: setuplib/practices.py resolving `## Practices` ids -- expected: resolve against practices.rows[].id (settles su-89; tl-307 closed). Also: checks holds a copy of todo's sqlstore.py until step 10.2.
-  · parent: tl-359
-  · added: 2026-10-19
 
 - **su-98 · devtools/parts.py in each repo is still 1.3.0 and lacks --jobs/uses -- input: checks checkslib/pa...**
   reported from tools/checks to tools/setup in dispatch toolu_01RTRCd7BG3nGNiNv96j65Qw, filed from the dispatch ledger by the delegation layer's report filer: devtools/parts.py in each repo is still 1.3.0 and lacks --jobs/uses -- input: checks checkslib/parts.py 1.4.0 (0be97db) -- expected: reinstalled through each repo's parts component.
@@ -833,13 +828,6 @@
   root and commits the appended `.gitignore`), then the rest on their next run.
   · reported to: hub on 2026-10-04 (no counterpart yet)
   · added: 2026-10-15
-
-- **su-89 · Practice ids resolve against gates.json rules[].id; step 7.2 (tl-283) has not landed PRACTICES rows there yet**
-  setup plans resolves each ## Practices id and each approved decision's gate: row in tools/checks/gates.json rules[].id (dependencies.json checks.registry). If 7.2 puts practice rows under another key or file, every cited id fails as unresolved; checks to confirm the rows keep rules[].id, or tell setup
-  2026-10-19 checks' tl-321 report (checks 18489e8, relayed by the coordinator): practice ids live at gates.json practices.rows[].id; rules[].id holds the CLAUDE.md section rows. So setuplib/practices.py must resolve ## Practices ids against practices.rows[].id, not rules[].id
-  · reported to: checks on 2026-10-18 (no counterpart yet)
-  · files: setuplib/practices.py, dependencies.json
-  · added: 2026-10-18
 
 - **su-92 · Plans that create a tool must declare it in a Creates header line**
   setup plans (setuplib/fit.py, PLAN-architecture §9 step 2) requires a ## Fit heading only in a plan not done that declares > **Creates:** `<path>` in its first 25 lines; which plans create a tool is never guessed from prose, so an undeclared one is not seen. On 2026-10-18: 0 of 36 live plans declare it. The plan template for a new tool should carry the line

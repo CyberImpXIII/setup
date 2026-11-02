@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (102 open, 23 closed in todo-history.json; seal cd45b2944296): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (103 open, 23 closed in todo-history.json; seal 734767ee0b51): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -934,3 +934,9 @@
   · work: code
   · done when: no direct read of todo.json/todo-history.json remains in this repo, or the todo CLI/export is used instead
   · added: 2026-10-31
+
+- **su-126 · setup spawns the whole environment, the harness included, on a new machine**
+  Jacob, 2026-11-02 (external audit ra-13.2): "I think the harness should be able to be \"spawned\" from the setup, so while the harness is the source in our case, I want to be able to download setup and have it set-up everything on a different computer." PLAN-portable-env.md (2026-10-02) has init owned by the harness, calling setup per repo; this turns it around: setup is the one download, and it sets up the harness (.claude) too, from the names record (PLAN-architecture.md §13.1) once one exists on the new machine. The plan's 'Owner: harness for init' line needs Jacob's wording when this is taken up.
+  · parent: tl-653
+  · work: tooling
+  · added: 2026-11-02

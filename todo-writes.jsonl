@@ -3,3 +3,4 @@
 {"at": "2026-11-02T00:28:55Z", "verb": "edit", "ids": ["su-92"], "by": "external-audit", "why": "13.1 step 3: a report addressed to a role, re-addressed to the location (ra-22.1)", "seal_before": "dbd3db22ddbf1885", "seal_after": "aed6bd9153e64c35", "rename": null}
 {"at": "2026-11-02T14:55:38Z", "verb": "done", "ids": ["su-89"], "by": "external-audit", "why": "PLAN-O27 landed (external audit ra-5.1 practices only, ra-5.2 warning)", "seal_before": "aed6bd9153e64c35", "seal_after": "2c0bb777978273a5", "rename": null}
 {"at": "2026-11-02T14:55:38Z", "verb": "done", "ids": ["su-96"], "by": "external-audit", "why": "PLAN-O27 landed (external audit ra-5.1 practices only, ra-5.2 warning)", "seal_before": "2c0bb777978273a5", "seal_after": "d790991129b23592", "rename": null}
+{"at": "2026-11-02T18:23:09Z", "verb": "report", "ids": ["su-126"], "by": "external-audit", "why": null, "seal_before": "d790991129b23592", "seal_after": "81428fdc3c94d526", "rename": null}

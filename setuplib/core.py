@@ -103,6 +103,24 @@ def preflight(target: Path, nest_in=None):
     return True, False
 
 
+def render_repolist(doc) -> str:
+    """The repo list's body from a names file: one bullet per location with a remote,
+    sorted by folder, then one naming the local-only folders. Deterministic, no
+    timestamp, so the block on disk either equals a fresh render or is behind."""
+    locs = doc["locations"]
+    if not isinstance(locs, list):
+        raise TypeError("locations is not a list")
+    def folder(loc):
+        d = loc["dir"]
+        return "the top folder" if d == "." else f"`{d}/`"
+    with_remote = sorted((l for l in locs if l.get("remote")), key=lambda l: l["dir"])
+    local = sorted((l for l in locs if not l.get("remote")), key=lambda l: l["dir"])
+    lines = [f"- {folder(l)} → `github.com/{l['remote']}`" for l in with_remote]
+    if local:
+        lines.append("- Local only, no remote: " + ", ".join(folder(l) for l in local))
+    return "\n".join(lines) + "\n"
+
+
 def _read(p: Path):
     try:
         return p.read_text()
@@ -272,11 +290,14 @@ class Setup:
                  hooks_from=None, plugins_from=None, user_scope_from=None, dir_base=None, gh: str = "gh",
                  spec=None, node=False, rebuild=False, rebuild_dry=False, nest_in=None, stands_for=None,
                  checks_cli=None, data_repo=None, only=None, hooks_rebuild=False, overwrite_uncommitted=False, no_commit=False,
-                 description=None):
+                 description=None, names=None):
         self.target = target
         # --description: the one line written into a services.json this run creates
         # (PLAN-architecture §9 step 10.2); never into an existing one, never a child's
         self.description = description
+        # --names: the names file (one record per location: name, dir, store, remote, agent) the
+        # repolist component renders from (PLAN-architecture.md §13.1 G9); setup never looks for it
+        self.names = Path(names) if names else None
         # what a node's rebuild renders services.json with: --description, else the one its
         # node.json `rebuild` command declares (c_node), so a child node rebuilt from its
         # parent renders as that command would
@@ -373,6 +394,54 @@ class Setup:
         new = text[:m.start()] + block + text[m.end():]
         self.w.write(c["file"], new)
         return Result("rules", "installed", f"block updated @{mark} -> @{sha12(tmpl)} (was behind the template)")
+
+    def _marked_for_repolist(self):
+        """True when the target's CLAUDE.md holds a names:repos block: the one case a folder
+        in no git work tree is rendered into (the workspace top)."""
+        c = self.comp["repolist"]
+        text = _read(self.target / c["file"])
+        return text is not None and f"<!-- names:{c['block_id']}@" in text
+
+    def c_repolist(self):
+        """The top's repo list, rendered from the names file (--names) between
+        `names:repos@<digest>` markers in CLAUDE.md (PLAN-architecture.md §13.1 G9; the
+        names record is the one source of each location's remote). Like the rules block:
+        behind, updated; edited locally (body not at its marker), drift and untouched; no
+        block, drift saying where it goes; no --names, none."""
+        c = self.comp["repolist"]
+        if self.names is None:
+            return Result("repolist", "none", "no --names file handed: the repo list is rendered from one, never looked for")
+        try:
+            doc = json.loads(self.names.read_text())
+            body = render_repolist(doc)
+        except (OSError, ValueError, TypeError, KeyError) as e:
+            return Result("repolist", "failed", f"--names {self.names}: cannot be read as a names file ({e})")
+        bid = c["block_id"]
+        begin = f"<!-- names:{bid}@{sha12(body)} -->"
+        end = f"<!-- /names:{bid} -->"
+        block = f"{begin}\n{body}{end}\n"
+        f = self.target / c["file"]
+        text = _read(f)
+        if text is None:
+            return Result("repolist", "drift", f"{c['file']} is missing; the repo list goes in it, after the line `{c['after']}`")
+        rx = re.compile(r"<!-- names:" + re.escape(bid) + r"@([0-9a-f]{12}) -->\n(.*?)" + re.escape(end) + r"\n?", re.S)
+        found = list(rx.finditer(text))
+        if len(found) > 1:
+            return Result("repolist", "drift", f"{c['file']} holds {len(found)} names:{bid} blocks; it must hold one")
+        if not found:
+            where = f"after the line `{c['after']}`" if c["after"] in text else f"where the hand-written repo list is (no line `{c['after']}` found)"
+            return Result("repolist", "drift", f"{c['file']} has no names:{bid} block (its repo list is a hand copy); "
+                                               f"its owner puts the markers {where}, and the next run renders the list")
+        m = found[0]
+        mark, old = m.group(1), m.group(2)
+        if old == body and mark == sha12(body):
+            return Result("repolist", "unchanged", f"block @{mark}")
+        if sha12(old) != mark:
+            return Result("repolist", "drift", f"block edited locally (content @{sha12(old)}, marker @{mark}); "
+                                               "not overwritten: the list is the names record's, change the record")
+        new = text[:m.start()] + block + text[m.end():]
+        self.w.write(c["file"], new)
+        return Result("repolist", "installed", f"block updated @{mark} -> @{sha12(body)} (the names record changed)")
 
     def c_hooks(self):
         """Every file the hook source's listing names, rendered into the repo (PLAN-repo-
@@ -1578,6 +1647,12 @@ class Setup:
         Refused before any write."""
         # the workspace top: not a repo, its hooks folder's parent is (`--only hooks` only)
         sub = self.comp["hooks"]["rebuild"]["scope_root"]
+        # the workspace top is no repo by design: `--only repolist` renders the one block its
+        # CLAUDE.md holds between names:repos markers, with no git work tree, no guard that
+        # reads git status, no commit and never an init (PLAN-architecture.md §13.1 G9)
+        if self.only == "repolist" and _toplevel(self.target) is None and self._marked_for_repolist():
+            self.is_new, self._existed_empty = False, False
+            return [self.c_repolist()]
         if self.only == "hooks" and sub_repo(self.target, sub):
             if self.plugins_from is not None:
                 raise Refused(f"--plugins proposes plug-in registrations, and {self.label}'s {sub}/ is its own repo "

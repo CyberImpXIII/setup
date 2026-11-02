@@ -11,7 +11,7 @@ class Fixture(Case):
         code, res = self.run_json("fresh", "--description", "A scaffolded fixture.")  # none: services needs-owner
         self.assertEqual(code, 0)
         self.assertEqual(self.statuses(res), {
-            "repo": "installed", "rules": "installed", "hooks": "installed",
+            "repo": "installed", "rules": "installed", "repolist": "none", "hooks": "installed",
             "todo": "installed", "docs": "installed", "check": "installed", "parts": "installed", "mutate": "none", "services": "installed", "cli": "none",
             "data": "none", "params": "installed", "ignore": "installed",
             # the default hook source (the hooks dependency) registers git-stamp.sh and write-ledger.sh

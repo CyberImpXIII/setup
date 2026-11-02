@@ -1,1 +1,3 @@
 {"at": "2026-11-01T02:16:45Z", "verb": "report", "ids": ["su-125"], "by": "external-audit", "why": "ra-6.3/13.1-step-4:re-address-reports", "seal_before": "3f83fd4e1192fdcd", "seal_after": "dbd3db22ddbf1885", "rename": null}
+{"at": "2026-11-02T00:28:51Z", "verb": "rename-repo", "ids": ["su-108"], "by": "external-audit", "why": "13.1-step-3:field-keys-to-names(ra-22.1)", "seal_before": "dbd3db22ddbf1885", "seal_after": "dbd3db22ddbf1885", "rename": {"old": ".claude", "new": "harness"}}
+{"at": "2026-11-02T00:28:55Z", "verb": "edit", "ids": ["su-92"], "by": "external-audit", "why": "13.1 step 3: a report addressed to a role, re-addressed to the location (ra-22.1)", "seal_before": "dbd3db22ddbf1885", "seal_after": "aed6bd9153e64c35", "rename": null}

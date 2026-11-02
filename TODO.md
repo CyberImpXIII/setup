@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (104 open, 21 closed in todo-history.json; seal b07ace22035f): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (104 open, 21 closed in todo-history.json; seal 0c4d8698abe6): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -843,7 +843,7 @@
 
 - **su-92 · Plans that create a tool must declare it in a Creates header line**
   setup plans (setuplib/fit.py, PLAN-architecture §9 step 2) requires a ## Fit heading only in a plan not done that declares > **Creates:** `<path>` in its first 25 lines; which plans create a tool is never guessed from prose, so an undeclared one is not seen. On 2026-10-18: 0 of 36 live plans declare it. The plan template for a new tool should carry the line
-  · reported to: planner on 2026-10-18 (no counterpart yet)
+  · reported to: claudeTest on 2026-11-01 (no counterpart yet)
   · files: setuplib/fit.py
   · added: 2026-10-18
 

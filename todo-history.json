@@ -664,7 +664,7 @@
       "evidence": "2026-10-20, after 17f8091/bb46ba4: `tools/setup/setup /Users/Specter/Desktop/claudeTest --rebuild --only hooks` -> exit 2, refused, nothing written: the .claude/ repo holds a modified settings.json (248 lines over its last commit 9cd567d of 2026-10-02; byte-equal to the settings.proposed.json an earlier setup run wrote there, now named in the hooks line and left as found) and an untracked settings.json.bak (2026-10-03). Setup never commits settings.json at the top (wiring.json's file), so it will not ride. The dry run renders 26 files (git-funnel.sh, bin/commit.sh among them) with no error.",
       "probe": null,
       "reported_to": {
-        "repo": ".claude",
+        "repo": "harness",
         "date": "2026-10-20",
         "their_id": null
       },
@@ -820,5 +820,5 @@
       "imported": null
     }
   ],
-  "seal": "2d70c2d6ee4b1209"
+  "seal": "54b7cbd06809b7bf"
 }

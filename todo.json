@@ -2777,8 +2777,8 @@
       "evidence": "setup plans (setuplib/fit.py, PLAN-architecture §9 step 2) requires a ## Fit heading only in a plan not done that declares > **Creates:** `<path>` in its first 25 lines; which plans create a tool is never guessed from prose, so an undeclared one is not seen. On 2026-10-18: 0 of 36 live plans declare it. The plan template for a new tool should carry the line",
       "probe": null,
       "reported_to": {
-        "repo": "planner",
-        "date": "2026-10-18",
+        "repo": "claudeTest",
+        "date": "2026-11-01",
         "their_id": null
       },
       "parent": null,
@@ -3718,5 +3718,5 @@
       "imported": null
     }
   ],
-  "seal": "dbd3db22ddbf1885"
+  "seal": "aed6bd9153e64c35"
 }

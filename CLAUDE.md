@@ -295,25 +295,16 @@ These hold across every tool here, whatever the task and however it is framed. T
 
 ## Keeping these rules in sync
 
-The rules in the block between the `shared:rules` markers above are shared with
-`../../CLAUDE.md`, `../../site-scrapers/CLAUDE.md`, `../../emailTools/CLAUDE.md`,
-`../../scripts/CLAUDE.md`, `../../scriptingTools/data-bridge/CLAUDE.md`,
-`../../scriptingTools/chronjobScheduler/CLAUDE.md`, `../../knowledge-base/CLAUDE.md`,
-`../../applications/CLAUDE.md` and `../../addon-bench/CLAUDE.md`: the
-hand-synced copies, the same list every one of them carries. Each repo carries
-its own copy because a fresh clone won't have the parent file.
-`tests/test_sync_list.py` checks this list against the top level's, both ways, in
-the workspace (skipped, with the reason, in a lone clone). Copies that carry this
-repo's block between `shared:rules` markers instead (the other tool folders) are
-deliberately not in the list, here or at the top level: they are reached through
-the template, below, and a backticked path added here would fail that comparison
-and the same check in the other hand-synced repos.
+Which files carry this block is answered by setup's marker, not by a list kept here:
+`grep -l 'shared:rules@' */CLAUDE.md */*/CLAUDE.md`, from the workspace top, names every
+copy, and tools/checks' `rules-in-sync` holds the block's text in each (PLAN-O7-O13,
+decision 26; Jacob, 2026-11-02). Each repo carries its own copy because a fresh clone
+won't have the parent file.
 
 Here, and in every repo carrying the block, it is installed by `./setup` from
 `templates/shared-rules.md`. **Do not edit it in place.** Change
 `templates/shared-rules.md`, run `./setup .`, and ask each block-carrying repo's
 owner to run `./setup <their path>`; a block edited in place is reported as
-`drift` (`./dev.sh self` here) and is never overwritten. The hand-synced copies
-stay hand-synced until each repo moves to the block (PLAN-repo-setup phase 2):
-**change a shared rule in the copies you own, and ask the owner for the ones you
-don't** — and say which copies you updated and which you asked for.
+`drift` (`./dev.sh self` here) and is never overwritten. **Change a shared rule in
+the template you own, and ask the owner for the copies you don't** — and say
+which copies you updated and which you asked for.

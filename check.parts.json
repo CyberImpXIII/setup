@@ -70,8 +70,6 @@
   {"name": "test.steps", "run": "python3 -m unittest -v tests.test_steps", "files": ["tests/test_steps.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests"},
   {"name": "test.subrepo", "run": "python3 -m unittest -v tests.test_subrepo", "files": ["tests/test_subrepo.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup, which reads its dependencies in the workspace"},
-  {"name": "test.sync_list", "run": "python3 -m unittest -v tests.test_sync_list", "files": ["tests/test_sync_list.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
-   "always": "reads the workspace top's CLAUDE.md and the copies it names"},
   {"name": "test.userscope", "run": "python3 -m unittest -v tests.test_userscope", "files": ["tests/test_userscope.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup, which reads its dependencies in the workspace"},
   {"name": "test.vocab", "run": "python3 -m unittest -v tests.test_vocab", "files": ["tests/test_vocab.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",

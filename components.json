@@ -95,6 +95,22 @@
       "failed": "named with why, never committed: refused, drift without --rebuild, a red or unfinished check (the render left written and uncommitted, its paths named), or a commit the repo's git hooks refused"
     }
   },
+  "audit_day": {
+    "_comment": "setup audit-day (PLAN-check-progress.md §13 step 4, Jacob 2026-11-03: 'more an audit than a check'): each git work tree under the root holding `declared_by` (the shared runner's parts file), one at a time, its `check` run once over every commit since the one its `record` says it last audited (fanout's `prune`). The runner's own progress file (`progress`) is read for each part's result and time, never the text; the range and those results go to `record` (inside the repo, gitignored, written through fsw; never the progress file, which the next short run rewrites whole). `findings` prints them as the findings list a todo detect detector prints; with --todo, the run files them with `detect --id <detector>` (the detector is registered in that tool's own list, not here). tests/test_audit_day.py holds the statuses documented == emitted.",
+    "declared_by": "check.parts.json",
+    "check": ["./dev.sh", "check", "--full"],
+    "progress": ".progress/check.json",
+    "record": ".progress/audit-day.json",
+    "timeout_s": 14400,
+    "detector": "AD",
+    "statuses": {
+      "passed": "audited: the full check ran once over the range (and any uncommitted path, named in the record) and every part passed; the record names the range",
+      "red": "audited: the full check ran once over the range and a part failed (or it exited non-zero after its parts); the record names the range and each part, and each failure is a finding",
+      "unchanged": "no commit since the one last audited: not run, the record kept",
+      "would-run": "--dry-run: a real run would audit this range; nothing run, nothing written",
+      "not-run": "nothing audited, the range kept for the next run, with why: git status failing, a record path git does not ignore, a held full-run lock, a run past its timeout, or a progress file that is not this run's --full record; a finding too"
+    }
+  },
   "rebuild_statuses": {
     "regenerated": "a generated file rendered byte for byte, mode included, as the tree holds it (or, absent there, as the last commit does: written back)",
     "drift":       "a generated file rendered otherwise, or in neither the tree nor the last commit: the render is written and git diff is the finding; one with uncommitted changes is kept, not rendered",

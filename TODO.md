@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (71 open, 69 closed in todo-history.json; seal ce7444909dfb): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (76 open, 69 closed in todo-history.json; seal 343a1686c955): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -143,6 +143,9 @@
 - **su-111 · `funnel.push` is unset in every repo, so commit.sh never pushes and git-funnel blocks a typed pus...**
   reported from emailTools to tools/setup in dispatch toolu_01SEZwfH6rtrMr5Zv3qg9M9w, filed from the dispatch ledger by the delegation layer's report filer: `funnel.push` is unset in every repo, so commit.sh never pushes and git-funnel blocks a typed push -- input: `commit.sh -C emailTools ...` -> "not pushed (no push record: git config funnel.push is not true)" -- expected: setup writes funnel.push=true for repos with an origin, or a sanctioned push path.
   · parent: tl-558
+  · work: tooling
+  · size: M
+  · done when: setup's component writes git config funnel.push=true in every repo with an origin unless its store records false, and has run at each such repo; bash .claude/lib/push-records.sh scan . shows no unset row; each repo's backlog is pushed with commit.sh --push (tl-571), a failed push stops and goes to Jacob, nothing is force-pushed; no repo is ahead of origin except one recorded false (PLAN-services.md §3 F3 'Default push, the fix')
   · approved: jacob 2026-11-03: Jacob, planner window, 2026-11-03: dt-46 row 1 answered default-push (one setup dispatch, tl-558/su-111, PLAN-services.md §3 F3 'Default push, the fix')
   · added: 2026-10-22
 
@@ -232,7 +235,19 @@
   · size: S
   · files: check.parts.json, dev.sh
   · done when: ./dev.sh check passes test.contract and test.node in the full suite at the usual load (raise their timeout, or serialise them away from mutants/hooks)
-  · handoff: done: timeout_s 2700 for test.contract, test.node and hooks in check.parts.json (probe: 323s/351s alone at load 40, time spread over many tests, so contention not a hang); next: full check via commit.sh with COMMIT_CHECK_TIMEOUT=5400; verify: .progress/check.json state passed, 45/45 (2026-11-03, at 8a5a826)
+  · handoff: done: cf613d7 (pushed) raises timeout_s to 2700 for test.contract, test.node, hooks; its full check passed 45/45, wall 1044s, contract 247s, node 412s, hooks 394s, mutants 654s -- but at load 9-30, where 900s would also have held, so the fix is not yet shown under load; next: one full ./dev.sh check at load >= 50, read .progress/check.json times; close if 45/45 (2026-11-03, at cf613d7)
+  · added: 2026-11-03
+
+- **su-142 · devtools/parts.py is now behind checks 1.7.0 -- input: `./setup . --only parts` then `setup fanou...**
+  reported from tools/checks to tools/setup in dispatch toolu_01VZ8xGiZ9mLH2B8SAQqNfD9, filed from the dispatch ledger by the delegation layer's report filer: devtools/parts.py is now behind checks 1.7.0 -- input: `./setup . --only parts` then `setup fanout parts` -- expected: all copies at 1.7.0, and step 4 audit-day reading `budget.over`/`full_not_run` from .progress/<stem>.json and `budget_s` from `usage --json`.
+  · parent: tl-726
+  · added: 2026-11-03
+
+- **su-145 · addon-bench devtools/parts.py no longer matches its source (parts.py 1.7.0, tools/checks e4259f1)**
+  Reported by the addon-bench agent during tl-626 (2026-11-03): ./dev.sh check, tests/test_check.py test_the_runner_copy_is_its_source fails because tools/checks committed parts.py 1.7.0 (e4259f1) mid-run, so addon-bench's copy is stale. It blocks tl-626's check and commit.
+  · parent: tl-728
+  · work: tooling
+  · done when: tools/setup/setup addon-bench --only parts --rebuild re-renders addon-bench/devtools/parts.py at 1.7.0 and test_the_runner_copy_is_its_source passes in addon-bench
   · added: 2026-11-03
 
 ## Open decisions
@@ -443,6 +458,14 @@
   · files: check.parts.json
   · added: 2026-11-03
 
+- **su-143 · audit-day audits a dirty tree with its range: uncommitted paths are run and named, not refused**
+  2026-11-03 tl-724: a dry run over the workspace found 9 of 18 declared repos holding uncommitted paths (mostly todo-store files: TODO.md, todo.json, todo-writes.jsonl); refusing them would leave half the repos never audited, so setuplib/auditday.py runs them and records `uncommitted` in .progress/audit-day.json and every finding's evidence. A part red only because of uncommitted work is then filed against the commit range. Choice made by the setup owner, not Jacob.
+  · probe: ./setup audit-day --dry-run --root <workspace top>: count would-run lines whose detail says 'plus N uncommitted path(s)'
+  · work: decision
+  · size: S
+  · files: setuplib/auditday.py
+  · added: 2026-11-03
+
 ## Reported to other owners
 
 - **su-65 · checks (2026-10-05, via the dispatcher):**
@@ -515,6 +538,13 @@
 - **su-140 · unverified: parts.py gives no warning when a part uses most of its timeout_s, so a part creeping toward it is seen only when it times out**
   su-138: hooks ran 888s of its 900s in a full suite (2026-11-03) and nothing said so; test.contract/test.node passed earlier runs then timed out at 900s. Suggest: the run's text and progress file name each part that used > 75% of its timeout_s
   · reported to: checks on 2026-11-03 (no counterpart yet)
+  · added: 2026-11-03
+
+## Stalls
+
+- **su-141 · D2: unsized open items (57)**
+  oldest 2026-10-15: su-1; su-2; su-3; su-4; su-5; su-6; su-7; su-10; su-14; su-19; su-25; su-27; su-28; su-35; su-58; su-64; su-65; su-66; su-67; su-68; su-69; su-70; su-71; su-78; su-79; su-80; su-81; su-82; su-83; su-84; su-88; su-92; su-98; su-100; su-101; su-102; su-106; su-107; su-110; su-114; su-115; su-116; su-118; su-119; su-120; su-121; su-122; su-123; su-124; su-125; su-126; su-136; su-137; su-139; su-140; su-142; su-145
+  · detector: D2 on unsized open items, count 57, last seen 2026-11-03; clears with: todo edit ID --size S|M|L (never ready until sized), or close it
   · added: 2026-11-03
 
 ## Plan steps
@@ -655,4 +685,12 @@
   · size: S
   · files: components.json
   · done when: each repo the docs index should read declares its docs, by setup runs per owner or a docs entry in setup fanout; or the plan says which repos are left out
+  · added: 2026-11-03
+
+- **su-144 · audit-day is not run nightly by anything yet, and its detector AD is not registered in the store CLI's list**
+  tl-724 built `setup audit-day` (filing via detect --id AD); the store CLI's vocab detectors.list has S7, D1, D2 only, so `--todo` reports 'filing FAILED' until AD is registered (reported to todo). PLAN-check-progress §13 step 5 (the scheduler) is the caller.
+  · work: tooling
+  · size: S
+  · files: setup, setuplib/auditday.py
+  · done when: a scheduled job runs `setup audit-day --todo <cli>` and `detect --id AD` exits 0 in the workspace
   · added: 2026-11-03

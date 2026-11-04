@@ -95,6 +95,32 @@
       unchanged, would-commit, undeclared: a --repos path the component is not
       for, failed), then a summary. Exit 1 when any repo failed; 2 on a usage
       error or a source that cannot be named.
+  setup audit-day [--root DIR | --repos PATH...] [--timeout S] [--todo CLI] [--dry-run] [--json]
+      the full suite, once, over what changed (PLAN-check-progress.md §13 step 4;
+      components.json `audit_day`): each git work tree under DIR (default: the
+      working folder) holding check.parts.json, or each --repos PATH, one at a
+      time. A repo with no commit since the one its record (.progress/audit-day.json,
+      gitignored) last audited: unchanged, nothing run. Else `./dev.sh check --full`
+      runs once (--timeout S, default 14400; past it the process group is stopped),
+      and each part's result and time are read from the runner's progress file
+      (.progress/check.json), only when it is this run's --full record. The range
+      (from, to, commits) and each part go to the record: passed, or red (a part
+      failed); uncommitted paths are audited with the range and named in the
+      record. not-run, the range kept for the next run: a record path git does
+      not ignore, a held full-run lock, a timeout, a progress file that is not
+      this run's --full one. --dry-run:
+      would-run, nothing run or written. --todo CLI then files the findings
+      (`CLI -C DIR --root DIR detect --id AD`; the detector is registered in that
+      CLI's own list). One line per repo, then a summary. Exit 1 when a repo was
+      not-run or filing failed (a red part is a finding, not a failure), 2 on a
+      usage error.
+  setup audit-day --findings --todo CLI [--root DIR]
+      read-only: prints the JSON findings list a todo detect detector prints, from
+      each record under DIR: one per failed part (`full part <name> failed`, its
+      evidence naming the range), one per repo for unchecked parts, a failure after
+      the parts, a not-run, a record path git does not ignore, and a short run over
+      its budget (the runner's `budget.over`). Each repo named as `CLI repos --status
+      --json` names it; a repo with findings and no name there: exit 1, nothing printed.
   setup components            what each component installs, and the status vocabulary
   setup plans <dir> [--steps [--todo CLI] [--cited-in FILE]... [--json] | --facts [--root DIR] [--json]]
       every PLAN-*.md there that is not done has a "Setup component" heading,
@@ -187,9 +213,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from setuplib import audit, core, facts, fanout, fit, fsw, plans, practices, rsids, steps  # noqa: E402
+from setuplib import audit, auditday, core, facts, fanout, fit, fsw, plans, practices, rsids, steps  # noqa: E402
 
-SUBCOMMANDS = ["components", "plans", "audit", "fanout"]
+SUBCOMMANDS = ["components", "plans", "audit", "fanout", "audit-day"]
 
 
 def cmd_components(_):
@@ -637,6 +663,62 @@ def cmd_fanout(argv):
     return 0 if doc["ok"] else 1
 
 
+def cmd_audit_day(argv):
+    p = argparse.ArgumentParser(prog="setup audit-day", add_help=False)
+    p.add_argument("--root")
+    p.add_argument("--repos", nargs="+")
+    p.add_argument("--timeout", type=int)
+    p.add_argument("--todo")
+    p.add_argument("--findings", action="store_true")
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--json", action="store_true")
+    try:
+        a = p.parse_args(argv)
+    except SystemExit:
+        return 2
+    root = Path(a.root or ".").resolve()
+    if not root.is_dir():
+        print(f"setup audit-day: --root {a.root} is not a folder", file=sys.stderr)
+        return 2
+    if a.findings:
+        if not a.todo or a.repos or a.timeout or a.dry_run:
+            print("setup audit-day --findings takes --todo CLI (its repos listing names each repo) and --root"
+                  " alone", file=sys.stderr)
+            return 2
+        try:
+            print(json.dumps(auditday.findings(a.todo, root)))
+        except auditday.Usage as e:
+            print(f"setup audit-day --findings: {e}", file=sys.stderr)
+            return 1
+        return 0
+    if a.repos and a.root:
+        print("setup audit-day: --repos or --root, not both", file=sys.stderr)
+        return 2
+    if a.timeout is not None and a.timeout <= 0:
+        print("setup audit-day: --timeout takes seconds, more than 0", file=sys.stderr)
+        return 2
+    opts = {"dry_run": a.dry_run, "todo": a.todo, "timeout": a.timeout or auditday.spec()["timeout_s"]}
+    try:
+        doc = auditday.run(a.repos, root, opts)
+    except auditday.Usage as e:
+        print(f"setup audit-day: {e}", file=sys.stderr)
+        return 2
+    if a.json:
+        print(json.dumps(doc))
+    else:
+        for r in doc["repos"]:
+            print(f"  {r['status']:<10} {r['path']}  {r['detail']}")
+        counts = {}
+        for r in doc["repos"]:
+            counts[r["status"]] = counts.get(r["status"], 0) + 1
+        summary = ", ".join(f"{n} {k}" for k, n in sorted(counts.items())) or "no repo declares a check"
+        filed = doc["filed"]
+        print(f"setup audit-day{' (dry run, nothing run or written)' if a.dry_run else ''}: {summary}"
+              + ("" if a.dry_run else "; findings not filed (no --todo)" if filed is None
+                 else f"; filing {'ok' if filed['ok'] else 'FAILED'}: {filed['said']}"))
+    return 0 if doc["ok"] else 1
+
+
 def cmd_setup(argv):
     p = argparse.ArgumentParser(prog="setup", add_help=False)
     p.add_argument("path")
@@ -768,7 +850,7 @@ def main(argv):
         print(__doc__.strip())
         return 0
     if argv[0] in SUBCOMMANDS:
-        return globals()["cmd_" + argv[0]](argv[1:])
+        return globals()["cmd_" + argv[0].replace("-", "_")](argv[1:])
     return cmd_setup(argv)
 
 

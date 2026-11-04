@@ -5,6 +5,8 @@
   {"name": "test.agent", "run": "python3 -m unittest -v tests.test_agent", "files": ["tests/test_agent.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup, which reads its dependencies in the workspace"},
   {"name": "test.audit", "run": "python3 -m unittest -v tests.test_audit", "files": ["tests/test_audit.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests"},
+  {"name": "test.audit_day", "run": "python3 -m unittest -v tests.test_audit_day", "files": ["tests/test_audit_day.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
+   "always": "runs the parts dependency's runner source and the store CLI, outside this repo"},
   {"name": "test.checkjson", "run": "python3 -m unittest -v tests.test_checkjson", "files": ["tests/test_checkjson.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup and the shared checks CLI (check-json), outside this repo"},
   {"name": "test.contract", "run": "python3 -m unittest -v tests.test_contract", "files": ["tests/test_contract.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests", "timeout_s": 2700,

@@ -33,11 +33,12 @@ class Vocab(Case):
 
     def test_usage_lists_exactly_the_subcommands(self):
         r = subprocess.run([str(ROOT / "setup"), "--help"], capture_output=True, text=True)
-        listed = re.findall(r"^\s+setup ([a-z]+)\b", r.stdout, re.M)
+        listed = re.findall(r"^\s+setup ([a-z][a-z-]*)(?![\w-])", r.stdout, re.M)
         src = (ROOT / "setup").read_text()
-        handlers = re.findall(r"^def cmd_([a-z]+)\(", src, re.M)
+        # main dispatches `a-b` to cmd_a_b
+        handlers = [h.replace("_", "-") for h in re.findall(r"^def cmd_([a-z_]+)\(", src, re.M)]
         subs = re.search(r"SUBCOMMANDS = \[(.*?)\]", src).group(1)
-        subs = re.findall(r'"([a-z]+)"', subs)
+        subs = re.findall(r'"([a-z-]+)"', subs)
         self.assertEqual(sorted(set(listed)), sorted(subs))
         self.assertEqual(sorted(handlers), sorted(subs + ["setup"]))
 

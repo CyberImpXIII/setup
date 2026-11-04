@@ -879,6 +879,15 @@
      "run": ["python3", "-m", "unittest", "tests.test_push.Push.test_a_full_run_sets_it_after_the_render_commit"]},
     {"id": "practices-rows-not-read", "gate": "plans: the practice registry is the rows `checks practices --rows --json` prints (PLAN-O27)",
      "file": "setuplib/practices.py", "old": "    rows = doc.get(\"rows\") if isinstance(doc, dict) else None", "new": "    rows = doc.get(\"rules\") if isinstance(doc, dict) else None",
-     "run": ["python3", "-m", "unittest", "tests.test_practices.Registry.test_the_practice_row_ids_are_read_through_the_cli"]}
+     "run": ["python3", "-m", "unittest", "tests.test_practices.Registry.test_the_practice_row_ids_are_read_through_the_cli"]},
+    {"id": "audit-day-reruns-unchanged", "gate": "audit-day: a repo with no commit since its last audit is skipped, the check not run (PLAN-check-progress §13 step 4)",
+     "file": "setuplib/auditday.py", "old": "    if frm == head:\n", "new": "    if False:\n",
+     "run": ["python3", "-m", "unittest", "tests.test_audit_day.Gates.test_an_unchanged_repo_is_skipped"]},
+    {"id": "audit-day-range-forgets-from", "gate": "audit-day: two new commits are audited once, the range from the commit last audited",
+     "file": "setuplib/auditday.py", "old": "    rng = span(tree, frm, head)\n", "new": "    rng = span(tree, None, head)\n",
+     "run": ["python3", "-m", "unittest", "tests.test_audit_day.Gates.test_two_new_commits_are_audited_once_over_both"]},
+    {"id": "audit-day-reads-any-progress", "gate": "audit-day: a progress file that is not this run's --full record (a held lock) is never read as the audit",
+     "file": "setuplib/auditday.py", "old": "    why = dwhy or this_run(doc, before, started)\n", "new": "    why = dwhy\n",
+     "run": ["python3", "-m", "unittest", "tests.test_audit_day.NotRun.test_a_held_lock_runs_nothing_and_keeps_the_range"]}
   ]
 }

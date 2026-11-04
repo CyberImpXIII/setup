@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (76 open, 69 closed in todo-history.json; seal 67820d2c7075): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (78 open, 69 closed in todo-history.json; seal 562d9a133d2e): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -245,7 +245,7 @@
   · parent: tl-726
   · work: tooling
   · size: M
-  · done when: setup's own devtools/parts.py is at checks 1.7.0 (./setup . --only parts, committed in tools/setup), then setup fanout parts brings every repo's copy to 1.7.0, each committed in its repo through commit.sh, a repo whose check fails reported by name and not forced; a repeat fanout reports no drift; knowledge-base's copy at 1.7.0 so kb-77's commit can proceed (PLAN-check-progress.md §13 step 1, tl-723)
+  · done when: setup's own devtools/parts.py is at checks 1.7.0 (./setup . --only parts, committed in tools/setup); setup fanout parts brings every repo's copy to 1.7.0, each repo committed by the fanout only after that repo's ./dev.sh check passes inside it with --check-timeout (PLAN-services.md §3, the fanout's existing check-then-commit, not commit.sh); a repo whose check fails or times out is reported by name and left uncommitted; a repeat fanout reports no drift; knowledge-base's copy at 1.7.0 so kb-77 can commit (PLAN-check-progress.md §13 step 1, tl-723)
   · added: 2026-11-03
 
 - **su-145 · addon-bench devtools/parts.py no longer matches its source (parts.py 1.7.0, tools/checks e4259f1)**
@@ -472,6 +472,13 @@
   · files: setuplib/auditday.py
   · added: 2026-11-03
 
+- **su-147 · dev.sh records the check pass itself though the runner's --record does the same (two recorders)**
+  dev.sh cmd_check takes the tree and runs .githooks/check-pass record itself (and tests/test_record_pass.py and ~9 mutants hold that code), while devtools/parts.py 1.7.0 offers --record doing the same (its usage: 'the repo's dev.sh passes it on its full check'). Two recorders of one pass: no-duplicate-procedure. Unproven: whether the two agree case by case (resume trailer, unchecked parts, full_not_run).
+  · probe: switch cmd_check to 'parts.py run ... --record' and run tests.test_record_pass; compare .claude/state/check-pass after a plain and a --resume run
+  · work: tooling
+  · size: S
+  · added: 2026-11-03
+
 ## Reported to other owners
 
 - **su-65 · checks (2026-10-05, via the dispatcher):**
@@ -546,11 +553,20 @@
   · reported to: checks on 2026-11-03 (no counterpart yet)
   · added: 2026-11-03
 
+- **su-146 · prefer-recipes: no one-block-case selector; setup's short check runs the whole test (26s) where §13 asks for one block test**
+  PLAN-check-progress.md §13 Gates: each repo's short check runs 'hooks copies' plus 'the one block test of prefer-recipes'. test-prefer-recipes.sh has no selector for one case (no argument or env read; 452 lines, 7+ cases plus the recipe-DB cases), so setup's ./dev.sh hooks runs the whole file: 26s wall (2026-11-04, load ~10), against copies --repo 1.6s.
+  · reported to: hooks on 2026-11-03 (no counterpart yet)
+  · parent: tl-732
+  · work: tooling
+  · size: S
+  · done when: tools/hooks ships a way to run prefer-recipes' one block case alone (an argument or env), and setup's HOOK_TESTS runs that instead of the whole test
+  · added: 2026-11-03
+
 ## Stalls
 
-- **su-141 · D2: unsized open items (57)**
-  oldest 2026-10-15: su-1; su-2; su-3; su-4; su-5; su-6; su-7; su-10; su-14; su-19; su-25; su-27; su-28; su-35; su-58; su-64; su-65; su-66; su-67; su-68; su-69; su-70; su-71; su-78; su-79; su-80; su-81; su-82; su-83; su-84; su-88; su-92; su-98; su-100; su-101; su-102; su-106; su-107; su-110; su-114; su-115; su-116; su-118; su-119; su-120; su-121; su-122; su-123; su-124; su-125; su-126; su-136; su-137; su-139; su-140; su-142; su-145
-  · detector: D2 on unsized open items, count 57, last seen 2026-11-03; clears with: todo edit ID --size S|M|L (never ready until sized), or close it
+- **su-141 · D2: unsized open items (56)**
+  oldest 2026-10-15: su-1; su-2; su-3; su-4; su-5; su-6; su-7; su-10; su-14; su-19; su-25; su-27; su-28; su-35; su-58; su-64; su-65; su-66; su-67; su-68; su-69; su-70; su-71; su-78; su-79; su-80; su-81; su-82; su-83; su-84; su-88; su-92; su-98; su-100; su-101; su-102; su-106; su-107; su-110; su-114; su-115; su-116; su-118; su-119; su-120; su-121; su-122; su-123; su-124; su-125; su-126; su-136; su-137; su-139; su-140; su-145
+  · detector: D2 on unsized open items, count 56, last seen 2026-11-03; clears with: todo edit ID --size S|M|L (never ready until sized), or close it
   · added: 2026-11-03
 
 ## Plan steps

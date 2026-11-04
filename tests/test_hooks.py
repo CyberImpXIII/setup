@@ -241,7 +241,8 @@ class DevShHooks(Case):
         (d / ".claude/settings.json").write_text(json.dumps(reg if settings else {"hooks": {}}))
         if proposal:
             (d / ".claude/settings.proposed.json").write_text(json.dumps(reg))
-        r = subprocess.run(["./dev.sh", "hooks"], cwd=d, capture_output=True, text=True)
+        env = dict(os.environ, HOOK_TESTS="x.sh")  # the fixture has no prefer-recipes.sh, the default
+        r = subprocess.run(["./dev.sh", "hooks"], cwd=d, env=env, capture_output=True, text=True)
         return r.returncode, r.stdout
 
     def test_registered_is_ok(self):

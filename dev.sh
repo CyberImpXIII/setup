@@ -9,8 +9,9 @@ usage() {
 
   check      the parts of check.parts.json (each test module, then each gate below but plans) via devtools/parts.py: [--resume | --only NAME...] [--json]; non-zero if any part fails
   test       the unit tests (tests/), all of them, trimmed to the result unless something fails (test, hooks, files, audit, self refuse an argument: one part is check --only NAME)
-  hooks      the shared hook copies: present, executable, parse, their own tests pass (exit 3 there: UNCHECKED, gate exit 3), registered (PENDING: only in the proposal, for Jacob)
-  files      the files the tool needs: present, executable where they must be, data parses
+  hooks      the shared hook copies: present, executable, parse, each has its test, registered (PENDING: only in the proposal, for Jacob); only the tests of $HOOK_TESTS run here (default prefer-recipes.sh: it proves a copy fires from where it is installed; exit 3 there: UNCHECKED, gate exit 3)
+  copies     the shared hook copies agree with their source by meaning (devtools/hookcopies.py: the hooks dependency's copies --repo; UNCHECKED, exit 3, in a lone clone)
+  files     the files the tool needs: present, executable where they must be, data parses
   audit      setup audit content, direction and deps (content and deps are UNCHECKED, so red, in a lone clone)
   self       ./setup --dry-run on this repo: nothing would be written, nothing drifted
   mutants    break each gate once in a throwaway copy, require red (devtools/mutants.json)
@@ -29,10 +30,20 @@ registers() {  # registers SETTINGS_FILE NAME: does that settings file run .clau
   jq -e --arg n "$2" '[.hooks[][].hooks[].command | select(endswith("/.claude/hooks/" + $n))] | length > 0' "$1" >/dev/null 2>&1
 }
 
+# The shared hooks' own tests run once, in the hooks source's own check
+# (PLAN-check-progress.md §13); here only those of the hooks in HOOK_TESTS run:
+# prefer-recipes proves a copy fires from where it is installed (its recipes are
+# found by walking up from the copy). That the copies agree with the source is
+# the copies gate. A name in HOOK_TESTS that is no hook here is FAIL, never skipped.
+HOOK_TESTS=${HOOK_TESTS-prefer-recipes.sh}
+
 cmd_hooks() {
-  local fails=0 pending=0 unchecked=0 h name t out code why
+  local fails=0 pending=0 unchecked=0 ran=0 h name t out code why
   [ -f .claude/settings.json ] && jq -e . .claude/settings.json >/dev/null 2>&1 \
     || { echo "  FAIL  .claude/settings.json missing or does not parse"; return 1; }
+  for name in $HOOK_TESTS; do
+    [ -f ".claude/hooks/$name" ] || { echo "  FAIL  HOOK_TESTS names $name, which is no hook in .claude/hooks"; fails=$((fails+1)); }
+  done
   for h in .claude/hooks/*.sh; do
     name=$(basename "$h")
     [ -x "$h" ] || { echo "  FAIL  $name is not executable"; fails=$((fails+1)); }
@@ -51,6 +62,7 @@ cmd_hooks() {
     fi
     t=".claude/hooks/test-$name"
     if [ ! -f "$t" ]; then echo "  FAIL  $name has no test-$name"; fails=$((fails+1)); continue; fi
+    case " $HOOK_TESTS " in *" $name "*) ran=$((ran+1)) ;; *) continue ;; esac
     # a hook's own test answers like a gate: 0 pass, 3 UNCHECKED (it could not run
     # here, e.g. no sibling repo above a lone clone), anything else FAIL
     out=$(bash "$t" </dev/null 2>&1); code=$?
@@ -64,8 +76,10 @@ cmd_hooks() {
   [ $fails -gt 0 ] && return 1
   # UNCHECKED is never a pass and never a FAIL: the gate exits 3 (check counts it red)
   if [ $unchecked -gt 0 ]; then echo "  note  hooks: $unchecked hook test(s) UNCHECKED: they did not run here, not a pass"; return 3; fi
-  echo "  ok    hooks: $(ls .claude/hooks/*.sh | grep -vc /test-) hooks, each executable, passing its own test and registered ($pending of them only in the proposal, PENDING Jacob)"
+  echo "  ok    hooks: $(ls .claude/hooks/*.sh | grep -vc /test-) hooks, each executable, with its test and registered ($pending of them only in the proposal, PENDING Jacob); $ran own test(s) run here (${HOOK_TESTS:-none}), the rest in the hooks source's check"
 }
+
+cmd_copies() { python3 devtools/hookcopies.py; }
 
 cmd_files() {
   local fails=0 f
@@ -158,7 +172,7 @@ cmd_check() {
 # The arms below that take no argument refuse one: `./dev.sh test test.x` once ran
 # the whole suite while reading as one part. One part alone: check --only.
 case "${1:-}" in
-  test|hooks|files|audit|self)
+  test|hooks|copies|files|audit|self)
     if [ $# -gt 1 ]; then
       echo "dev.sh $1 takes no arguments (given: ${*:2}); one part alone: ./dev.sh check --only <part>" >&2
       exit 2
@@ -169,6 +183,7 @@ case "${1:-}" in
   check)   shift; cmd_check "$@" ;;
   test)    cmd_test ;;
   hooks)   cmd_hooks ;;
+  copies)  cmd_copies ;;
   files)   cmd_files ;;
   audit)   cmd_audit ;;
   self)    cmd_self ;;

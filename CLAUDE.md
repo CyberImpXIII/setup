@@ -51,7 +51,7 @@ command, or read the delegation layer.
 | replace one plan section (PLAN-services §3) | `./setup plans edit <file> §<n> --from <src> --digest <sha256>`: refused unless the file still has the digest `show` printed, the folder's `setup plans` is green before and would stay green after, and `<src>` is that one section; every byte outside it is kept; written through fsw.py |
 | add one plan section | `./setup plans add <file> --after §<n> --from <src> --digest <sha256>`: `<src>` (one section, its heading numbered at §n's level with a number no heading carries) goes after §n and everything under it; refused as `edit` is (the digest, the gate before and after, nothing written), the same guarded write (`_guarded_plan_write`). `tests/test_plans.py` (`Add`: one fixture per refusal) |
 | re-derive the facts a plan cites (PLAN-architecture §12 item 3) | `./setup plans <dir> --facts [--root DIR] [--json]`: each `` `<cmd>` → <value> `` in a plan not done is re-run when `<cmd>` is one argv naming a CLI exactly one `cli.json` under DIR declares and a verb in its `read.verbs`, and its stripped stdout compared with the value; anything else is never run and fails (not-declared, not-one-command, ambiguous). Exit 0 only when every fact is the same. `setuplib/facts.py`, `tests/test_facts.py` |
-| before committing | `./dev.sh check [--resume] [--only PART...]`: the shared runner (`devtools/parts.py`, the `parts` component's copy) over `check.parts.json`, one part per test module and one per gate (hooks, files, audit, self, mutants); `tests/test_vocab.py` holds that list to the modules and dev.sh's arms. A pass is recorded for the pre-commit gate only when every part passed (an UNCHECKED part, `--only` or `CHECK_PARTS` record nothing; `--resume` records where it resumed from). `CHECK_PARTS=<file>` runs another suite, which is how the shared `check-partial` gate drives it. `tests/test_record_pass.py` |
+| before committing | `./dev.sh check [--resume] [--only PART...]`: the shared runner (`devtools/parts.py`, the `parts` component's copy) over `check.parts.json`, one part per test module and one per gate (hooks, copies, files, audit, self, mutants); `tests/test_vocab.py` holds that list to the modules and dev.sh's arms. The commit gate keeps to the 300 s budget (PLAN-check-progress §13): the parts tagged `full` -- `mutants`, `test.node`, `test.contract`, each over it alone -- run only under `./dev.sh check --full` (every part; one at a time on the machine), which `setup audit-day` runs; `tests/test_vocab.py` holds that list to the tags. A pass is recorded for the pre-commit gate only when every part passed (an UNCHECKED part, `--only` or `CHECK_PARTS` record nothing; `--resume` records where it resumed from). `CHECK_PARTS=<file>` runs another suite, which is how the shared `check-partial` gate drives it. `tests/test_record_pass.py` |
 | the check as JSON | `./dev.sh check --json`: the one schema every repo prints (tools/checks holds it), the runner's one check per part; the stub setup installs prints its red report. Proven by a fixture and a canned three-part suite here and, in the workspace, by the real validator (`tests/test_checkjson.py`); no copy of the schema lives here |
 | what is open | `TODO.md` |
 
@@ -91,11 +91,11 @@ exits 2. `--dry-run` reports `installed` for what it would write.
 once in a throwaway copy and requires red; `./dev.sh check` runs it, and a
 mutant whose code moved is STALE and fails the check until it is updated.
 
-**A lone clone is red, on purpose.** Two gates need the workspace around this
-folder: `hooks` (the shared troubleshooting hook's own test fails when it cannot
-find its sibling, because the hook then enforces nothing; that test belongs to
-the hooks source), `audit content` and `audit deps` (no sibling repos to compare
-against: `UNCHECKED`, exit 3). The hooks component fails too unless
+**A lone clone is red, on purpose.** Three gates need the workspace around this
+folder: `hooks` (the prefer-recipes test, the one hook test run here, finds its
+recipes in a sibling repo: `UNCHECKED` without it), `copies` (no hooks
+dependency to compare the copies against: `UNCHECKED`, exit 3), `audit content`
+and `audit deps` (no sibling repos to compare against: `UNCHECKED`, exit 3). The hooks component fails too unless
 `--hooks-from DIR` is passed (no dependency to install from), so `test` is red as
 well: every test whose fixture runs setup with the default hook source (99 of 318
 on 2026-10-08, in 13 modules; TODO.md). None reads as a pass. `checks.json` holds this repo's
@@ -111,11 +111,16 @@ prints, which the direction audit still checks phrase by phrase).
 (every hook its listing names, with its test, and the libraries), and they are
 no longer what setup installs from. **Never hand-edit them**; a change is made
 in tools/hooks' source and re-rendered. `./dev.sh hooks` checks each is
-present, executable, parses, passes its own test and is registered in
+present, executable, parses, has its test and is registered in
 `.claude/settings.json`; one registered only in `settings.proposed.json` prints
 `PENDING` (it does not run until Jacob copies the proposal: settings.json is
-his) and one in neither is FAIL. That they agree with the source by meaning is
-`tests.test_hooks` (`hooks copies --gate`) and the hooks tool's own check.
+his) and one in neither is FAIL. Of the hooks' own tests only those `HOOK_TESTS`
+names run here (default `prefer-recipes.sh`, which proves a copy fires from where
+it is installed): the rest run once, in the hooks source's own check
+(PLAN-check-progress §13). That the copies agree with the source by meaning is
+`./dev.sh copies` (`devtools/hookcopies.py`: the dependency's `copies --repo`,
+judged from its report; `tests/test_hookcopies.py`), `tests.test_hooks`
+(`hooks copies --gate`) and the hooks tool's own check.
 
 <!-- shared:rules@7867132c3871 -->
 ## Shared rules

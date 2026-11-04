@@ -1,5 +1,5 @@
 {
- "_comment": "This repo's `./dev.sh check`, in parts, run by devtools/parts.py (the shared runner the parts component renders; its docstring is the format). A test part (one per tests/test_*.py) reads the whole repo but the other test modules and TODO.md; a gate part (`./dev.sh <gate>`, one per gate dev.sh dispatches but check, test and plans) reads the whole repo. A part that reads what no files list can name says `always`, so --resume never skips it: every module that runs ./setup on a scratch repo does (setup resolves its dependencies -- tools/hooks, tools/checks, the docs reader -- in the workspace around this repo), and so does every gate but files. tests/test_vocab.py (DevSh) holds this file to the test modules and to dev.sh's gates.",
+ "_comment": "This repo's `./dev.sh check`, in parts, run by devtools/parts.py (the shared runner the parts component renders; its docstring is the format). A test part (one per tests/test_*.py) reads the whole repo but the other test modules and TODO.md; a gate part (`./dev.sh <gate>`, one per gate dev.sh dispatches but check, test and plans) reads the whole repo. A part that reads what no files list can name says `always`, so --resume never skips it: every module that runs ./setup on a scratch repo does (setup resolves its dependencies -- tools/hooks, tools/checks, the docs reader -- in the workspace around this repo), and so does every gate but files. tests/test_vocab.py (DevSh) holds this file to the test modules and to dev.sh's gates. A part tagged `full` (PLAN-check-progress.md §13: over the 300s budget alone in the runner's record) runs only under `./dev.sh check --full`; tests/test_vocab.py holds the tagged set to the one CLAUDE.md names.",
  "defaults": {"files": ["."], "timeout_s": 900, "role": "code"},
  "parts": [
   {"name": "test.agent", "run": "python3 -m unittest -v tests.test_agent", "files": ["tests/test_agent.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
@@ -10,6 +10,7 @@
   {"name": "test.checkjson", "run": "python3 -m unittest -v tests.test_checkjson", "files": ["tests/test_checkjson.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup and the shared checks CLI (check-json), outside this repo"},
   {"name": "test.contract", "run": "python3 -m unittest -v tests.test_contract", "files": ["tests/test_contract.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests", "timeout_s": 2700,
+   "full": "327s in the last plain check (2026-11-04, 14 jobs), over the 300s budget alone (PLAN-check-progress.md §13 step 2)",
    "_comment": "su-138: 323-356s alone at load 40-50, its time spread over 48 tests (none above 68s), but past the default 900s in three full suites at load 30-79 beside mutants and hooks: CPU contention, not a hang, so 3x the default",
    "always": "runs ./setup, which reads its dependencies in the workspace"},
   {"name": "test.data", "run": "python3 -m unittest -v tests.test_data", "files": ["tests/test_data.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
@@ -29,6 +30,8 @@
    "always": "runs ./setup, which reads its dependencies in the workspace"},
   {"name": "test.githooks", "run": "python3 -m unittest -v tests.test_githooks", "files": ["tests/test_githooks.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup and the shared checks CLI, outside this repo"},
+  {"name": "test.hookcopies", "run": "python3 -m unittest -v tests.test_hookcopies", "files": ["tests/test_hookcopies.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
+   "always": "runs the hooks dependency's copies comparison, outside this repo"},
   {"name": "test.hooks", "run": "python3 -m unittest -v tests.test_hooks", "files": ["tests/test_hooks.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup and tools/hooks' listing, outside this repo"},
   {"name": "test.hooks_gate", "run": "python3 -m unittest -v tests.test_hooks_gate", "files": ["tests/test_hooks_gate.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests"},
@@ -41,6 +44,7 @@
   {"name": "test.nocommit", "run": "python3 -m unittest -v tests.test_nocommit", "files": ["tests/test_nocommit.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup, which reads its dependencies in the workspace"},
   {"name": "test.node", "run":"python3 -m unittest -v tests.test_node", "files": ["tests/test_node.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests", "timeout_s": 2700,
+   "full": "376s in the last plain check (2026-11-04, 14 jobs), over the 300s budget alone (PLAN-check-progress.md §13 step 2)",
    "_comment": "su-138: 351-421s alone at load 40-50 (31 tests, the live two-level tree 105s), past 900s in three full suites at load 30-79: as test.contract",
    "always": "runs ./setup, which reads its dependencies in the workspace"},
   {"name": "test.only", "run": "python3 -m unittest -v tests.test_only", "files": ["tests/test_only.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
@@ -78,15 +82,18 @@
    "always": "runs ./setup, which reads its dependencies in the workspace"},
   {"name": "test.vocab", "run": "python3 -m unittest -v tests.test_vocab", "files": ["tests/test_vocab.py"], "except": ["tests/test_*.py", "TODO.md"], "role": "tests",
    "always": "runs ./setup, which reads its dependencies in the workspace"},
-  {"name": "hooks", "run": "./dev.sh hooks", "timeout_s": 2700,
-   "_comment": "su-138: 888s of the default 900s in a full suite at load 79 (2026-11-03): the next to time out, so as test.contract",
-   "always": "runs the shared hooks' own tests, some of which read sibling repos"},
+  {"name": "hooks", "run": "./dev.sh hooks",
+   "_comment": "PLAN-check-progress.md §13 step 2: no longer every shared hook's own test (266-888s; they run once, in the hooks source's check), only HOOK_TESTS' (prefer-recipes, ~30s); the copies part holds the copies to the source",
+   "always": "the prefer-recipes test reads its recipes in a sibling repo"},
+  {"name": "copies", "run": "./dev.sh copies",
+   "always": "runs the hooks dependency's copies comparison, outside this repo"},
   {"name": "files", "run": "./dev.sh files"},
   {"name": "audit", "run": "./dev.sh audit", "role": "audit",
    "always": "the content and deps audits read the workspace around this repo"},
   {"name": "self", "run": "./dev.sh self",
    "always": "./setup . reads its dependencies in the workspace"},
   {"name": "mutants", "run": "./dev.sh mutants", "role": "tests", "timeout_s": 3600,
+   "full": "628s in the last plain check (2026-11-04): it runs a test once per mutant, over the 300s budget alone (PLAN-check-progress.md §13 step 2)",
    "always": "runs test modules that read the workspace"}
  ]
 }

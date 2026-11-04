@@ -89,3 +89,7 @@
 {"at": "2026-11-04T01:56:31Z", "verb": "edit", "ids": ["su-142"], "by": "unattributed", "why": null, "seal_before": "52b65829c9dc6bd4", "seal_after": "b16dfd5ebef4f3bf", "rename": null}
 {"at": "2026-11-04T01:56:31Z", "verb": "edit", "ids": ["su-145"], "by": "unattributed", "why": null, "seal_before": "b16dfd5ebef4f3bf", "seal_after": "518b5709f3c2b942", "rename": null}
 {"at": "2026-11-04T01:56:37Z", "verb": "edit", "ids": ["su-142"], "by": "unattributed", "why": null, "seal_before": "518b5709f3c2b942", "seal_after": "698d6ae6a7dba150", "rename": null}
+{"at": "2026-11-04T02:21:28Z", "verb": "edit", "ids": ["su-142"], "by": "unattributed", "why": null, "seal_before": "698d6ae6a7dba150", "seal_after": "a34eca06b9ed7535", "rename": null}
+{"at": "2026-11-04T02:22:51Z", "verb": "detect", "ids": ["su-141"], "by": "unattributed", "why": null, "seal_before": "a34eca06b9ed7535", "seal_after": "a611dd618b506b63", "rename": null}
+{"at": "2026-11-04T02:32:53Z", "verb": "add", "ids": ["su-146"], "by": "setup", "why": "tl-732: setup's hooks part replaced by the copies comparison", "seal_before": "a611dd618b506b63", "seal_after": "511422021c4427d9", "rename": null}
+{"at": "2026-11-04T02:33:05Z", "verb": "add", "ids": ["su-147"], "by": "setup", "why": "noticed during tl-732", "seal_before": "511422021c4427d9", "seal_after": "9f02f39f2c97a5fc", "rename": null}

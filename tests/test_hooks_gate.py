@@ -34,8 +34,11 @@ class HooksGate(Case):
             groups.append({"hooks": [{"type": "command", "command": f"bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/{name}"}]})
         (d / ".claude" / "settings.json").write_text(json.dumps({"hooks": {"PreToolUse": groups}}))
 
-    def hooks(self, x=0, y=0):
+    def hooks(self, x=0, y=0, tests="x.sh y.sh"):
         env = dict(self.env, X_EXIT=str(x), Y_EXIT=str(y))
+        env.pop("HOOK_TESTS", None)
+        if tests is not None:
+            env["HOOK_TESTS"] = tests
         r = subprocess.run(["./dev.sh", "hooks"], cwd=self.dir, env=env, capture_output=True, text=True)
         return r.returncode, r.stdout
 
@@ -43,6 +46,29 @@ class HooksGate(Case):
         code, out = self.hooks()
         self.assertEqual(code, 0, out)
         self.assertIn("  ok    hooks: 2 hooks", out)
+        self.assertIn("2 own test(s) run here (x.sh y.sh)", out)
+
+    def test_only_the_tests_named_run(self):
+        """PLAN-check-progress §13: the shared hooks' tests run once, in their source's
+        check; here only HOOK_TESTS'. x's test fails, and is not run when y alone is
+        named (the counterfactual of test_a_failing_test_is_fail)."""
+        code, out = self.hooks(x=1, tests="y.sh")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("test-x.sh", out)
+        self.assertIn("1 own test(s) run here (y.sh)", out)
+
+    def test_a_named_hook_that_is_absent_fails(self):
+        code, out = self.hooks(tests="x.sh gone.sh")
+        self.assertEqual(code, 1, out)
+        self.assertIn("FAIL  HOOK_TESTS names gone.sh, which is no hook in .claude/hooks", out)
+
+    def test_the_default_is_prefer_recipes(self):
+        """Unset, HOOK_TESTS is prefer-recipes.sh (it fires from where it is installed):
+        absent from this fixture, so FAIL naming it, never a silent pass."""
+        code, out = self.hooks(tests=None)
+        self.assertEqual(code, 1, out)
+        self.assertIn("HOOK_TESTS names prefer-recipes.sh, which is no hook", out)
+        self.assertTrue((ROOT / ".claude/hooks/prefer-recipes.sh").is_file(), "this repo lost its default")
 
     def test_a_failing_test_is_fail(self):
         code, out = self.hooks(x=1)

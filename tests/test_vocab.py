@@ -95,6 +95,17 @@ class DevSh(Case):
                            capture_output=True, text=True)
         self.assertEqual((r.returncode, r.stdout), (0, f"ok: {len(parts)} parts\n"), r.stderr)
 
+    def test_the_full_parts_are_the_ones_claude_md_names(self):
+        """PLAN-check-progress §13 step 2: the parts over the 300s budget are tagged
+        `full`; CLAUDE.md's list of them and the tags agree, both directions."""
+        parts = json.loads((ROOT / "check.parts.json").read_text())["parts"]
+        tagged = sorted(p["name"] for p in parts if p.get("full"))
+        m = re.search(r"the parts tagged `full` -- (.*?), each over it alone", (ROOT / "CLAUDE.md").read_text())
+        self.assertIsNotNone(m, "CLAUDE.md no longer names the full parts")
+        self.assertEqual(sorted(re.findall(r"`([^`]+)`", m.group(1))), tagged)
+        self.assertTrue(tagged, "no part is tagged full")
+        self.assertLess(len(tagged), len(parts), "every part full: a plain check would run none")
+
 
 # Anything that changes disk or a remote. Only setuplib/fsw.py may contain these.
 WRITES = re.compile(r"write_text|write_bytes|\.mkdir\(|chmod|unlink|rmtree|os\.remove|\.rename\(|shutil\."

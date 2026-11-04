@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (76 open, 69 closed in todo-history.json; seal 343a1686c955): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (76 open, 69 closed in todo-history.json; seal 67820d2c7075): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -240,11 +240,17 @@
 
 - **su-142 · devtools/parts.py is now behind checks 1.7.0 -- input: `./setup . --only parts` then `setup fanou...**
   reported from tools/checks to tools/setup in dispatch toolu_01VZ8xGiZ9mLH2B8SAQqNfD9, filed from the dispatch ledger by the delegation layer's report filer: devtools/parts.py is now behind checks 1.7.0 -- input: `./setup . --only parts` then `setup fanout parts` -- expected: all copies at 1.7.0, and step 4 audit-day reading `budget.over`/`full_not_run` from .progress/<stem>.json and `budget_s` from `usage --json`.
+  2026-11-03 (tl-726): setup's own copy already cmp-equal to checks e4259f1 (362b089). ./setup fanout parts --root ../.. --rebuild --agent setup: committed chronjobScheduler 29e36e7, data-bridge 064ef31, tools/hooks 02ac2eb, research 1099624, usage d4a4c1e, wizard 174de2b; transcripts red on test.parts under parallel load (passes alone), then committed through its commit.sh bec48ae after a green check. applications red: tests/test_stores.py pins devtools/parts.py raw writes at 3, 1.7.0 has 4 (owner's test; render left written, uncommitted; test.resume also red under load, passes alone). knowledge-base (kb-77) and addon-bench (su-145): rendered with --only parts --rebuild --no-commit, cmp-equal to the source, for their owners to commit. Refused as dirty, nothing written: emailTools, income, scripts, context-hygiene, hub, tab-digest. Nothing pushed: funnel.push unset or no origin in all six (su-111). Repeat dry run: 6 failed (those six), 12 unchanged.
+  The report's second ask, audit-day reading the 1.7.0 records: budget.over is read from .progress/<stem>.json already (setuplib/auditday.py _short_budget and findings_of, 362b089); full_not_run and usage --json budget_s are not read. budget_s comes from the budget record the short run judged (the same number unless PARTS_BUDGET_S overrode it, which the record names). Not changed in tl-726: open whether either adds a finding audit-day lacks.
   · parent: tl-726
+  · work: tooling
+  · size: M
+  · done when: setup's own devtools/parts.py is at checks 1.7.0 (./setup . --only parts, committed in tools/setup), then setup fanout parts brings every repo's copy to 1.7.0, each committed in its repo through commit.sh, a repo whose check fails reported by name and not forced; a repeat fanout reports no drift; knowledge-base's copy at 1.7.0 so kb-77's commit can proceed (PLAN-check-progress.md §13 step 1, tl-723)
   · added: 2026-11-03
 
 - **su-145 · addon-bench devtools/parts.py no longer matches its source (parts.py 1.7.0, tools/checks e4259f1)**
   Reported by the addon-bench agent during tl-626 (2026-11-03): ./dev.sh check, tests/test_check.py test_the_runner_copy_is_its_source fails because tools/checks committed parts.py 1.7.0 (e4259f1) mid-run, so addon-bench's copy is stale. It blocks tl-626's check and commit.
+  2026-11-03 (tl-726): ./setup addon-bench --only parts --rebuild --no-commit wrote devtools/parts.py at 1.7.0 (cmp-equal to checks e4259f1); python3 -m unittest tests.test_check: 16 OK. Left uncommitted for the owner to commit with tl-626's work.
   · parent: tl-728
   · work: tooling
   · done when: tools/setup/setup addon-bench --only parts --rebuild re-renders addon-bench/devtools/parts.py at 1.7.0 and test_the_runner_copy_is_its_source passes in addon-bench

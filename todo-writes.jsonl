@@ -108,3 +108,11 @@
 {"at": "2026-11-19T02:10:13Z", "verb": "add", "ids": ["su-149"], "by": "unattributed", "why": null, "seal_before": "f1eafa341d790abe", "seal_after": "7209a680daecdd11", "rename": null}
 {"at": "2026-11-19T02:10:14Z", "verb": "edit", "ids": ["su-142"], "by": "unattributed", "why": null, "seal_before": "7209a680daecdd11", "seal_after": "9f78aea81d216319", "rename": null}
 {"at": "2026-11-19T02:10:19Z", "verb": "add", "ids": ["su-150"], "by": "unattributed", "why": null, "seal_before": "9f78aea81d216319", "seal_after": "6bb5c264192f3064", "rename": null}
+{"at": "2026-11-19T17:36:23Z", "verb": "detect", "ids": ["su-141"], "by": "unattributed", "why": null, "seal_before": "6bb5c264192f3064", "seal_after": "df825115c0923bc2", "rename": null}
+{"at": "2026-11-19T18:08:48Z", "verb": "edit", "ids": ["su-142"], "by": "unattributed", "why": null, "seal_before": "df825115c0923bc2", "seal_after": "0447f88c9592fe30", "rename": null}
+{"at": "2026-11-19T18:38:43Z", "verb": "report", "ids": ["su-151"], "by": "unattributed", "why": null, "seal_before": "0447f88c9592fe30", "seal_after": "5acec6b7e52ccc50", "rename": null}
+{"at": "2026-11-19T18:39:11Z", "verb": "report", "ids": ["su-152"], "by": "unattributed", "why": null, "seal_before": "5acec6b7e52ccc50", "seal_after": "8ab372f7401a5528", "rename": null}
+{"at": "2026-11-19T18:44:38Z", "verb": "edit", "ids": ["su-148"], "by": "unattributed", "why": null, "seal_before": "8ab372f7401a5528", "seal_after": "715655f8a3e1bdfd", "rename": null}
+{"at": "2026-11-19T18:44:53Z", "verb": "add", "ids": ["su-153"], "by": "unattributed", "why": null, "seal_before": "715655f8a3e1bdfd", "seal_after": "902a789535caf951", "rename": null}
+{"at": "2026-11-19T18:46:22Z", "verb": "detect", "ids": ["su-141"], "by": "unattributed", "why": null, "seal_before": "902a789535caf951", "seal_after": "f400a3f3d94b8f57", "rename": null}
+{"at": "2026-11-19T18:47:06Z", "verb": "done", "ids": ["su-148"], "by": "unattributed", "why": null, "seal_before": "f400a3f3d94b8f57", "seal_after": "0bd8249e596ac575", "rename": null}

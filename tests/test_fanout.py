@@ -167,6 +167,34 @@ class ThreeRepos(Base):
         self.assertIn("Agent: setup", git(["log", "-1", "--format=%B"], self.a).stdout)
 
 
+class Symlinked(Base):
+    """su-148: scripts and scriptingTools/chronjobScheduler are links into another folder;
+    --root reaches a linked work tree and names a link it does not enter."""
+
+    def test_a_linked_repo_under_root_is_rendered_and_committed(self):
+        far = self.repo("away/far")
+        head = self.head(far)
+        top = self.tmp / "top"
+        (top / "group").mkdir(parents=True)
+        (top / "group" / "far-link").symlink_to(far)
+        (self.tmp / "plain").mkdir()
+        (top / "to-plain").symlink_to(self.tmp / "plain")
+        code, doc = self.fan_json("--root", str(top))
+        self.assertEqual(code, 0, doc)
+        self.assertEqual({r["path"]: r["status"] for r in doc["repos"]}, {"away/far": "committed"})
+        self.assertNotEqual(self.head(far), head, "the linked repo got the render's commit")
+        self.assertEqual(self.ran(), ["away/far"])
+        links = {x["path"]: x for x in doc["links"]}
+        self.assertEqual(sorted(links), ["top/group/far-link", "top/to-plain"])
+        self.assertEqual((links["top/group/far-link"]["followed"], links["top/group/far-link"]["target"]),
+                         (True, str(far)))
+        self.assertIs(links["top/to-plain"]["followed"], False)
+        r = self.fan("--root", str(top), "--dry-run")
+        last = r.stdout.strip().splitlines()[-1]
+        self.assertIn(f"1 symlink(s) to a work tree followed: top/group/far-link -> {far}", last)
+        self.assertIn("1 symlinked folder(s) not entered: top/to-plain (its target is not the top", last)
+
+
 class Refusals(Base):
     def setUp(self):
         super().setUp()
@@ -477,3 +505,33 @@ class Unit(Case):
         self.assertIn("does not name other a child", why["n/other"])
         self.assertIn("names no children (no node.json)", why["plain/clone"])
         self.assertIn("itself skipped", why["n/other/deeper"])
+
+    def test_a_symlinked_work_tree_is_followed_and_any_other_link_named(self):
+        """su-148: a link to a work tree top (outside root here, as scripts is) is walked
+        at its resolved path, its nested trees too; a link to a plain folder, a broken one
+        and a cycle back into root are named, never entered twice; a tree reached both
+        directly and through a link is listed once."""
+        root, away = self.tmp / "root", self.tmp / "away"
+        git_repo(root / "direct")
+        git_repo(away / "linked")
+        git_repo(away / "linked" / "kid")
+        (away / "plain" / "hidden").mkdir(parents=True)
+        git_repo(away / "plain" / "hidden" / "repo")
+        (root / "group").mkdir()
+        (root / "group" / "to-linked").symlink_to(away / "linked")
+        (root / "to-plain").symlink_to(away / "plain")
+        (root / "to-nothing").symlink_to(self.tmp / "gone")
+        (root / "again").symlink_to(root / "direct")
+        (away / "linked" / "back").symlink_to(root / "direct")
+        trees, links = fanout.discover(root, set(FO["prune"]))
+        self.assertEqual([str(p) for p in trees], [str(away / "linked"), str(away / "linked" / "kid"),
+                                                   str(root / "direct")])
+        by = {x["path"].relative_to(self.tmp).as_posix(): x for x in links}
+        self.assertEqual(sorted(by), ["away/linked/back", "root/again", "root/group/to-linked",
+                                      "root/to-nothing", "root/to-plain"])
+        self.assertEqual({k for k, x in by.items() if x["followed"]},
+                         {"away/linked/back", "root/again", "root/group/to-linked"})
+        self.assertEqual(by["root/group/to-linked"]["target"], away / "linked")
+        self.assertIn("not the top of a git work tree", by["root/to-plain"]["why"])
+        self.assertIn(f"its target {self.tmp / 'gone'} does not exist", by["root/to-nothing"]["why"])
+        self.assertEqual(fanout.work_trees(root, set(FO["prune"])), trees)

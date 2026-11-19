@@ -81,7 +81,9 @@
       one shared change into every repo that declares the component (components.json
       `fanout`: rules, hooks, parts, mutate), each git work tree under DIR (default: the
       working folder; one nested in another is skipped, named and counted, unless the
-      outer tree's node.json names it a child) or each --repos PATH; one after another, each step its own
+      outer tree's node.json names it a child; a symlink to a work tree top is
+      followed, any other symlinked folder named and not entered) or each --repos
+      PATH; one after another, each step its own
       process. Per repo: `setup <repo> --only <component> --dry-run` (a copy it
       would keep as drift, or a refusal: failed, nothing written; nothing to
       render: unchanged, no check, no commit), a clean tree (else failed), the
@@ -656,12 +658,18 @@ def cmd_fanout(argv):
         for r in doc["repos"]:
             counts[r["status"]] = counts.get(r["status"], 0) + 1
         failed = [r["path"] for r in doc["repos"] if r["status"] == "failed"]
+        followed = [x for x in doc["links"] if x["followed"]]
+        unfollowed = [x for x in doc["links"] if not x["followed"]]
         summary = ", ".join(f"{n} {k}" for k, n in sorted(counts.items())) or "no repo declares it"
         print(f"setup fanout {a.component} from {doc['source']['path']}@{doc['source']['commit'][:12]}"
               f"{' (dry run, nothing written)' if a.dry_run else ''}: {summary}"
               + (f"; {doc['undeclared']} other repo(s) do not declare it" if doc["undeclared"] else "")
               + (f"; {len(doc['nested'])} nested work tree(s) skipped, no node.json naming them a child: "
                  f"{', '.join(n['path'] for n in doc['nested'])}" if doc["nested"] else "")
+              + (f"; {len(followed)} symlink(s) to a work tree followed: "
+                 f"{', '.join(x['path'] + ' -> ' + x['target'] for x in followed)}" if followed else "")
+              + (f"; {len(unfollowed)} symlinked folder(s) not entered: "
+                 f"{', '.join(x['path'] + ' (' + x['why'] + ')' for x in unfollowed)}" if unfollowed else "")
               + (f"; failed: {', '.join(failed)}" if failed else ""))
     return 0 if doc["ok"] else 1
 

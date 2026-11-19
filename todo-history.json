@@ -2733,7 +2733,54 @@
       "done": "2026-11-18",
       "resolution": "closed with su-111: 097c79b: the push component writes funnel.push=true by default where an origin exists unless services.json records push:false (a record already false is never flipped). ./setup <repo> --only push run 2026-11-18 at all 16 repos with an origin: 13 set, 3 unchanged. Backlogs pushed with .claude/bin/commit.sh -C <repo> --push, none failed, no force: site-scrapers 2, emailTools 2, scripts 8, data-bridge 8, chronjobScheduler 12, knowledge-base 12, applications 7, addon-bench 9, tools/hooks 14, tools/checks 21, income 3 (branch claude/relaxed-pasteur-pumsxz), tools/usage 13. bash .claude/lib/push-records.sh scan . : every origin row true, ahead 0.",
       "imported": null
+    },
+    {
+      "id": "su-148",
+      "title": "fanout discovery does not follow symlinks: scripts and scriptingTools/chronjobScheduler (links into claudeGeneral since 11-06) are silently left out of --root; only --repos reaches them",
+      "kind": "bug",
+      "status": "done",
+      "evidence": null,
+      "probe": null,
+      "reported_to": null,
+      "parent": null,
+      "blocked_by": null,
+      "waits_on": null,
+      "pointer": null,
+      "hinges_on": null,
+      "recommend": null,
+      "today": null,
+      "problem": null,
+      "principle": null,
+      "options": null,
+      "chosen": null,
+      "jacob_words": null,
+      "repo": "setup",
+      "work": "code",
+      "size": "S",
+      "files": [
+        "setuplib/fanout.py"
+      ],
+      "research": null,
+      "done_when": "fanout --root ../.. reaches scripts and chronjobScheduler, or names each symlinked work tree it skipped",
+      "done_check": null,
+      "handoff": {
+        "date": "2026-11-19",
+        "text": "fanout.discover follows a symlink to a work tree top and names any other symlinked folder or dangling link (links in --json, text summary); tests Unit + Symlinked, mutants fanout-symlink-*; live dry run over ../.. reaches scripts and chronjobScheduler. Next: full check, commit, close. Verify: ./setup fanout rules --root ../.. --dry-run",
+        "commit": "6e8a8fc"
+      },
+      "approved": null,
+      "dispatched": null,
+      "priority": null,
+      "retire": null,
+      "tags": null,
+      "plan_pins": null,
+      "detector": null,
+      "plan_step": null,
+      "added": "2026-11-18",
+      "done": "2026-11-19",
+      "resolution": "fanout.discover follows a symlink whose target is a work tree top (walked at its resolved path, each target once, so cycles end) and names any other symlinked folder or dangling link (links in --json, a summary clause in text). Live: ./setup fanout rules --root ../.. --dry-run listed ../../../claudeGeneral/scripts and ../../../claudeGeneral/chronjobScheduler and named both links. Tests Unit.test_a_symlinked_work_tree_is_followed_and_any_other_link_named, Symlinked; mutants fanout-symlink-not-followed and fanout-symlink-unnamed red. audit-day shares discover (su-153 for naming its links).",
+      "imported": null
     }
   ],
-  "seal": "0e278b89f64a8e36"
+  "seal": "53db4ff2ddc6cfc0"
 }

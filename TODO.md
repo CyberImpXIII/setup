@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (74 open, 76 closed in todo-history.json; seal 46e11c81da8b): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (76 open, 77 closed in todo-history.json; seal 95ecf2e8bb11): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -205,7 +205,7 @@
   · work: tooling
   · size: M
   · done when: setup's own devtools/parts.py is at checks 1.7.0 (./setup . --only parts, committed in tools/setup); setup fanout parts brings every repo's copy to 1.7.0, each repo committed by the fanout only after that repo's ./dev.sh check passes inside it with --check-timeout (PLAN-services.md §3, the fanout's existing check-then-commit, not commit.sh); a repo whose check fails or times out is reported by name and left uncommitted; a repeat fanout reports no drift; knowledge-base's copy at 1.7.0 so kb-77 can commit (PLAN-check-progress.md §13 step 1, tl-723)
-  · handoff: 2026-11-18 later: knowledge-base copy cmp-equal to checks 1.7.0, so kb-77 is unblocked. Still open: income, context-hygiene, hub, tab-digest (dirty, reported to owners); audit-day full_not_run/budget_s ask not started. (2026-11-18, at 097c79b)
+  · handoff: planner 2026-11-19: not queued today. The repos still behind cannot clear from your side: each is skipped as dirty while its own check is red on the stale devtools/parts.py, so its owner cannot commit to become clean. tools/context-hygiene is being unstuck from its side (ch-90: its agent runs setup . --only parts there, checks, commits). tools/hub also fails its leak audit (td-104, a decision put to Jacob 2026-11-19). tools/tab-digest's check is still your stub until its owner fills it in (tl-602). income has 13 uncommitted paths nobody has looked at. Re-run the fanout only for a repo whose tree is clean; do not render into a dirty tree and leave the file there (that is how site-scrapers got 12 ownerless paths, tl-656). (2026-11-19, at 6e8a8fc)
   · added: 2026-11-03
 
 - **su-145 · addon-bench devtools/parts.py no longer matches its source (parts.py 1.7.0, tools/checks e4259f1)**
@@ -216,12 +216,18 @@
   · done when: tools/setup/setup addon-bench --only parts --rebuild re-renders addon-bench/devtools/parts.py at 1.7.0 and test_the_runner_copy_is_its_source passes in addon-bench
   · added: 2026-11-03
 
-- **su-148 · fanout discovery does not follow symlinks: scripts and scriptingTools/chronjobScheduler (links into claudeGeneral since 11-06) are silently left out of --root; only --repos reaches them**
+- **su-152 · su-151 (ch-101 pairing) is in setup's todo.json, uncommitted -- input: `todo -C tools/context-hyg...**
+  reported from tools/context-hygiene to tools/setup in dispatch toolu_01Pcty22ojkPBdqpnq8wSdZU, filed from the dispatch ledger by the delegation layer's report filer: su-151 (ch-101 pairing) is in setup's todo.json, uncommitted -- input: `todo -C tools/context-hygiene report ch-101 --to setup` -- expected: setup commits its todo.json
+  · parent: tl-738
+  · added: 2026-11-19
+
+- **su-153 · audit-day reaches symlinked work trees through fanout.discover (su-148) but drops the links it did not follow: a dangling or non-tree symlink is silent there**
+  auditday.declared() calls fanout.work_trees, which returns discover()[0] only; fanout run() reports links, audit-day prints none
   · work: code
   · size: S
-  · files: setuplib/fanout.py
-  · done when: fanout --root ../.. reaches scripts and chronjobScheduler, or names each symlinked work tree it skipped
-  · added: 2026-11-18
+  · files: setuplib/auditday.py
+  · done when: setup audit-day names each symlink discover did not follow (text and --json), tested
+  · added: 2026-11-19
 
 ## Open decisions
 
@@ -539,9 +545,9 @@
 
 ## Stalls
 
-- **su-141 · D2: unsized open items (51)**
-  oldest 2026-10-15: su-1; su-2; su-3; su-4; su-5; su-6; su-7; su-10; su-14; su-19; su-25; su-27; su-28; su-35; su-58; su-64; su-65; su-66; su-67; su-68; su-69; su-70; su-71; su-78; su-79; su-80; su-81; su-82; su-83; su-84; su-88; su-92; su-98; su-100; su-101; su-102; su-106; su-107; su-110; su-119; su-120; su-121; su-123; su-124; su-125; su-126; su-136; su-137; su-139; su-140; su-145
-  · detector: D2 on unsized open items, count 51, last seen 2026-11-18; clears with: todo edit ID --size S|M|L (never ready until sized), or close it
+- **su-141 · D2: unsized open items (54)**
+  oldest 2026-10-15: su-1; su-2; su-3; su-4; su-5; su-6; su-7; su-10; su-14; su-19; su-25; su-27; su-28; su-35; su-58; su-64; su-65; su-66; su-67; su-68; su-69; su-70; su-71; su-78; su-79; su-80; su-81; su-82; su-83; su-84; su-88; su-92; su-98; su-100; su-101; su-102; su-106; su-107; su-110; su-119; su-120; su-121; su-123; su-124; su-125; su-126; su-136; su-137; su-139; su-140; su-145; su-149; su-151; su-152
+  · detector: D2 on unsized open items, count 54, last seen 2026-11-19; clears with: todo edit ID --size S|M|L (never ready until sized), or close it
   · added: 2026-11-03
 
 ## Plan steps
@@ -695,3 +701,10 @@
 - **su-149 · four stale .mutants/run-* folders in tools/setup (su-129 territory)**
   · done when: the four .mutants/run-* folders are gone or su-129 explains them
   · added: 2026-11-18
+
+- **su-151 · setup: devtools/parts.py is runner 1.6.0, tools/checks is 1.7.0; check red, commits blocked**
+  2026-11-18 ./dev.sh check: shared:rendered-matches 'parts drift: devtools/parts.py: copy 1.6.0; source runner 1.7.0 (tools/checks)', and test.parts test_the_runner_copy_is_the_source_as_committed fails. devtools/parts.py is unmodified here since setup's 5a6de48 (2026-10-30). It blocks every commit through commit.sh, which runs ./dev.sh check.
+  · parent: ch-101
+  · work: tooling
+  · done when: setup re-renders devtools/parts.py from the checks runner 1.7.0 and shared:rendered-matches and test.parts pass
+  · added: 2026-11-19

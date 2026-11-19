@@ -62,15 +62,59 @@ def declares(target: Path, component: str, fo):
         return None, f"{d['file']} is unreadable ({e.strerror or e})"
 
 
-def work_trees(root: Path, prune):
-    """Every git work tree at or under root (a folder holding `.git`), sorted; a
-    nested one included. Never follows a symlink; never enters a `prune` folder."""
-    out = []
+def discover(root: Path, prune, _seen=None):
+    """(trees, links): every git work tree at or under root (a folder holding `.git`),
+    sorted, a nested one included, never entering a `prune` folder; and each symlinked
+    folder met on the way, {path, target, followed, why} (su-148). A symlink whose target
+    is itself a work tree top is followed: its target, resolved, is walked like root (so
+    the trees found there are in `trees`, at their resolved paths, each once). Any other
+    symlinked folder is not entered, and is named with why. Each target is walked at
+    most once, so a cycle of links ends."""
+    seen = set() if _seen is None else _seen
+    seen.add(root.resolve())
+    trees, links = [], []
     for dirpath, dirnames, filenames in os.walk(root):
         if ".git" in dirnames or ".git" in filenames:
-            out.append(Path(dirpath))
-        dirnames[:] = sorted(d for d in dirnames if d not in prune)
-    return sorted(out)
+            trees.append(Path(dirpath))
+        keep = []
+        for f in sorted(filenames):  # a dangling link is listed as a file: it may have led to a tree
+            dangling = Path(dirpath) / f
+            if dangling.is_symlink() and not dangling.exists():
+                links.append({"path": dangling, "target": None, "followed": False,
+                              "why": f"its target {os.readlink(dangling)} does not exist"})
+        for d in sorted(d for d in dirnames if d not in prune):
+            link = Path(dirpath) / d
+            if not link.is_symlink():
+                keep.append(d)
+                continue
+            try:
+                target = link.resolve(strict=True)
+            except (OSError, RuntimeError) as e:
+                links.append({"path": link, "target": None, "followed": False,
+                              "why": f"its target cannot be resolved ({getattr(e, 'strerror', None) or e})"})
+                continue
+            if not (target / ".git").exists():
+                links.append({"path": link, "target": target, "followed": False,
+                              "why": "its target is not the top of a git work tree: not entered"})
+                continue
+            links.append({"path": link, "target": target, "followed": True, "why": None})
+            if target not in seen:
+                more, more_links = discover(target, prune, seen)
+                trees += more
+                links += more_links
+        dirnames[:] = keep
+    unique, named = {}, {}
+    for p in trees:
+        unique.setdefault(p.resolve(), p)
+    for x in links:
+        named.setdefault(x["path"].parent.resolve() / x["path"].name, x)
+    return sorted(unique.values()), list(named.values())
+
+
+def work_trees(root: Path, prune):
+    """The work trees of `discover` (a symlinked work tree top followed, other symlinks
+    not entered); the links it met are dropped here."""
+    return discover(root, prune)[0]
 
 
 def undeclared_nested(found):
@@ -258,12 +302,16 @@ def run(component, repos, root, opts):
         raise Usage(f"fanout {component}: {why}")
     source = {"name": where.name, "where": where, "paths": paths, "commit": commit}
     explicit = repos is not None
-    nested = []
+    nested, links = [], []
     if explicit:
         found = [Path(r).resolve() for r in repos]  # named: run as named, nested or not
     else:
-        found, skipped = undeclared_nested(work_trees(root, set(fo["prune"])))
+        trees, met = discover(root, set(fo["prune"]))
+        found, skipped = undeclared_nested(trees)
         nested = [{"path": os.path.relpath(p, Path.cwd()), "why": why} for p, why in skipped]
+        links = [{"path": os.path.relpath(x["path"], Path.cwd()),
+                  "target": str(x["target"]) if x["target"] else None,
+                  "followed": x["followed"], "why": x["why"]} for x in met]
     out, seen, undeclared = [], set(), 0
     for p in found:
         label = os.path.relpath(p, Path.cwd())
@@ -282,4 +330,4 @@ def run(component, repos, root, opts):
         out.append(res)
     return {"component": component, "source": {"path": str(where), "commit": commit},
             "rebuild": opts["rebuild"], "dry_run": opts["dry_run"], "undeclared": undeclared,
-            "nested": nested, "repos":[asdict(o) for o in out], "ok": not any(o.status == "failed" for o in out)}
+            "nested": nested, "links": links, "repos": [asdict(o) for o in out], "ok": not any(o.status == "failed" for o in out)}

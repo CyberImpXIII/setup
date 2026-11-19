@@ -2790,7 +2790,7 @@
         "subject": "unsized open items",
         "count": 56,
         "clears_with": "todo edit ID --size S|M|L (never ready until sized), or close it",
-        "seen": "2026-11-03"
+        "seen": "2026-11-18"
       },
       "plan_step": null,
       "added": "2026-11-03",
@@ -3050,5 +3050,5 @@
       "imported": null
     }
   ],
-  "seal": "9f02f39f2c97a5fc"
+  "seal": "e6e92cf1433537f6"
 }

@@ -18,7 +18,7 @@ import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from . import core
+from . import core, node
 from .fsw import Writer
 
 SETUP = core.TOOL_ROOT / "setup"
@@ -71,6 +71,33 @@ def work_trees(root: Path, prune):
             out.append(Path(dirpath))
         dirnames[:] = sorted(d for d in dirnames if d not in prune)
     return sorted(out)
+
+
+def undeclared_nested(found):
+    """(kept, skipped[(path, why)]) of discovered work trees. One inside another is kept
+    only when its nearest enclosing tree is kept and that tree's node.json names it a
+    child (su-127): a candidate's clone or a vendored checkout inside a repo is that
+    repo's content, not a repo of the workspace, whatever it holds."""
+    found = sorted(found)
+    kept, skipped = [], []
+    for p in found:
+        outer = [q for q in found if q != p and q in p.parents]
+        if not outer:
+            kept.append(p)
+            continue
+        q = max(outer, key=lambda x: len(x.parts))
+        rel = p.relative_to(q).as_posix()
+        if q not in kept:
+            skipped.append((p, f"inside {q.name}, itself skipped"))
+            continue
+        cfg, why = node.load(q / node.NODE_FILE)
+        if cfg is None:
+            skipped.append((p, f"inside the work tree {q.name}, whose {node.NODE_FILE} names no children ({why})"))
+        elif rel not in cfg["children"]:
+            skipped.append((p, f"inside the work tree {q.name}, whose {node.NODE_FILE} does not name {rel} a child"))
+        else:
+            kept.append(p)
+    return kept, skipped
 
 
 def placement(path: Path, component: str, sub: str):
@@ -231,10 +258,12 @@ def run(component, repos, root, opts):
         raise Usage(f"fanout {component}: {why}")
     source = {"name": where.name, "where": where, "paths": paths, "commit": commit}
     explicit = repos is not None
+    nested = []
     if explicit:
-        found = [Path(r).resolve() for r in repos]
+        found = [Path(r).resolve() for r in repos]  # named: run as named, nested or not
     else:
-        found = work_trees(root, set(fo["prune"]))
+        found, skipped = undeclared_nested(work_trees(root, set(fo["prune"])))
+        nested = [{"path": os.path.relpath(p, Path.cwd()), "why": why} for p, why in skipped]
     out, seen, undeclared = [], set(), 0
     for p in found:
         label = os.path.relpath(p, Path.cwd())
@@ -253,4 +282,4 @@ def run(component, repos, root, opts):
         out.append(res)
     return {"component": component, "source": {"path": str(where), "commit": commit},
             "rebuild": opts["rebuild"], "dry_run": opts["dry_run"], "undeclared": undeclared,
-            "repos": [asdict(o) for o in out], "ok": not any(o.status == "failed" for o in out)}
+            "nested": nested, "repos":[asdict(o) for o in out], "ok": not any(o.status == "failed" for o in out)}

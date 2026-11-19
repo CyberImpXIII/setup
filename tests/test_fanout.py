@@ -129,6 +129,17 @@ class ThreeRepos(Base):
         # plain, and the hook source's own repo (it holds no .claude/hooks)
         self.assertIn("2 other repo(s) do not declare it", r.stdout)
 
+    def test_a_nested_clone_declaring_the_hooks_is_skipped_and_named(self):
+        """su-127: a candidate's clone inside a repo keeps .claude/hooks, so it declares the
+        hooks; no node.json names it, so it is not the workspace's to render into."""
+        self.repo("a/clone")
+        code, doc = self.fan_json("--dry-run")
+        self.assertNotIn("a/clone", [r["path"] for r in doc["repos"]])
+        self.assertEqual([n["path"] for n in doc["nested"]], ["a/clone"])
+        self.assertIn("names no children", doc["nested"][0]["why"])
+        r = self.fan("--dry-run")
+        self.assertIn("1 nested work tree(s) skipped, no node.json naming them a child: a/clone", r.stdout)
+
     def test_a_dry_run_writes_nothing_and_runs_no_check(self):
         before = {n: snapshot(r) for n, r in (("a", self.a), ("b", self.b), ("c", self.c))}
         code, doc = self.fan_json("--dry-run")
@@ -451,3 +462,18 @@ class Unit(Case):
         git_repo(self.tmp / "node_modules" / "x")
         found = fanout.work_trees(self.tmp, set(FO["prune"]))
         self.assertEqual([p.relative_to(self.tmp).as_posix() for p in found], ["a", "a/nested"])
+
+    def test_a_nested_tree_is_kept_only_as_a_declared_child(self):
+        """su-127: kept when the nearest enclosing tree is kept and its node.json names it."""
+        for rel in ("plain", "plain/clone", "n", "n/kid", "n/other", "n/kid/deep", "n/other/deeper"):
+            git_repo(self.tmp / rel)
+        (self.tmp / "n" / "node.json").write_text(json.dumps(
+            {"rebuild": ["true"], "generated": [], "record": [], "children": ["kid"]}))
+        kept, skipped = fanout.undeclared_nested(fanout.work_trees(self.tmp, set(FO["prune"])))
+        rel = lambda p: p.relative_to(self.tmp).as_posix()  # noqa: E731
+        self.assertEqual([rel(p) for p in kept], ["n", "n/kid", "plain"])
+        why = {rel(p): w for p, w in skipped}
+        self.assertEqual(sorted(why), ["n/kid/deep", "n/other", "n/other/deeper", "plain/clone"])
+        self.assertIn("does not name other a child", why["n/other"])
+        self.assertIn("names no children (no node.json)", why["plain/clone"])
+        self.assertIn("itself skipped", why["n/other/deeper"])

@@ -1566,8 +1566,10 @@ class Setup:
     def c_push(self):
         """The record commit.sh reads before it pushes (git config funnel.push), set
         from the repo's own registration (services.json `push`: the store,
-        PLAN-architecture §13), never from a list here and never guessed: a
-        registration without the field writes nothing. Only where an origin exists
+        PLAN-architecture §13), never from a list here; a registration without the
+        field, or none, takes Jacob's default (components.json push `default`, true:
+        2026-11-03 default-push), except over a record that already reads false,
+        which no default flips (needs-owner). Only where an origin exists
         (or, in a dry run, where c_remote would create one). Written at once: it gates
         no commit, and this runs after the render's commit."""
         c = self.comp["push"]
@@ -1587,24 +1589,29 @@ class Setup:
         elif any(rel == f for rel, _ in self.w.written):
             doc = self.skeleton()  # a dry run's skeleton, not on disk yet
         else:
-            return Result("push", "needs-owner", f"no {f}: the push record has no source here, nothing written; "
-                                                 f"{now}")
-        want = doc.get(field)
-        if field not in doc:
-            return Result("push", "needs-owner", f"{f} declares no `{field}` (true: commit.sh pushes to "
-                                                 f"{c['remote']}; false: it never does; a repo that must not push "
-                                                 f"is Jacob's call): nothing written; {now}")
+            doc = None
+        if doc is None or field not in doc:
+            # Jacob's default (components.json push `default`); a record already
+            # reading false is someone's no, never flipped by a default
+            src = f"no {f}" if doc is None else f"{f} declares no `{field}`"
+            if have == "false":
+                return Result("push", "needs-owner", f"{src} and {key} is false: a default never overrides a "
+                                                     f"recorded no; record `{field}: false` in {f}, or remove the "
+                                                     f"record. Nothing written")
+            want, source = c["default"], f"the default ({src}; Jacob 2026-11-03, default-push)"
+        else:
+            want, source = doc[field], f"{f} `{field}`"
         if not isinstance(want, bool):
             return Result("push", "drift", f"{f} `{field}` is {json.dumps(want)}, not true or false: nothing "
                                            f"written; {now}")
         want = "true" if want else "false"
         if have == want:
-            return Result("push", "unchanged", f"{key} = {want}, as {f} `{field}` says")
+            return Result("push", "unchanged", f"{key} = {want}, as {source} says")
         err = self.w.git_config(key, want, defer=False)
         if err:
-            return Result("push", "failed", f"{key} = {want} from {f} `{field}`: {err}")
-        return Result("push", "installed", f"{'would set' if self.dry_run else 'set'} {key} = {want} from {f} "
-                                           f"`{field}` (was {have})")
+            return Result("push", "failed", f"{key} = {want} from {source}: {err}")
+        return Result("push", "installed", f"{'would set' if self.dry_run else 'set'} {key} = {want} from {source} "
+                                           f"(was {have})")
 
     def _push_record(self, key):
         """The push record as commit.sh reads it (git's own boolean reading, every

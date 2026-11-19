@@ -2463,7 +2463,51 @@
         "title_from": "bold",
         "sep": " "
       }
+    },
+    {
+      "id": "su-127",
+      "title": "setup fanout renders into a repo nested inside another work tree that no node.json declares (addon-bench's candidate clone of emailTools)",
+      "kind": "bug",
+      "status": "done",
+      "evidence": "Seen 2026-10-15 and again 2026-11-03: `./setup fanout hooks --root <workspace> --dry-run` from tools/setup -> '1 failed, 21 unchanged; failed: ../../addon-bench/candidates/graphify/work/src/emailTools' (hooks drift, 23 installed of 29). work_trees (setuplib/fanout.py:65) includes every nested work tree, and a candidate's clone keeps a .claude/hooks folder, so it counts as declaring the hooks. Moved here from su-9 (tl-669).",
+      "probe": null,
+      "reported_to": null,
+      "parent": null,
+      "blocked_by": null,
+      "waits_on": null,
+      "pointer": null,
+      "hinges_on": null,
+      "recommend": null,
+      "today": null,
+      "problem": null,
+      "principle": null,
+      "options": null,
+      "chosen": null,
+      "jacob_words": null,
+      "repo": "setup",
+      "work": "code",
+      "size": "S",
+      "files": [
+        "setuplib/fanout.py",
+        "components.json",
+        "tests/test_fanout.py"
+      ],
+      "research": null,
+      "done_when": "setup fanout skips a git work tree nested inside another work tree unless the parent's node.json names it a child, and counts it; a test in tests/test_fanout.py with a mutant; the dry run above reports 0 failed",
+      "done_check": null,
+      "handoff": null,
+      "approved": null,
+      "dispatched": null,
+      "retire": null,
+      "tags": null,
+      "plan_pins": null,
+      "detector": null,
+      "plan_step": null,
+      "added": "2026-11-03",
+      "done": "2026-11-18",
+      "resolution": "513d56a: fanout skips a discovered work tree nested in another unless the nearest enclosing kept tree's node.json names it a child; counted and named (--json nested). tests/test_fanout.py Unit.test_a_nested_tree_is_kept_only_as_a_declared_child + ThreeRepos nested-clone test; mutants fanout-nested-rendered, fanout-nested-any-node (both red). ./setup fanout hooks --root ../.. --dry-run: 19 unchanged, 0 failed, 3 nested skipped (addon-bench candidate clone, emailTools/vendor/digest, uitool).",
+      "imported": null
     }
   ],
-  "seal": "bf8bbada57a7c80b"
+  "seal": "4ad7edd071bef11b"
 }

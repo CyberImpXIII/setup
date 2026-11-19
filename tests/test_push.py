@@ -62,22 +62,37 @@ class Push(Case):
         self.assertIn("no origin", line["detail"])
         self.assertIsNone(self.record(r))
 
-    def test_no_field_is_never_guessed(self):
-        r = self.repo(push="absent", record="true")
+    def test_no_field_takes_jacobs_default(self):
+        # su-111: true in every repo with an origin unless its store records false
+        r = self.repo(push="absent")
         code, line = self.only_push()
-        self.assertEqual((code, line["status"]), (0, "needs-owner"), line)
-        self.assertIn("declares no `push`", line["detail"])
-        self.assertIn("funnel.push is true", line["detail"])  # the current record, left as found
+        self.assertEqual((code, line["status"]), (0, "installed"), line)
+        self.assertIn("set funnel.push = true from the default (services.json declares no `push`", line["detail"])
         self.assertEqual(self.record(r), "true")
+        code, line = self.only_push()
+        self.assertEqual((code, line["status"]), (0, "unchanged"), line)
 
-    def test_no_registration_is_never_guessed(self):
+    def test_no_registration_takes_jacobs_default(self):
         r = self.repo(push=True)
         (r / "services.json").unlink()
         commit_all(r, "no registration")
         code, line = self.only_push()
-        self.assertEqual((code, line["status"]), (0, "needs-owner"), line)
-        self.assertIn("no services.json", line["detail"])
-        self.assertIsNone(self.record(r))
+        self.assertEqual((code, line["status"]), (0, "installed"), line)
+        self.assertIn("from the default (no services.json", line["detail"])
+        self.assertEqual(self.record(r), "true")
+
+    def test_a_default_never_flips_a_recorded_no(self):
+        for absent in ("field", "file"):
+            with self.subTest(absent=absent):
+                r = self.repo(push="absent" if absent == "field" else True, record="false")
+                if absent == "file":
+                    (r / "services.json").unlink()
+                    commit_all(r, "no registration")
+                code, line = self.only_push()
+                self.assertEqual((code, line["status"]), (0, "needs-owner"), line)
+                self.assertIn("a default never overrides a recorded no", line["detail"])
+                self.assertEqual(self.record(r), "false")
+                self.drop(r)
 
     def test_a_field_that_is_not_a_boolean_is_drift(self):
         for bad in ("true", 1, None):
@@ -130,11 +145,14 @@ class Push(Case):
         self.assertEqual(res["push"]["status"], "installed", res["push"])
         self.assertEqual(self.record(r), "true")
 
-    def test_a_new_repo_with_github_has_no_field_yet(self):
+    def test_a_new_repo_with_github_takes_the_default(self):
         # the skeleton declares no `push` (services.schema.json does not take it yet:
-        # TODO.md), so the record is not guessed, in the dry run or the real one
+        # TODO.md), so the record is the default, in the dry run and the real one
         code, res = self.run_json("fresh", "--github", "--dry-run")
-        self.assertEqual(res["push"]["status"], "needs-owner", res["push"])
+        self.assertEqual(res["push"]["status"], "installed", res["push"])
+        self.assertIn("would set funnel.push = true from the default", res["push"]["detail"])
+        self.assertFalse((self.tmp / "fresh").exists(), "a dry run creates nothing")
         code, res = self.run_json("fresh", "--github")
-        self.assertEqual(res["push"]["status"], "needs-owner", res["push"])
-        self.assertIsNone(self.record(self.tmp / "fresh"))
+        self.assertEqual(res["remote"]["status"], "installed", res["remote"])  # the fake gh made the origin
+        self.assertEqual(res["push"]["status"], "installed", res["push"])
+        self.assertEqual(self.record(self.tmp / "fresh"), "true")

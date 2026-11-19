@@ -94,3 +94,4 @@
 {"at": "2026-11-04T02:32:53Z", "verb": "add", "ids": ["su-146"], "by": "setup", "why": "tl-732: setup's hooks part replaced by the copies comparison", "seal_before": "a611dd618b506b63", "seal_after": "511422021c4427d9", "rename": null}
 {"at": "2026-11-04T02:33:05Z", "verb": "add", "ids": ["su-147"], "by": "setup", "why": "noticed during tl-732", "seal_before": "511422021c4427d9", "seal_after": "9f02f39f2c97a5fc", "rename": null}
 {"at": "2026-11-19T01:03:35Z", "verb": "detect", "ids": ["su-141"], "by": "unattributed", "why": null, "seal_before": "9f02f39f2c97a5fc", "seal_after": "e6e92cf1433537f6", "rename": null}
+{"at": "2026-11-19T01:51:13Z", "verb": "done", "ids": ["su-127"], "by": "unattributed", "why": null, "seal_before": "e6e92cf1433537f6", "seal_after": "e2feeedd045724c3", "rename": null}

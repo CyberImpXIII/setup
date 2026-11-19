@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (78 open, 69 closed in todo-history.json; seal 186cc4152233): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (77 open, 70 closed in todo-history.json; seal 622b0f0ef16d): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -192,14 +192,6 @@
   reported from tools/research to tools/setup in dispatch toolu_01H5EKRE2f8fWyHowujRQh7J, filed from the dispatch ledger by the delegation layer's report filer: tools/research `./dev.sh check` red on shared:hooks-installed (5 drifted copies, browser-drivers.sh missing) after tools/hooks 34d6cfd and 774780d -- input: cd tools/research && ./dev.sh check -- expected: `./setup tools/research --only hooks --rebuild` re-renders them, then I commit rs-31 and close tl-627.
   · parent: tl-639
   · added: 2026-10-23
-
-- **su-127 · setup fanout renders into a repo nested inside another work tree that no node.json declares (addon-bench's candidate clone of emailTools)**
-  Seen 2026-10-15 and again 2026-11-03: `./setup fanout hooks --root <workspace> --dry-run` from tools/setup -> '1 failed, 21 unchanged; failed: ../../addon-bench/candidates/graphify/work/src/emailTools' (hooks drift, 23 installed of 29). work_trees (setuplib/fanout.py:65) includes every nested work tree, and a candidate's clone keeps a .claude/hooks folder, so it counts as declaring the hooks. Moved here from su-9 (tl-669).
-  · work: code
-  · size: S
-  · files: setuplib/fanout.py, components.json, tests/test_fanout.py
-  · done when: setup fanout skips a git work tree nested inside another work tree unless the parent's node.json names it a child, and counts it; a test in tests/test_fanout.py with a mutant; the dry run above reports 0 failed
-  · added: 2026-11-03
 
 - **su-129 · mutate.py hides a cleanup failure (rmtree ignore_errors) and never sweeps a killed run's leftover run-*/ folder**
   devtools/mutate.py (setup's mutate component source, rendered into other repos) cleans up on exit, ^C and SIGTERM, but only SIGKILL aside (its docstring); its cleanup is shutil.rmtree(tmp, ignore_errors=True) (line 164), which hides a cleanup that left files, and no run sweeps a stale run-*/ left by a killed one (5 such folders, 515M, were removed by hand 2026-10-09). Moved here from su-24 (tl-669).

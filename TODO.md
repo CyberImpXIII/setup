@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (77 open, 70 closed in todo-history.json; seal 622b0f0ef16d): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (74 open, 76 closed in todo-history.json; seal 46e11c81da8b): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -140,30 +140,6 @@
   · parent: tl-526
   · added: 2026-10-20
 
-- **su-111 · `funnel.push` is unset in every repo, so commit.sh never pushes and git-funnel blocks a typed pus...**
-  reported from emailTools to tools/setup in dispatch toolu_01SEZwfH6rtrMr5Zv3qg9M9w, filed from the dispatch ledger by the delegation layer's report filer: `funnel.push` is unset in every repo, so commit.sh never pushes and git-funnel blocks a typed push -- input: `commit.sh -C emailTools ...` -> "not pushed (no push record: git config funnel.push is not true)" -- expected: setup writes funnel.push=true for repos with an origin, or a sanctioned push path.
-  · parent: tl-558
-  · work: tooling
-  · size: M
-  · done when: setup's component writes git config funnel.push=true in every repo with an origin unless its store records false, and has run at each such repo; bash .claude/lib/push-records.sh scan . shows no unset row; each repo's backlog is pushed with commit.sh --push (tl-571), a failed push stops and goes to Jacob, nothing is force-pushed; no repo is ahead of origin except one recorded false (PLAN-services.md §3 F3 'Default push, the fix')
-  · approved: jacob 2026-11-03: Jacob, planner window, 2026-11-03: dt-46 row 1 answered default-push (one setup dispatch, tl-558/su-111, PLAN-services.md §3 F3 'Default push, the fix')
-  · added: 2026-10-22
-
-- **su-114 · chronjobScheduler has no funnel.push record, so commit.sh never pushes and the hook blocks a raw ...**
-  reported from scriptingTools/chronjobScheduler to tools/setup in dispatch toolu_015sxuVPq4STrfadTnx5wNVs, filed from the dispatch ledger by the delegation layer's report filer: chronjobScheduler has no funnel.push record, so commit.sh never pushes and the hook blocks a raw push -- input: commit.sh -C scriptingTools/chronjobScheduler ... -- expected: commits reach origin
-  · parent: tl-574
-  · added: 2026-10-22
-
-- **su-115 · addon-bench has no push record (`git config --bool funnel.push` unset), so commit.sh never pushes...**
-  reported from addon-bench to tools/setup in dispatch toolu_01U4Wct8vnsomxxg3oGrrnUr, filed from the dispatch ledger by the delegation layer's report filer: addon-bench has no push record (`git config --bool funnel.push` unset), so commit.sh never pushes and 8a06525 sits ahead 1 of origin/master -- input: cd addon-bench && git config funnel.push -- expected: true (the remote origin exists)
-  · parent: tl-583
-  · added: 2026-10-22
-
-- **su-116 · tools/checks has no `git config funnel.push` record, so commit.sh never pushes and 51cbafb, fdc62...**
-  reported from tools/checks to tools/setup in dispatch toolu_01DNYWHyzimCzvnSdgBcuu4U, filed from the dispatch ledger by the delegation layer's report filer: tools/checks has no `git config funnel.push` record, so commit.sh never pushes and 51cbafb, fdc629f, 9525576 sit unpushed -- input: `commit.sh -C tools/checks "<msg>" checkslib/sqlstore.py` -- expected: pushed to origin/main.
-  · parent: tl-593
-  · added: 2026-10-22
-
 - **su-117 · services.json `push` is refused by the shared schema, so the push component reports needs-owner everywhere**
   checks' services.schema.json has additionalProperties false: a scratch repo with services.json {"name":"r","push":true,...} gives 'FAIL services-valid: services.json: schema: $: unknown key `push`' (checks one services-valid). So no repo can record the push decision that the push component (2015390) reads, and the skeleton leaves it out. Today every live repo with an origin reports needs-owner (dry run: emailTools, usage, checks, hub, site-scrapers).
   · parent: tl-570
@@ -171,21 +147,12 @@
   · size: S
   · files: services.json
   · done when: checks accepts an optional boolean push; the skeleton services.json carries it; each repo's owner records push (usage and checks false, per PLAN-services §3 F3 step 5) and ./setup <repo> --only push reports installed or unchanged
+  · handoff: 2026-11-18 (su-111, 097c79b): no repo reports needs-owner any more: a missing push field now takes the default true. The rest stands: checks' services.schema.json still refuses a push key, so no repo can record push:false. The done-when's 'usage and checks false' is superseded by PLAN-services §3 F3 step 5 (both default to push, Jacob 2026-11-03); next: report to checks, then the skeleton carries push. (2026-11-18, at 097c79b)
   · added: 2026-10-22
-
-- **su-118 · commit.sh does not push because `git config funnel.push` is unset, so 700aafb, 3458fd7 and c54553...**
-  reported from emailTools to tools/setup in dispatch toolu_01Jp4vUxgyWQ3r1EbCfDee4Z, filed from the dispatch ledger by the delegation layer's report filer: commit.sh does not push because `git config funnel.push` is unset, so 700aafb, 3458fd7 and c545539 are local only -- input: `.claude/bin/commit.sh` in emailTools -- expected: a sanctioned push path
-  · parent: tl-618
-  · added: 2026-10-23
 
 - **su-119 · re-render every copy of prefer-recipes.sh, test-prefer-recipes.sh, the new lib browser-drivers.sh...**
   reported from tools/hooks to tools/setup in dispatch toolu_01NEFfK5YJcieSwXMmoYfuKt, filed from the dispatch ledger by the delegation layer's report filer: re-render every copy of prefer-recipes.sh, test-prefer-recipes.sh, the new lib browser-drivers.sh and the Bash registration in each settings.proposed.json (tl-562) -- input: tools/hooks source at 34d6cfd -- expected: hooks copies shows no DRIFT/MISSING for them
   · parent: tl-630
-  · added: 2026-10-23
-
-- **su-122 · tools/hooks has no push record, so nothing committed through the verb reaches origin -- input: gi...**
-  reported from tools/hooks to tools/setup in dispatch toolu_013Bac7MbeDv4uZR9VTvAvbs, filed from the dispatch ledger by the delegation layer's report filer: tools/hooks has no push record, so nothing committed through the verb reaches origin -- input: git -C tools/hooks config --bool funnel.push -- expected: true (then `tools/hooks/dev.sh commit --push`); also re-render bin/commit.sh, git-funnel.sh and test-git-funnel.sh everywhere (until then an installed verb answers --push with usage).
-  · parent: tl-636
   · added: 2026-10-23
 
 - **su-123 · tools/research `./dev.sh check` red on shared:hooks-installed (5 drifted copies, browser-drivers....**
@@ -238,6 +205,7 @@
   · work: tooling
   · size: M
   · done when: setup's own devtools/parts.py is at checks 1.7.0 (./setup . --only parts, committed in tools/setup); setup fanout parts brings every repo's copy to 1.7.0, each repo committed by the fanout only after that repo's ./dev.sh check passes inside it with --check-timeout (PLAN-services.md §3, the fanout's existing check-then-commit, not commit.sh); a repo whose check fails or times out is reported by name and left uncommitted; a repeat fanout reports no drift; knowledge-base's copy at 1.7.0 so kb-77 can commit (PLAN-check-progress.md §13 step 1, tl-723)
+  · handoff: 2026-11-18 later: knowledge-base copy cmp-equal to checks 1.7.0, so kb-77 is unblocked. Still open: income, context-hygiene, hub, tab-digest (dirty, reported to owners); audit-day full_not_run/budget_s ask not started. (2026-11-18, at 097c79b)
   · added: 2026-11-03
 
 - **su-145 · addon-bench devtools/parts.py no longer matches its source (parts.py 1.7.0, tools/checks e4259f1)**
@@ -247,6 +215,13 @@
   · work: tooling
   · done when: tools/setup/setup addon-bench --only parts --rebuild re-renders addon-bench/devtools/parts.py at 1.7.0 and test_the_runner_copy_is_its_source passes in addon-bench
   · added: 2026-11-03
+
+- **su-148 · fanout discovery does not follow symlinks: scripts and scriptingTools/chronjobScheduler (links into claudeGeneral since 11-06) are silently left out of --root; only --repos reaches them**
+  · work: code
+  · size: S
+  · files: setuplib/fanout.py
+  · done when: fanout --root ../.. reaches scripts and chronjobScheduler, or names each symlinked work tree it skipped
+  · added: 2026-11-18
 
 ## Open decisions
 
@@ -471,6 +446,14 @@
   · size: S
   · added: 2026-11-03
 
+- **su-150 · unverified: audit-day walks work_trees without the nested rule (su-127), so emailTools/vendor/digest and uitool may be audited as repos**
+  · probe: grep -n 'work_trees\|undeclared_nested' setuplib/auditday.py
+  · work: code
+  · size: S
+  · files: setuplib/auditday.py
+  · done when: audit-day discovers repos through fanout.undeclared_nested, or a test shows a nested clone is not audited
+  · added: 2026-11-18
+
 ## Reported to other owners
 
 - **su-65 · checks (2026-10-05, via the dispatcher):**
@@ -556,9 +539,9 @@
 
 ## Stalls
 
-- **su-141 · D2: unsized open items (56)**
-  oldest 2026-10-15: su-1; su-2; su-3; su-4; su-5; su-6; su-7; su-10; su-14; su-19; su-25; su-27; su-28; su-35; su-58; su-64; su-65; su-66; su-67; su-68; su-69; su-70; su-71; su-78; su-79; su-80; su-81; su-82; su-83; su-84; su-88; su-92; su-98; su-100; su-101; su-102; su-106; su-107; su-110; su-114; su-115; su-116; su-118; su-119; su-120; su-121; su-122; su-123; su-124; su-125; su-126; su-136; su-137; su-139; su-140; su-145
-  · detector: D2 on unsized open items, count 56, last seen 2026-11-18; clears with: todo edit ID --size S|M|L (never ready until sized), or close it
+- **su-141 · D2: unsized open items (51)**
+  oldest 2026-10-15: su-1; su-2; su-3; su-4; su-5; su-6; su-7; su-10; su-14; su-19; su-25; su-27; su-28; su-35; su-58; su-64; su-65; su-66; su-67; su-68; su-69; su-70; su-71; su-78; su-79; su-80; su-81; su-82; su-83; su-84; su-88; su-92; su-98; su-100; su-101; su-102; su-106; su-107; su-110; su-119; su-120; su-121; su-123; su-124; su-125; su-126; su-136; su-137; su-139; su-140; su-145
+  · detector: D2 on unsized open items, count 51, last seen 2026-11-18; clears with: todo edit ID --size S|M|L (never ready until sized), or close it
   · added: 2026-11-03
 
 ## Plan steps
@@ -708,3 +691,7 @@
   · files: setup, setuplib/auditday.py
   · done when: a scheduled job runs `setup audit-day --todo <cli>` and `detect --id AD` exits 0 in the workspace
   · added: 2026-11-03
+
+- **su-149 · four stale .mutants/run-* folders in tools/setup (su-129 territory)**
+  · done when: the four .mutants/run-* folders are gone or su-129 explains them
+  · added: 2026-11-18

@@ -1,4 +1,4 @@
-<!-- rendered by todo from todo.json (76 open, 77 closed in todo-history.json; seal 95ecf2e8bb11): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
+<!-- rendered by todo from todo.json (75 open, 79 closed in todo-history.json; seal 26082d3723cc): do not edit by hand, `todo check` fails on a hand edit. Change items with the todo CLI; a hand edit is recovered with `todo import`. -->
 # setup TODO
 
 ## Own bugs
@@ -139,16 +139,6 @@
   reported from emailTools to tools/setup in dispatch toolu_01JSTDoEP9cPktEn3mYvnnTh, filed from the dispatch ledger by the delegation layer's report filer: emailTools devtools/parts.py is stale (1.3.0 vs 1.4.0), and cfc946e is unpushed alongside uncommitted .claude edits -- input: cd emailTools && ./dev.sh check -- expected: 12 of 12; the fix the test names: tools/setup/setup emailTools --only parts --rebuild
   · parent: tl-526
   · added: 2026-10-20
-
-- **su-117 · services.json `push` is refused by the shared schema, so the push component reports needs-owner everywhere**
-  checks' services.schema.json has additionalProperties false: a scratch repo with services.json {"name":"r","push":true,...} gives 'FAIL services-valid: services.json: schema: $: unknown key `push`' (checks one services-valid). So no repo can record the push decision that the push component (2015390) reads, and the skeleton leaves it out. Today every live repo with an origin reports needs-owner (dry run: emailTools, usage, checks, hub, site-scrapers).
-  · parent: tl-570
-  · work: code
-  · size: S
-  · files: services.json
-  · done when: checks accepts an optional boolean push; the skeleton services.json carries it; each repo's owner records push (usage and checks false, per PLAN-services §3 F3 step 5) and ./setup <repo> --only push reports installed or unchanged
-  · handoff: 2026-11-18 (su-111, 097c79b): no repo reports needs-owner any more: a missing push field now takes the default true. The rest stands: checks' services.schema.json still refuses a push key, so no repo can record push:false. The done-when's 'usage and checks false' is superseded by PLAN-services §3 F3 step 5 (both default to push, Jacob 2026-11-03); next: report to checks, then the skeleton carries push. (2026-11-18, at 097c79b)
-  · added: 2026-10-22
 
 - **su-119 · re-render every copy of prefer-recipes.sh, test-prefer-recipes.sh, the new lib browser-drivers.sh...**
   reported from tools/hooks to tools/setup in dispatch toolu_01NEFfK5YJcieSwXMmoYfuKt, filed from the dispatch ledger by the delegation layer's report filer: re-render every copy of prefer-recipes.sh, test-prefer-recipes.sh, the new lib browser-drivers.sh and the Bash registration in each settings.proposed.json (tl-562) -- input: tools/hooks source at 34d6cfd -- expected: hooks copies shows no DRIFT/MISSING for them
@@ -547,7 +537,7 @@
 
 - **su-141 · D2: unsized open items (54)**
   oldest 2026-10-15: su-1; su-2; su-3; su-4; su-5; su-6; su-7; su-10; su-14; su-19; su-25; su-27; su-28; su-35; su-58; su-64; su-65; su-66; su-67; su-68; su-69; su-70; su-71; su-78; su-79; su-80; su-81; su-82; su-83; su-84; su-88; su-92; su-98; su-100; su-101; su-102; su-106; su-107; su-110; su-119; su-120; su-121; su-123; su-124; su-125; su-126; su-136; su-137; su-139; su-140; su-145; su-149; su-151; su-152
-  · detector: D2 on unsized open items, count 54, last seen 2026-11-19; clears with: todo edit ID --size S|M|L (never ready until sized), or close it
+  · detector: D2 on unsized open items, count 54, last seen 2026-11-24; clears with: todo edit ID --size S|M|L (never ready until sized), or close it
   · added: 2026-11-03
 
 ## Plan steps

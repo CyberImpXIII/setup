@@ -116,3 +116,10 @@
 {"at": "2026-11-19T18:44:53Z", "verb": "add", "ids": ["su-153"], "by": "unattributed", "why": null, "seal_before": "715655f8a3e1bdfd", "seal_after": "902a789535caf951", "rename": null}
 {"at": "2026-11-19T18:46:22Z", "verb": "detect", "ids": ["su-141"], "by": "unattributed", "why": null, "seal_before": "902a789535caf951", "seal_after": "f400a3f3d94b8f57", "rename": null}
 {"at": "2026-11-19T18:47:06Z", "verb": "done", "ids": ["su-148"], "by": "unattributed", "why": null, "seal_before": "f400a3f3d94b8f57", "seal_after": "0bd8249e596ac575", "rename": null}
+{"at": "2026-11-20T12:03:17Z", "verb": "detect", "ids": ["su-141"], "by": "unattributed", "why": null, "seal_before": "0bd8249e596ac575", "seal_after": "fffc653eb7be4194", "rename": null}
+{"at": "2026-11-21T17:29:28Z", "verb": "detect", "ids": ["su-141"], "by": "unattributed", "why": null, "seal_before": "fffc653eb7be4194", "seal_after": "7365bb445c8c9286", "rename": null}
+{"at": "2026-11-24T15:29:42Z", "verb": "detect", "ids": ["su-141"], "by": "unattributed", "why": null, "seal_before": "7365bb445c8c9286", "seal_after": "96401ddf4c441191", "rename": null}
+{"at": "2026-11-24T17:06:34Z", "verb": "report", "ids": ["su-154"], "by": "unattributed", "why": null, "seal_before": "96401ddf4c441191", "seal_after": "e2b61a0bb11db17e", "rename": null}
+{"at": "2026-11-24T17:14:48Z", "verb": "edit", "ids": ["su-117"], "by": "unattributed", "why": null, "seal_before": "e2b61a0bb11db17e", "seal_after": "5ced5dce51d10361", "rename": null}
+{"at": "2026-11-24T17:42:40Z", "verb": "done", "ids": ["su-117"], "by": "unattributed", "why": null, "seal_before": "5ced5dce51d10361", "seal_after": "f64e88429d41cb9c", "rename": null}
+{"at": "2026-11-24T17:42:40Z", "verb": "done", "ids": ["su-154"], "by": "unattributed", "why": null, "seal_before": "f64e88429d41cb9c", "seal_after": "7edcb8b4569d1ccf", "rename": null}

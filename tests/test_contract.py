@@ -30,9 +30,12 @@ SPEC = core.load_spec()
 GATES = next(c for c in SPEC["components"] if c["name"] == "gates")["contract"]
 
 
-def skeleton(name, description=None):
-    doc = {"name": name, "services": [{"service": "check", "run": "dev.sh", "verbs": ["check"]}]}
-    return doc if description is None else {"name": name, "description": description, "services": doc["services"]}
+def skeleton(name, description=None, push=True):
+    """The skeleton as a reader sees it, key order included: the name, the
+    description, the push decision (su-117: Jacob's default, true), the services."""
+    doc = {"name": name, **({} if description is None else {"description": description}),
+           **({} if push is None else {"push": push})}
+    return {**doc, "services": [{"service": "check", "run": "dev.sh", "verbs": ["check"]}]}
 
 
 def load(p):
@@ -55,6 +58,15 @@ class Contract(Case):
         repo = self.tmp / "fresh"
         self.assertEqual(load(repo / "services.json"), skeleton("fresh", DESC))
         self.assertIn("services.json", git(["ls-files"], repo).stdout.split())
+
+    def test_the_skeleton_records_the_push_default_after_the_description(self):
+        # su-117: the push decision is in the store from the first commit, as
+        # components.json push `default` (its one copy), where a reader looks for it
+        self.run_json("fresh", "--description", DESC)
+        doc = load(self.tmp / "fresh/services.json")
+        self.assertEqual(list(doc), ["name", "description", "push", "services"])
+        push = next(c for c in SPEC["components"] if c["name"] == "push")
+        self.assertIs(doc[push["field"]], push["default"])
 
     def test_the_skeleton_takes_the_name_given(self):
         self.run_json("fresh", "--name", 'odd "name"')
@@ -123,7 +135,7 @@ class Description(Case):
         code, res = self.run_json("fresh", "--description", DESC)
         self.assertEqual((code, res["services"]["status"]), (0, "installed"))
         text = (self.tmp / "fresh/services.json").read_text()
-        self.assertEqual(list(json.loads(text)), ["name", "description", "services"])
+        self.assertEqual(list(json.loads(text)), ["name", "description", "push", "services"])
         self.assertEqual(json.loads(text)["description"], DESC)
 
     def test_the_input_changes_the_output(self):
@@ -478,6 +490,8 @@ class LiveContract(Case):
         code, res = self.run_json("fresh", "--checks", str(CHECKS_CLI))
         self.assertEqual((code, res["gates"]["status"]), (0, "unchanged"), res["gates"])
         repo = self.tmp / "fresh"
+        # not vacuous: the skeleton carries `push`, which the shared schema refused before su-117
+        self.assertIn("push", load(repo / "services.json"))
         self.assertEqual(self.checks_one("services-valid", repo)["status"], "ok")
         self.assertEqual(self.checks_one("accessor", repo)["status"], "ok")
 

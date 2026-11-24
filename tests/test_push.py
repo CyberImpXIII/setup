@@ -145,14 +145,33 @@ class Push(Case):
         self.assertEqual(res["push"]["status"], "installed", res["push"])
         self.assertEqual(self.record(r), "true")
 
-    def test_a_new_repo_with_github_takes_the_default(self):
-        # the skeleton declares no `push` (services.schema.json does not take it yet:
-        # TODO.md), so the record is the default, in the dry run and the real one
+    def test_a_new_repo_with_github_takes_the_skeletons_push(self):
+        # su-117: the skeleton records `push` (the default, true), so the record
+        # comes from the registration, in the dry run and the real one
         code, res = self.run_json("fresh", "--github", "--dry-run")
         self.assertEqual(res["push"]["status"], "installed", res["push"])
-        self.assertIn("would set funnel.push = true from the default", res["push"]["detail"])
+        self.assertIn("would set funnel.push = true from services.json `push`", res["push"]["detail"])
         self.assertFalse((self.tmp / "fresh").exists(), "a dry run creates nothing")
         code, res = self.run_json("fresh", "--github")
         self.assertEqual(res["remote"]["status"], "installed", res["remote"])  # the fake gh made the origin
         self.assertEqual(res["push"]["status"], "installed", res["push"])
+        self.assertIn("from services.json `push`", res["push"]["detail"])
+        self.assertIs(json.loads((self.tmp / "fresh/services.json").read_text())["push"], True)
         self.assertEqual(self.record(self.tmp / "fresh"), "true")
+
+    def test_a_skeleton_never_records_push_over_a_recorded_no(self):
+        # an existing repo with no services.json gets the skeleton; where its clone
+        # already reads false, the skeleton (a default) leaves `push` out rather than
+        # record a true that would flip that no. Counterfactual: no record, `push: true`
+        for record, want_field, want_status, want_record in ((None, True, "installed", "true"),
+                                                             ("false", None, "needs-owner", "false")):
+            with self.subTest(record=record):
+                r = self.repo(push=True, record=record)
+                (r / "services.json").unlink()
+                commit_all(r, "no registration")
+                code, res = self.run_json("r")
+                self.assertEqual(json.loads((r / "services.json").read_text()).get("push"), want_field)
+                self.assertEqual(res["push"]["status"], want_status, res["push"])
+                self.assertIn("push", res["services"]["detail"])
+                self.assertEqual(self.record(r), want_record)
+                self.drop(r)

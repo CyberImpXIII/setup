@@ -2,7 +2,7 @@
   "format": 2,
   "repo": "setup",
   "prefix": "su",
-  "next": 154,
+  "next": 155,
   "render_gate_from": "2026-10-22",
   "hand_edits": [],
   "items": [
@@ -1625,49 +1625,6 @@
       "imported": null
     },
     {
-      "id": "su-117",
-      "title": "services.json `push` is refused by the shared schema, so the push component reports needs-owner everywhere",
-      "kind": "bug",
-      "status": "open",
-      "evidence": "checks' services.schema.json has additionalProperties false: a scratch repo with services.json {\"name\":\"r\",\"push\":true,...} gives 'FAIL services-valid: services.json: schema: $: unknown key `push`' (checks one services-valid). So no repo can record the push decision that the push component (2015390) reads, and the skeleton leaves it out. Today every live repo with an origin reports needs-owner (dry run: emailTools, usage, checks, hub, site-scrapers).",
-      "probe": null,
-      "reported_to": null,
-      "parent": "tl-570",
-      "blocked_by": null,
-      "waits_on": null,
-      "pointer": null,
-      "hinges_on": null,
-      "recommend": null,
-      "options": null,
-      "chosen": null,
-      "jacob_words": null,
-      "repo": "setup",
-      "work": "code",
-      "size": "S",
-      "files": [
-        "services.json"
-      ],
-      "research": null,
-      "done_when": "checks accepts an optional boolean push; the skeleton services.json carries it; each repo's owner records push (usage and checks false, per PLAN-services §3 F3 step 5) and ./setup <repo> --only push reports installed or unchanged",
-      "done_check": null,
-      "handoff": {
-        "date": "2026-11-18",
-        "text": "2026-11-18 (su-111, 097c79b): no repo reports needs-owner any more: a missing push field now takes the default true. The rest stands: checks' services.schema.json still refuses a push key, so no repo can record push:false. The done-when's 'usage and checks false' is superseded by PLAN-services §3 F3 step 5 (both default to push, Jacob 2026-11-03); next: report to checks, then the skeleton carries push.",
-        "commit": "097c79b"
-      },
-      "approved": null,
-      "dispatched": null,
-      "retire": null,
-      "tags": null,
-      "plan_pins": null,
-      "detector": null,
-      "plan_step": null,
-      "added": "2026-10-22",
-      "done": null,
-      "resolution": null,
-      "imported": null
-    },
-    {
       "id": "su-119",
       "title": "re-render every copy of prefer-recipes.sh, test-prefer-recipes.sh, the new lib browser-drivers.sh...",
       "kind": "bug",
@@ -2524,7 +2481,7 @@
         "subject": "unsized open items",
         "count": 54,
         "clears_with": "todo edit ID --size S|M|L (never ready until sized), or close it",
-        "seen": "2026-11-19"
+        "seen": "2026-11-24"
       },
       "plan_step": null,
       "added": "2026-11-03",
@@ -2997,5 +2954,5 @@
       "imported": null
     }
   ],
-  "seal": "0bd8249e596ac575"
+  "seal": "7edcb8b4569d1ccf"
 }

@@ -1034,12 +1034,19 @@ class Setup:
 
     def skeleton(self, name=None):
         """The services.json setup writes for a repo called name (default: this one,
-        which alone carries --description: a child's is never guessed)."""
+        which alone carries --description: a child's is never guessed). It records
+        the push decision (components.json push `field`) as Jacob's default (push
+        `default`, the one copy of it; su-117), except where this clone's record
+        already reads false: a skeleton is a default, and a default never overrides
+        a recorded no (c_push then says needs-owner, as with no field)."""
         doc = _fill_doc(self.comp["services"]["skeleton"], {"name": name or self.name})
+        head = [next(iter(doc.items()))]  # the name; the rest follow, as a reader looks for them
         if name is None and self.description is not None:
-            items = list(doc.items())  # after the name, as a reader looks for it
-            doc = dict([items[0], (self.comp["services"]["description"], self.description), *items[1:]])
-        return doc
+            head.append((self.comp["services"]["description"], self.description))
+        p = self.comp["push"]
+        if not (name is None and self._push_record(p["config"]) == "false"):
+            head.append((p["field"], p["default"]))
+        return dict([*head, *list(doc.items())[1:]])
 
     def c_services(self):
         """PLAN-routing-tree §14.8, and PLAN-architecture §9 step 10.2: the skeleton
@@ -1062,13 +1069,17 @@ class Setup:
                                                    f"what this repo is for; never written here{unused}")
             return Result("services", "unchanged", f"{f} present, with its `{key}`: the owner's (the shared "
                                                    f"services-valid gates the rest){unused}")
-        self.w.write(f, json.dumps(self.skeleton(), indent=2) + "\n")
+        doc = self.skeleton()
+        self.w.write(f, json.dumps(doc, indent=2) + "\n")
+        push = self.comp["push"]["field"]
+        push = (f"its `{push}` ({json.dumps(doc[push])}, the default)" if push in doc else
+                f"no `{push}` ({self.comp['push']['config']} already reads false here: see the push line)")
         if self.description is None:
             return Result("services", "needs-owner", f"{f} skeleton written without a `{key}`: no --description "
                                                      "given; the owner adds one line saying what this repo is for "
-                                                     "(a later run reports it missing as drift)")
-        return Result("services", "installed", f"{f} skeleton: the name, its `{key}` (from --description) and "
-                                               "its check entry; the owner adds write entries and tags")
+                                                     f"(a later run reports it missing as drift); {push}")
+        return Result("services", "installed", f"{f} skeleton: the name, its `{key}` (from --description), "
+                                               f"{push} and its check entry; the owner adds write entries and tags")
 
     def c_cli(self):
         c = self.comp["cli"]
@@ -1953,6 +1964,9 @@ class Setup:
                   # an input, as the name is: --description, else node.json's `rebuild` argv.
                   # Never read back from services.json, which the shared rendered-matches deletes first
                   description=self.render_description)
+        # spec["components"] says which components run; their data is every
+        # component's (the skeleton reads push's `field` and `default`: su-117)
+        s.comp = self.comp
         try:
             results = s.run()
         except Refused as e:
